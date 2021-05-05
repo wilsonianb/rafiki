@@ -37,6 +37,7 @@ coverage
 # Next.js build output
 .next
 dist
+!packages/tigerbeetle-node/dist
 
 # Yarn
 .yarn/*

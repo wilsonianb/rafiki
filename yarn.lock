@@ -8717,6 +8717,7 @@ __metadata:
     rosie: ^2.1.0
     rxjs: ^6.6.7
     testcontainers: ^7.14.0
+    tigerbeetle-node: "workspace:packages/tigerbeetle-node"
     uuid: ^8.3.2
   languageName: unknown
   linkType: soft
@@ -14326,6 +14327,12 @@ resolve@^2.0.0-next.3:
   checksum: 918d9151680b5355990011eb8c4b02e8cb8cf6e9fb6ea3d3e5a1faa688343789e261634ae35de4ea9167ab029d1e7bac6af2fe61b843931768d405fdc3e8897c
   languageName: node
   linkType: hard
+
+"tigerbeetle-node@workspace:packages/tigerbeetle-node":
+  version: 0.0.0-use.local
+  resolution: "tigerbeetle-node@workspace:packages/tigerbeetle-node"
+  languageName: unknown
+  linkType: soft
 
 "tildify@npm:2.0.0":
   version: 2.0.0
