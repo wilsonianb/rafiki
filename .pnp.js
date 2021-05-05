@@ -33,6 +33,10 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
       {
         "name": "frontend",
         "reference": "workspace:packages/frontend"
+      },
+      {
+        "name": "tigerbeetle-node",
+        "reference": "workspace:packages/tigerbeetle-node"
       }
     ],
     "enableTopLevelFallback": true,
@@ -41,7 +45,8 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
       ["@coil/rafiki", ["workspace:."]],
       ["backend", ["workspace:packages/backend"]],
       ["connector", ["workspace:packages/connector"]],
-      ["frontend", ["workspace:packages/frontend"]]
+      ["frontend", ["workspace:packages/frontend"]],
+      ["tigerbeetle-node", ["workspace:packages/tigerbeetle-node"]]
     ],
     "fallbackPool": [
     ],
@@ -3708,6 +3713,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["raw-body", "npm:2.4.1"],
             ["rosie", "npm:2.1.0"],
             ["rxjs", "npm:6.6.7"],
+            ["tigerbeetle-node", "workspace:packages/tigerbeetle-node"],
             ["uuid", "npm:8.3.2"]
           ],
           "linkType": "SOFT",
@@ -11332,6 +11338,15 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["readable-stream", "npm:3.6.0"]
           ],
           "linkType": "HARD",
+        }]
+      ]],
+      ["tigerbeetle-node", [
+        ["workspace:packages/tigerbeetle-node", {
+          "packageLocation": "./packages/tigerbeetle-node/",
+          "packageDependencies": [
+            ["tigerbeetle-node", "workspace:packages/tigerbeetle-node"]
+          ],
+          "linkType": "SOFT",
         }]
       ]],
       ["tildify", [
