@@ -11,7 +11,8 @@ export const RafikiServicesFactory = Factory.define<RafikiServices>('PeerInfo')
   //.attr('router', ['peers'], (peers: InMemoryPeers) => {
   //  return new InMemoryRouter(peers, { ilpAddress: 'test.rafiki' })
   //})
-  .attr('accounts', () => {
-    return new MockAccountsService()
+  .option('ilpAddress', 'test.rafiki')
+  .attr('accounts', ['ilpAddress'], (ilpAddress: string) => {
+    return new MockAccountsService(ilpAddress)
   })
   .attr('logger', TestLoggerFactory.build())
