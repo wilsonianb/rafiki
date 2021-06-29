@@ -26,7 +26,10 @@ const hmac = (key: Buffer, message: Buffer): Buffer =>
 describe('Stream Controller', function () {
   const alice = PeerAccountFactory.build()
   const controller = createStreamController()
-  const services = RafikiServicesFactory.build()
+  const services = RafikiServicesFactory.build(
+    {},
+    { redisUrl: global['__REDIS_URL__'] }
+  )
 
   afterAll(async () => {
     await services.redis.disconnect()

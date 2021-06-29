@@ -8,7 +8,7 @@ module.exports = {
   ...baseConfig,
   clearMocks: true,
   roots: [`<rootDir>/packages/${packageName}`],
-  globalSetup: `<rootDir>/packages/${packageName}/jest.setup.js`,
+  testEnvironment: `<rootDir>/packages/${packageName}/jest.environment.js`,
   testRegex: `(packages/${packageName}/.*/__tests__/.*|\\.(test|spec))\\.tsx?$`,
   moduleDirectories: ['.yarn'],
   modulePaths: [`<rootDir>/packages/${packageName}/src/`],

@@ -21,10 +21,12 @@ export const RafikiServicesFactory = Factory.define<MockRafikiServices>(
     return new MockAccountsService(ilpAddress)
   })
   .attr('logger', TestLoggerFactory.build())
+  .option('redisUrl', 'redis://127.0.0.1:6380')
   .attr(
     'redis',
-    () =>
-      new IORedis(process.env.REDIS || 'redis://127.0.0.1:6380', {
+    ['redisUrl'],
+    (redisUrl: string) =>
+      new IORedis(redisUrl, {
         // lazyConnect so that tests that don't use Redis don't have to disconnect it when they're finished.
         lazyConnect: true,
         stringNumbers: true
