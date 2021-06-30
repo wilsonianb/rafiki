@@ -48,6 +48,8 @@ describe('Accounts Service', (): void => {
 
   beforeAll(
     async (): Promise<void> => {
+      Config.databaseUrl = global['__DATABASE_URL__']
+      Config.tigerbeetleReplicaAddresses = [global['__TIGERBEETLE_PORT__']]
       deps = await initIocContainer(Config)
       appContainer = await createTestApp(deps)
       accounts = appContainer.app.getAccounts()

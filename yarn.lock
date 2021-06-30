@@ -3560,6 +3560,7 @@ __metadata:
     "@types/koa__router": ^8.0.4
     "@types/pino": ^6.3.8
     "@types/uuid": ^8.3.0
+    jest-environment-node: ^27.0.6
     knex: ^0.21.17
     koa: ^2.13.1
     koa-bodyparser: ^4.3.0
@@ -3567,6 +3568,7 @@ __metadata:
     objection-db-errors: ^1.1.2
     pg: ^8.6.0
     pino: ^6.11.3
+    testcontainers: ^7.11.1
     tigerbeetle-node: ^0.3.2
     uuid: ^8.3.2
   languageName: unknown

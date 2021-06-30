@@ -4854,6 +4854,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["@types/koa__router", "npm:8.0.4"],
             ["@types/pino", "npm:6.3.8"],
             ["@types/uuid", "npm:8.3.0"],
+            ["jest-environment-node", "npm:27.0.6"],
             ["knex", "virtual:75ef94ee35fffa78cdcbd31dc15f08c559a00894439e92869b13d6646caf94e77557ab98adf1d2430b91f23e6862a9f4b7f723ee69d9f3f746b3fc8706802767#npm:0.21.19"],
             ["koa", "npm:2.13.1"],
             ["koa-bodyparser", "npm:4.3.0"],
@@ -4861,6 +4862,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["objection-db-errors", "virtual:75ef94ee35fffa78cdcbd31dc15f08c559a00894439e92869b13d6646caf94e77557ab98adf1d2430b91f23e6862a9f4b7f723ee69d9f3f746b3fc8706802767#npm:1.1.2"],
             ["pg", "virtual:75ef94ee35fffa78cdcbd31dc15f08c559a00894439e92869b13d6646caf94e77557ab98adf1d2430b91f23e6862a9f4b7f723ee69d9f3f746b3fc8706802767#npm:8.6.0"],
             ["pino", "npm:6.11.3"],
+            ["testcontainers", "npm:7.11.1"],
             ["tigerbeetle-node", "npm:0.3.2"],
             ["uuid", "npm:8.3.2"]
           ],
