@@ -4474,6 +4474,7 @@ __metadata:
     graphql-scalars: ^1.10.0
     graphql-tools: ^7.0.5
     ioredis: ^4.26.0
+    jest-environment-node: ^27.0.6
     knex: ^0.21.17
     koa: ^2.13.1
     koa-bodyparser: ^4.3.0
@@ -4484,6 +4485,7 @@ __metadata:
     pg: ^8.6.0
     pino: ^6.11.3
     pino-pretty: ^4.7.1
+    testcontainers: ^7.11.1
     uuid: ^8.3.2
   languageName: unknown
   linkType: soft

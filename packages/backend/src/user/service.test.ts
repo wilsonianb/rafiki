@@ -24,6 +24,7 @@ describe('User Service', (): void => {
 
   beforeAll(
     async (): Promise<void> => {
+      Config.databaseUrl = global['__DATABASE_URL__']
       deps = await initIocContainer(Config)
       deps.bind('messageProducer', async () => mockMessageProducer)
       appContainer = await createTestApp(deps)

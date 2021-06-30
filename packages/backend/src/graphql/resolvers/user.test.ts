@@ -18,6 +18,7 @@ describe('User', (): void => {
 
   beforeAll(
     async (): Promise<void> => {
+      Config.databaseUrl = global['__DATABASE_URL__']
       deps = await initIocContainer(Config)
       appContainer = await createTestApp(deps)
     }
