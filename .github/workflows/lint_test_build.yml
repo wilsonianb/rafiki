@@ -85,7 +85,6 @@ jobs:
       - run: yarn workspace connector lint
       - run: yarn workspace connector format:check
       - run: yarn install --immutable --immutable-cache
-      - run: yarn build
       - run: yarn workspace connector test
 
   frontend:

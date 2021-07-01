@@ -5,6 +5,7 @@
     "lint": "yarn lint:local",
     "format": "yarn format:local",
     "format:check": "yarn format:check:local",
+    "prepare": "yarn build",
     "start": "node dist/index.js",
     "test": "yarn test:local"
   },

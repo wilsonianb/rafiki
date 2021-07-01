@@ -9,7 +9,7 @@ From the monorepo root directory:
 docker-compose -f packages/connector/docker-compose.yml up -d
 
 # Build accounts service
-yarn workspace accounts build
+yarn install --immutable --immutable-cache
 
 # Run tests
 yarn workspace connector test
