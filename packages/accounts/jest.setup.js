@@ -1,10 +1,9 @@
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const Knex = require('knex')
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { GenericContainer, Wait } = require('testcontainers')
+const { GenericContainer } = require('testcontainers')
 
 const POSTGRES_PORT = 5432
-const TIGERBEETLE_PORT = 3001
 
 module.exports = async () => {
   const postgresContainer = await new GenericContainer('postgres')
@@ -44,21 +43,4 @@ module.exports = async () => {
   process.env.POSTGRES_URL = POSTGRES_URL
   global.__ACCOUNTS_KNEX__ = knex
   global.__ACCOUNTS_POSTGRES__ = postgresContainer
-
-  const tigerbeetleContainer = await new GenericContainer(
-    'wilsonianbcoil/tigerbeetle'
-  )
-    .withExposedPorts(TIGERBEETLE_PORT)
-    .withCmd([
-      '--cluster-id=0a5ca1ab1ebee11e',
-      '--replica-index=0',
-      '--replica-addresses=0.0.0.0:' + TIGERBEETLE_PORT
-    ])
-    .withWaitStrategy(Wait.forLogMessage(/listening on/))
-    .start()
-
-  process.env.TIGERBEETLE_REPLICA_ADDRESSES = `[${tigerbeetleContainer.getMappedPort(
-    TIGERBEETLE_PORT
-  )}]`
-  global.__TIGERBEETLE__ = tigerbeetleContainer
 }

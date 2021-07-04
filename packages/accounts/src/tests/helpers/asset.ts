@@ -1,7 +1,5 @@
 import { randomInt } from 'crypto'
 
-// Use unique assets as a workaround for not being able to reset
-// Tigerbeetle between tests
 export function randomAsset(): { code: string; scale: number } {
   const letters = []
   while (letters.length < 3) {

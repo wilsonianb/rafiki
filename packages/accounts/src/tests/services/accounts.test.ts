@@ -1,5 +1,6 @@
 import { Transaction } from 'knex'
 import { Model } from 'objection'
+import { GenericContainer, StartedTestContainer, Wait } from 'testcontainers'
 import { Account as Balance } from 'tigerbeetle-node'
 import { v4 as uuid } from 'uuid'
 
@@ -44,35 +45,41 @@ describe('Accounts Service', (): void => {
   let accounts: AccountsService
   let accountFactory: AccountFactory
   let config: typeof Config
+  let tigerbeetleContainer: StartedTestContainer
   let trx: Transaction
 
-  beforeAll(
-    async (): Promise<void> => {
-      deps = await initIocContainer(Config)
-      appContainer = await createTestApp(deps)
-      accounts = appContainer.app.getAccounts()
-      config = appContainer.app.getConfig()
-      accountFactory = new AccountFactory(accounts)
-    }
-  )
+  const TIGERBEETLE_PORT = 3001
 
-  beforeEach(
-    async (): Promise<void> => {
-      trx = await appContainer.knex.transaction()
-      Model.knex(trx)
-    }
-  )
+  beforeEach(async (): Promise<void> => {
+    tigerbeetleContainer = await new GenericContainer(
+      'wilsonianbcoil/tigerbeetle'
+    )
+      .withExposedPorts(TIGERBEETLE_PORT)
+      .withCmd([
+        '--cluster-id=0a5ca1ab1ebee11e',
+        '--replica-index=0',
+        '--replica-addresses=0.0.0.0:' + TIGERBEETLE_PORT
+      ])
+      .withWaitStrategy(Wait.forLogMessage(/listening on/))
+      .start()
+    Config.tigerbeetleReplicaAddresses = [
+      tigerbeetleContainer.getMappedPort(TIGERBEETLE_PORT)
+    ]
+    deps = await initIocContainer(Config)
+    appContainer = await createTestApp(deps)
+    accounts = appContainer.app.getAccounts()
+    config = appContainer.app.getConfig()
+    accountFactory = new AccountFactory(accounts)
+    trx = await appContainer.knex.transaction()
+    Model.knex(trx)
+  }, 10_000)
 
   afterEach(
     async (): Promise<void> => {
       await trx.rollback()
       await trx.destroy()
-    }
-  )
-
-  afterAll(
-    async (): Promise<void> => {
       await appContainer.shutdown()
+      await tigerbeetleContainer.stop()
     }
   )
 
