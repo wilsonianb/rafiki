@@ -11,7 +11,7 @@
     "format:local": "prettier --write $INIT_CWD",
     "format:check:local": "prettier --check $INIT_CWD",
     "test": "jest --passWithNoTests",
-    "test:local": "jest $INIT_CWD --passWithNoTests",
+    "test:local": "node --expose-gc $(yarn bin jest) $INIT_CWD --passWithNoTests --runInBand --logHeapUsage",
     "build": "tsc --build",
     "postinstall": "husky install"
   },
