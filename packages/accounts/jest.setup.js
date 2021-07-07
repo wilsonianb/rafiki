@@ -59,7 +59,7 @@ module.exports = async () => {
       ])
       .withWaitStrategy(Wait.forLogMessage(/listening on/))
       .start()
-
+    console.log('tigerbeetleContainer ready')
     process.env.TIGERBEETLE_REPLICA_ADDRESSES = `[${tigerbeetleContainer.getMappedPort(
       TIGERBEETLE_PORT
     )}]`

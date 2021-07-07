@@ -48,16 +48,19 @@ describe('Accounts Service', (): void => {
 
   beforeAll(
     async (): Promise<void> => {
+      console.log('beforeAll')
       deps = await initIocContainer(Config)
       appContainer = await createTestApp(deps)
       accounts = appContainer.app.getAccounts()
       config = appContainer.app.getConfig()
       accountFactory = new AccountFactory(accounts)
+      console.log('beforeAll done')
     }
   )
 
   beforeEach(
     async (): Promise<void> => {
+      console.log(expect.getState().currentTestName)
       trx = await appContainer.knex.transaction()
       Model.knex(trx)
     }
