@@ -38,7 +38,7 @@ jobs:
       - run: yarn install --immutable --immutable-cache
       - run: |
           ulimit -c unlimited
-          sudo yarn workspace accounts test || sudo chmod -R +rwx /var/crash/*
+          sudo yarn workspace accounts test || (cat /var/log/syslog && sudo chmod -R +rwx /var/crash/*)
         env:
           DEBUG: "*"
       - uses: actions/upload-artifact@master
