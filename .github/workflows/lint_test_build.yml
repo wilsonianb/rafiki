@@ -36,7 +36,7 @@ jobs:
       - run: yarn workspace accounts lint
       - run: yarn workspace accounts format:check
       - run: yarn install --immutable --immutable-cache
-      - run: yarn workspace accounts test || tail -n 1000 /var/log/syslog
+      - run: yarn workspace accounts test || (tail -n 1000 /var/log/syslog && exit 1)
         env:
           DEBUG: "*"
 
