@@ -37,6 +37,8 @@ jobs:
       - run: yarn workspace accounts format:check
       - run: yarn install --immutable --immutable-cache
       - run: yarn workspace accounts test
+        env:
+          DEBUG: "*"
 
   backend:
     runs-on: ubuntu-latest
