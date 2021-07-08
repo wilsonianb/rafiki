@@ -36,9 +36,10 @@ jobs:
       - run: yarn workspace accounts lint
       - run: yarn workspace accounts format:check
       - run: yarn install --immutable --immutable-cache
-      - run: yarn workspace accounts test
+      - run: yarn workspace accounts test || cat ts-jest.log
         env:
           DEBUG: "*"
+          TS_JEST_LOG: ts-jest.log
 
   backend:
     runs-on: ubuntu-latest
