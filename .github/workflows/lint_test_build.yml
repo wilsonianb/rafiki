@@ -44,7 +44,7 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: crashes
-          path: /var/crash
+          path: core
 
   backend:
     runs-on: ubuntu-latest
