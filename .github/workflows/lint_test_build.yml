@@ -39,8 +39,6 @@ jobs:
       - run: |
           ulimit -c unlimited
           yarn workspace accounts test || (cat /var/log/syslog && ls ./)
-        env:
-          DEBUG: "*"
       - uses: actions/upload-artifact@v2
         with:
           name: crashes
