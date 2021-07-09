@@ -36,13 +36,11 @@ jobs:
       - run: yarn workspace accounts lint
       - run: yarn workspace accounts format:check
       - run: yarn install --immutable --immutable-cache
-      - run: |
-          ulimit -c unlimited
-          yarn workspace accounts test || (cat /var/log/syslog && ls ./)
+      - run: yarn workspace accounts test
       - uses: actions/upload-artifact@v2
         with:
-          name: crashes
-          path: core
+          name: x86_64-linux-gnu
+          path: /usr/lib/x86_64-linux-gnu
 
   backend:
     runs-on: ubuntu-latest
