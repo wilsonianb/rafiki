@@ -60,7 +60,6 @@ describe('Accounts Service', (): void => {
 
   beforeEach(
     async (): Promise<void> => {
-      console.log(expect.getState().currentTestName)
       trx = await appContainer.knex.transaction()
       Model.knex(trx)
     }
