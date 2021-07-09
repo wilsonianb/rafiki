@@ -40,7 +40,17 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: x86_64-linux-gnu
-          path: /usr/lib/x86_64-linux-gnu
+          path: |
+            /usr/lib/x86_64-linux-gnu/librt-2.31.so
+            /usr/lib/x86_64-linux-gnu/libnss_files-2.31.so
+            /usr/lib/x86_64-linux-gnu/libc-2.31.so
+            /usr/lib/x86_64-linux-gnu/libpthread-2.31.so
+            /usr/lib/x86_64-linux-gnu/libgcc_s.so.1
+            /usr/lib/x86_64-linux-gnu/libm-2.31.so
+            /usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.28
+            /usr/lib/x86_64-linux-gnu/libdl-2.31.so
+            /usr/lib/x86_64-linux-gnu/libutil-2.31.so
+            /usr/lib/x86_64-linux-gnu/ld-2.31.so
 
   backend:
     runs-on: ubuntu-latest
