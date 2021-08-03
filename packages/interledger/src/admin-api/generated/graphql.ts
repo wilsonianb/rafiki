@@ -265,27 +265,23 @@ export type MutationTransferArgs = {
 
 
 export type MutationExtendTrustlineArgs = {
-  trustlineId: Scalars['ID'];
-  amount: Scalars['Int'];
+  amount: Scalars['UInt64'];
   autoApply?: Scalars['Boolean'];
 };
 
 
 export type MutationRevokeTrustlineArgs = {
-  trustlineId: Scalars['ID'];
-  amount: Scalars['Int'];
+  amount: Scalars['UInt64'];
 };
 
 
 export type MutationUtilizeTrustlineArgs = {
-  trustlineId: Scalars['ID'];
-  amount: Scalars['Int'];
+  amount: Scalars['UInt64'];
 };
 
 
 export type MutationSettleTrustlineArgs = {
-  trustlineId: Scalars['ID'];
-  amount: Scalars['Int'];
+  amount: Scalars['UInt64'];
   autoApply?: Scalars['Boolean'];
 };
 
@@ -334,9 +330,8 @@ export type MutationResponse = {
 
 export type Operator = {
   __typename?: 'Operator';
-  trustlineId: Scalars['ID'];
-  availableCredit: Scalars['Int'];
-  totalBorrowed: Scalars['Int'];
+  availableCredit: Scalars['UInt64'];
+  totalBorrowed: Scalars['UInt64'];
 };
 
 export type PageInfo = {
@@ -861,10 +856,10 @@ export type MutationResolvers<ContextType = any, ParentType extends ResolversPar
   deleteIlpAccount?: Resolver<ResolversTypes['DeleteIlpAccountMutationResponse'], ParentType, ContextType, RequireFields<MutationDeleteIlpAccountArgs, 'id'>>;
   createIlpSubAccount?: Resolver<ResolversTypes['CreateIlpSubAccountMutationResponse'], ParentType, ContextType, RequireFields<MutationCreateIlpSubAccountArgs, 'superAccountId'>>;
   transfer?: Resolver<Maybe<ResolversTypes['TransferMutationResponse']>, ParentType, ContextType, RequireFields<MutationTransferArgs, 'sourceAmount' | 'sourceAccountId' | 'destinationAccountId' | 'idempotencyKey'>>;
-  extendTrustline?: Resolver<Maybe<ResolversTypes['ExtendTrustlineMutationResponse']>, ParentType, ContextType, RequireFields<MutationExtendTrustlineArgs, 'trustlineId' | 'amount' | 'autoApply'>>;
-  revokeTrustline?: Resolver<Maybe<ResolversTypes['RevokeTrustlineMutationResponse']>, ParentType, ContextType, RequireFields<MutationRevokeTrustlineArgs, 'trustlineId' | 'amount'>>;
-  utilizeTrustline?: Resolver<Maybe<ResolversTypes['UtilizeTrustlineMutationResponse']>, ParentType, ContextType, RequireFields<MutationUtilizeTrustlineArgs, 'trustlineId' | 'amount'>>;
-  settleTrustline?: Resolver<Maybe<ResolversTypes['SettleTrustlineMutationResponse']>, ParentType, ContextType, RequireFields<MutationSettleTrustlineArgs, 'trustlineId' | 'amount' | 'autoApply'>>;
+  extendTrustline?: Resolver<Maybe<ResolversTypes['ExtendTrustlineMutationResponse']>, ParentType, ContextType, RequireFields<MutationExtendTrustlineArgs, 'amount' | 'autoApply'>>;
+  revokeTrustline?: Resolver<Maybe<ResolversTypes['RevokeTrustlineMutationResponse']>, ParentType, ContextType, RequireFields<MutationRevokeTrustlineArgs, 'amount'>>;
+  utilizeTrustline?: Resolver<Maybe<ResolversTypes['UtilizeTrustlineMutationResponse']>, ParentType, ContextType, RequireFields<MutationUtilizeTrustlineArgs, 'amount'>>;
+  settleTrustline?: Resolver<Maybe<ResolversTypes['SettleTrustlineMutationResponse']>, ParentType, ContextType, RequireFields<MutationSettleTrustlineArgs, 'amount' | 'autoApply'>>;
   createWebhook?: Resolver<Maybe<ResolversTypes['CreateWebhookMutationResponse']>, ParentType, ContextType, RequireFields<MutationCreateWebhookArgs, 'ilpAccountId'>>;
   updateWebhook?: Resolver<Maybe<ResolversTypes['UpdateWebhookMutationResponse']>, ParentType, ContextType, RequireFields<MutationUpdateWebhookArgs, 'webhookId'>>;
   deleteWebhook?: Resolver<Maybe<ResolversTypes['DeleteWebhookMutationResponse']>, ParentType, ContextType, RequireFields<MutationDeleteWebhookArgs, 'webhookId'>>;
@@ -882,9 +877,8 @@ export type MutationResponseResolvers<ContextType = any, ParentType extends Reso
 };
 
 export type OperatorResolvers<ContextType = any, ParentType extends ResolversParentTypes['Operator'] = ResolversParentTypes['Operator']> = {
-  trustlineId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
-  availableCredit?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
-  totalBorrowed?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  availableCredit?: Resolver<ResolversTypes['UInt64'], ParentType, ContextType>;
+  totalBorrowed?: Resolver<ResolversTypes['UInt64'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
