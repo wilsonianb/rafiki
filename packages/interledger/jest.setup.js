@@ -51,7 +51,7 @@ module.exports = async () => {
 
   if (!process.env.TIGERBEETLE_REPLICA_ADDRESSES) {
     const tigerbeetleContainer = await new GenericContainer(
-      'wilsonianbcoil/tigerbeetle'
+      'wilsonianbcoil/tigerbeetle:baseline'
     )
       .withExposedPorts(TIGERBEETLE_PORT)
       .withCmd([
