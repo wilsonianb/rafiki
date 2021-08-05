@@ -50,6 +50,7 @@ jobs:
       - run: yarn workspace interledger format:check
       - run: yarn install --immutable --immutable-cache
       - run: yarn build
+      - run: lscpu
       - run: yarn workspace interledger test
 
   frontend:
