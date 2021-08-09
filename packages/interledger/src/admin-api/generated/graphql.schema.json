@@ -1970,9 +1970,41 @@
             "deprecationReason": null
           },
           {
-            "name": "extendTrustline",
-            "description": "Extend Trustline",
+            "name": "extendCredit",
+            "description": "Extend credit",
             "args": [
+              {
+                "name": "accountId",
+                "description": "Account extending credit",
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "ID",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "subAccountId",
+                "description": "Sub-account to which credit is extended",
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "ID",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
               {
                 "name": "amount",
                 "description": "Amount of additional line of credit.",
@@ -2015,12 +2047,44 @@
             "deprecationReason": null
           },
           {
-            "name": "revokeTrustline",
-            "description": "Revoke trustline",
+            "name": "revokeCredit",
+            "description": "Revoke credit",
             "args": [
               {
+                "name": "accountId",
+                "description": "Account revoking credit",
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "ID",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "subAccountId",
+                "description": "Sub-account to which credit is revoked",
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "ID",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
                 "name": "amount",
-                "description": "Amount of additional line of credit.",
+                "description": "Amount of revoked line of credit.",
                 "type": {
                   "kind": "NON_NULL",
                   "name": null,
@@ -2044,12 +2108,44 @@
             "deprecationReason": null
           },
           {
-            "name": "utilizeTrustline",
-            "description": "Utilize trustline",
+            "name": "utilizeCredit",
+            "description": "Utilize credit",
             "args": [
               {
+                "name": "accountId",
+                "description": "Account extending credit",
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "ID",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "subAccountId",
+                "description": "Sub-account to which credit is extended",
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "ID",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
                 "name": "amount",
-                "description": "Amount of additional line of credit.",
+                "description": "Amount of utilized line of credit.",
                 "type": {
                   "kind": "NON_NULL",
                   "name": null,
@@ -2073,12 +2169,44 @@
             "deprecationReason": null
           },
           {
-            "name": "settleTrustline",
-            "description": "Settle trustline",
+            "name": "settleDebt",
+            "description": "Settle debt",
             "args": [
               {
+                "name": "accountId",
+                "description": "Account collecting debt",
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "ID",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "subAccountId",
+                "description": "Sub-account settling debt",
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "ID",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
                 "name": "amount",
-                "description": "Amount of additional line of credit.",
+                "description": "Amount of debt.",
                 "type": {
                   "kind": "NON_NULL",
                   "name": null,
@@ -2093,7 +2221,7 @@
                 "deprecationReason": null
               },
               {
-                "name": "autoApply",
+                "name": "revolve",
                 "description": "Replenish the account's line of credit commensurate with the debt settled.",
                 "type": {
                   "kind": "NON_NULL",
