@@ -24,10 +24,7 @@ export const getIlpAccount: QueryResolvers['ilpAccount'] = async (
   ctx
 ): ResolversTypes['IlpAccount'] => {
   // TODO: get account all information from accounts service
-  const account = await ctx.accountsService.getAccount(args.id)
-  return {
-    id: account.accountId
-  }
+  return await ctx.accountsService.getAccount(args.id)
 }
 
 export const createIlpAccount: MutationResolvers['createIlpAccount'] = async (
@@ -35,9 +32,13 @@ export const createIlpAccount: MutationResolvers['createIlpAccount'] = async (
   args,
   ctx
 ): ResolversTypes['CreateIlpAccountMutationResponse'] => {
-  // TODO:
-  console.log(ctx) // temporary to pass linting
-  return {}
+  const ilpAccount = await ctx.accountsService.createAccount(args.input)
+  return {
+    code: '200',
+    success: true,
+    message: 'Created ILP Account',
+    ilpAccount
+  }
 }
 
 export const updateIlpAccount: MutationResolvers['updateIlpAccount'] = async (

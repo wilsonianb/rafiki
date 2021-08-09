@@ -12,10 +12,7 @@ type Query {
   ): IlpAccountsConnection!
 
   "Get an Interledger account by ID."
-  ilpAccount(id: ID!): IlpAccount!
-
-  "Get a trustline by ID."
-  trustline("The ID of the trustline to get." id: ID!): Trustline!
+  ilpAccount(id: ID!, withSubAccounts: Boolean): IlpAccount!
 
   "Get a webhook by ID."
   webhook("The ID of the webhook to get." id: ID!): Webhook!
@@ -29,7 +26,9 @@ type Query {
 
 type Mutation {
   "Create Interledger account"
-  createIlpAccount: CreateIlpAccountMutationResponse!
+  createIlpAccount(
+    input: CreateIlpAccountInput!
+  ): CreateIlpAccountMutationResponse!
 
   "Update Interledger account"
   updateIlpAccount: UpdateIlpAccountMutationResponse!
@@ -52,47 +51,47 @@ type Mutation {
 
   "Extend credit"
   extendCredit(
-    "Account extending credit"
+    "Account extending credit."
     accountId: ID!
-    "Sub-account to which credit is extended"
+    "Sub-account to which credit is extended."
     subAccountId: ID!
     "Amount of additional line of credit."
     amount: UInt64!
     "Automatically utilized and applied to the account balance."
     autoApply: Boolean! = false
-  ): ExtendTrustlineMutationResponse
+  ): ExtendCreditMutationResponse
 
   "Revoke credit"
   revokeCredit(
     "Account revoking credit"
     accountId: ID!
-    "Sub-account to which credit is revoked"
+    "Sub-account to which credit is revoked."
     subAccountId: ID!
     "Amount of revoked line of credit."
     amount: UInt64!
-  ): RevokeTrustlineMutationResponse
+  ): RevokeCreditMutationResponse
 
   "Utilize credit"
   utilizeCredit(
-    "Account extending credit"
+    "Account extending credit."
     accountId: ID!
-    "Sub-account to which credit is extended"
+    "Sub-account to which credit is extended."
     subAccountId: ID!
     "Amount of utilized line of credit."
     amount: UInt64!
-  ): UtilizeTrustlineMutationResponse
+  ): RevokeCreditMutationResponse
 
   "Settle debt"
   settleDebt(
-    "Account collecting debt"
+    "Account collecting debt."
     accountId: ID!
-    "Sub-account settling debt"
+    "Sub-account settling debt."
     subAccountId: ID!
     "Amount of debt."
     amount: UInt64!
     "Replenish the account's line of credit commensurate with the debt settled."
     revolve: Boolean! = true
-  ): SettleTrustlineMutationResponse
+  ): SettleDebtMutationResponse
 
   "Create webhook"
   createWebhook(
@@ -118,6 +117,8 @@ type Mutation {
     ilpAccountId: ID!
     "Amount of deposit."
     amount: UInt64!
+    "The id of the deposit."
+    id: ID
   ): CreateDepositMutationResponse
 
   "Create withdrawal"
@@ -126,6 +127,8 @@ type Mutation {
     ilpAccountId: ID!
     "Amount of deposit."
     amount: UInt64!
+    "The id of the withdrawal."
+    id: ID
   ): CreateWithdrawalMutationResponse
 
   "Finalize pending withdrawal"
@@ -151,9 +154,47 @@ type IlpAccountEdge {
   cursor: String!
 }
 
+input CreateIlpAccountInput {
+  id: ID
+  disabled: Boolean
+  superAccountId: ID
+  maxPacketAmount: String
+  http: HttpInput
+  asset: AssetInput!
+  stream: StreamInput
+  routing: RoutingInput
+}
+
+input HttpInput {
+  incoming: HttpIncomingInput!
+  outgoing: HttpOutgoingInput!
+}
+
+input HttpIncomingInput {
+  authTokens: [String!]!
+}
+
+input HttpOutgoingInput {
+  authToken: String!
+  endpoint: String!
+}
+
+input AssetInput {
+  code: String!
+  scale: Int!
+}
+
+input StreamInput {
+  enabled: Boolean!
+}
+
+input RoutingInput {
+  staticIlpAddress: String!
+}
+
 type IlpAccount {
   id: ID!
-  enabled: Boolean!
+  disabled: Boolean!
   superAccount: IlpAccount
   subAccounts(
     "Paginating forwards: the cursor before the the requested page."
@@ -166,7 +207,7 @@ type IlpAccount {
     last: Int
   ): IlpAccountsConnection!
   liquidityAccountId: ID
-  maxPacketAmount: String!
+  maxPacketAmount: UInt64!
   http: Http!
   asset: Asset!
   stream: Stream!
@@ -214,7 +255,7 @@ type HttpIncoming {
   authTokens: [String!]!
 }
 type HttpOutgoing {
-  authTokens: String!
+  authToken: String!
   endpoint: String!
 }
 
@@ -292,15 +333,6 @@ type Withdrawal {
   finalizedTime: Int
 }
 
-type Trustline {
-  id: ID!
-  createdTime: Int!
-  creditorAccountId: ID
-  debtorAccountId: ID!
-  availableCredit: UInt64!
-  debtBalance: UInt64!
-}
-
 type CreateIlpAccountMutationResponse implements MutationResponse {
   code: String!
   success: Boolean!
@@ -334,26 +366,25 @@ type TransferMutationResponse implements MutationResponse {
   message: String!
 }
 
-type ExtendTrustlineMutationResponse implements MutationResponse {
-  code: String!
-  success: Boolean!
-  message: String!
-  trustline: Trustline!
-}
-
-type RevokeTrustlineMutationResponse implements MutationResponse {
+type ExtendCreditMutationResponse implements MutationResponse {
   code: String!
   success: Boolean!
   message: String!
 }
 
-type UtilizeTrustlineMutationResponse implements MutationResponse {
+type RevokeCreditMutationResponse implements MutationResponse {
   code: String!
   success: Boolean!
   message: String!
 }
 
-type SettleTrustlineMutationResponse implements MutationResponse {
+type RevokeCreditMutationResponse implements MutationResponse {
+  code: String!
+  success: Boolean!
+  message: String!
+}
+
+type SettleDebtMutationResponse implements MutationResponse {
   code: String!
   success: Boolean!
   message: String!
@@ -406,7 +437,7 @@ type RollbackPendingWithdrawalMutationResponse implements MutationResponse {
 }
 
 type Asset {
-  currency: String!
+  code: String!
   scale: Int!
 }
 

@@ -22,7 +22,7 @@
               "name": null,
               "ofType": {
                 "kind": "SCALAR",
-                "name": "Int",
+                "name": "UInt64",
                 "ofType": null
               }
             },
@@ -64,16 +64,6 @@
         ],
         "inputFields": null,
         "interfaces": [],
-        "enumValues": null,
-        "possibleTypes": null
-      },
-      {
-        "kind": "SCALAR",
-        "name": "Int",
-        "description": "The `Int` scalar type represents non-fractional signed whole numeric values. Int can represent values between -(2^31) and 2^31 - 1.",
-        "fields": null,
-        "inputFields": null,
-        "interfaces": null,
         "enumValues": null,
         "possibleTypes": null
       },
@@ -88,12 +78,22 @@
         "possibleTypes": null
       },
       {
+        "kind": "SCALAR",
+        "name": "Int",
+        "description": "The `Int` scalar type represents non-fractional signed whole numeric values. Int can represent values between -(2^31) and 2^31 - 1.",
+        "fields": null,
+        "inputFields": null,
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
         "kind": "OBJECT",
         "name": "Asset",
         "description": null,
         "fields": [
           {
-            "name": "currency",
+            "name": "code",
             "description": null,
             "args": [],
             "type": {
@@ -127,6 +127,49 @@
         ],
         "inputFields": null,
         "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "INPUT_OBJECT",
+        "name": "AssetInput",
+        "description": null,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "code",
+            "description": null,
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "scale",
+            "description": null,
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
         "enumValues": null,
         "possibleTypes": null
       },
@@ -192,7 +235,7 @@
               "name": null,
               "ofType": {
                 "kind": "SCALAR",
-                "name": "Int",
+                "name": "UInt64",
                 "ofType": null
               }
             },
@@ -205,7 +248,7 @@
             "args": [],
             "type": {
               "kind": "SCALAR",
-              "name": "Int",
+              "name": "UInt64",
               "ofType": null
             },
             "isDeprecated": false,
@@ -217,7 +260,7 @@
             "args": [],
             "type": {
               "kind": "SCALAR",
-              "name": "Int",
+              "name": "UInt64",
               "ofType": null
             },
             "isDeprecated": false,
@@ -232,7 +275,7 @@
               "name": null,
               "ofType": {
                 "kind": "SCALAR",
-                "name": "Int",
+                "name": "UInt64",
                 "ofType": null
               }
             },
@@ -248,7 +291,7 @@
               "name": null,
               "ofType": {
                 "kind": "SCALAR",
-                "name": "Int",
+                "name": "UInt64",
                 "ofType": null
               }
             },
@@ -370,6 +413,117 @@
         "description": "The `Boolean` scalar type represents `true` or `false`.",
         "fields": null,
         "inputFields": null,
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "INPUT_OBJECT",
+        "name": "CreateIlpAccountInput",
+        "description": null,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "id",
+            "description": null,
+            "type": {
+              "kind": "SCALAR",
+              "name": "ID",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "disabled",
+            "description": null,
+            "type": {
+              "kind": "SCALAR",
+              "name": "Boolean",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "superAccountId",
+            "description": null,
+            "type": {
+              "kind": "SCALAR",
+              "name": "ID",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "maxPacketAmount",
+            "description": null,
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "http",
+            "description": null,
+            "type": {
+              "kind": "INPUT_OBJECT",
+              "name": "HttpInput",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "asset",
+            "description": null,
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "INPUT_OBJECT",
+                "name": "AssetInput",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "stream",
+            "description": null,
+            "type": {
+              "kind": "INPUT_OBJECT",
+              "name": "StreamInput",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "routing",
+            "description": null,
+            "type": {
+              "kind": "INPUT_OBJECT",
+              "name": "RoutingInput",
+              "ofType": null
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
         "interfaces": null,
         "enumValues": null,
         "possibleTypes": null
@@ -858,7 +1012,7 @@
               "name": null,
               "ofType": {
                 "kind": "SCALAR",
-                "name": "Int",
+                "name": "UInt64",
                 "ofType": null
               }
             },
@@ -983,7 +1137,7 @@
       },
       {
         "kind": "OBJECT",
-        "name": "ExtendTrustlineMutationResponse",
+        "name": "ExtendCreditMutationResponse",
         "description": null,
         "fields": [
           {
@@ -1028,22 +1182,6 @@
               "ofType": {
                 "kind": "SCALAR",
                 "name": "String",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "trustline",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "kind": "OBJECT",
-                "name": "Trustline",
                 "ofType": null
               }
             },
@@ -1206,12 +1344,90 @@
         "possibleTypes": null
       },
       {
+        "kind": "INPUT_OBJECT",
+        "name": "HttpIncomingInput",
+        "description": null,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "authTokens",
+            "description": null,
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  }
+                }
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "INPUT_OBJECT",
+        "name": "HttpInput",
+        "description": null,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "incoming",
+            "description": null,
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "INPUT_OBJECT",
+                "name": "HttpIncomingInput",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "outgoing",
+            "description": null,
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "INPUT_OBJECT",
+                "name": "HttpOutgoingInput",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
         "kind": "OBJECT",
         "name": "HttpOutgoing",
         "description": null,
         "fields": [
           {
-            "name": "authTokens",
+            "name": "authToken",
             "description": null,
             "args": [],
             "type": {
@@ -1249,6 +1465,49 @@
         "possibleTypes": null
       },
       {
+        "kind": "INPUT_OBJECT",
+        "name": "HttpOutgoingInput",
+        "description": null,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "authToken",
+            "description": null,
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "endpoint",
+            "description": null,
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
         "kind": "OBJECT",
         "name": "IlpAccount",
         "description": null,
@@ -1270,7 +1529,7 @@
             "deprecationReason": null
           },
           {
-            "name": "enabled",
+            "name": "disabled",
             "description": null,
             "args": [],
             "type": {
@@ -1383,7 +1642,7 @@
               "name": null,
               "ofType": {
                 "kind": "SCALAR",
-                "name": "String",
+                "name": "UInt64",
                 "ofType": null
               }
             },
@@ -1773,7 +2032,24 @@
           {
             "name": "createIlpAccount",
             "description": "Create Interledger account",
-            "args": [],
+            "args": [
+              {
+                "name": "input",
+                "description": null,
+                "type": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "CreateIlpAccountInput",
+                    "ofType": null
+                  }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              }
+            ],
             "type": {
               "kind": "NON_NULL",
               "name": null,
@@ -1880,7 +2156,7 @@
                   "name": null,
                   "ofType": {
                     "kind": "SCALAR",
-                    "name": "Int",
+                    "name": "UInt64",
                     "ofType": null
                   }
                 },
@@ -1925,7 +2201,7 @@
                 "description": null,
                 "type": {
                   "kind": "SCALAR",
-                  "name": "Int",
+                  "name": "UInt64",
                   "ofType": null
                 },
                 "defaultValue": null,
@@ -1975,7 +2251,7 @@
             "args": [
               {
                 "name": "accountId",
-                "description": "Account extending credit",
+                "description": "Account extending credit.",
                 "type": {
                   "kind": "NON_NULL",
                   "name": null,
@@ -1991,7 +2267,7 @@
               },
               {
                 "name": "subAccountId",
-                "description": "Sub-account to which credit is extended",
+                "description": "Sub-account to which credit is extended.",
                 "type": {
                   "kind": "NON_NULL",
                   "name": null,
@@ -2013,7 +2289,7 @@
                   "name": null,
                   "ofType": {
                     "kind": "SCALAR",
-                    "name": "Int",
+                    "name": "UInt64",
                     "ofType": null
                   }
                 },
@@ -2040,7 +2316,7 @@
             ],
             "type": {
               "kind": "OBJECT",
-              "name": "ExtendTrustlineMutationResponse",
+              "name": "ExtendCreditMutationResponse",
               "ofType": null
             },
             "isDeprecated": false,
@@ -2068,7 +2344,7 @@
               },
               {
                 "name": "subAccountId",
-                "description": "Sub-account to which credit is revoked",
+                "description": "Sub-account to which credit is revoked.",
                 "type": {
                   "kind": "NON_NULL",
                   "name": null,
@@ -2090,7 +2366,7 @@
                   "name": null,
                   "ofType": {
                     "kind": "SCALAR",
-                    "name": "Int",
+                    "name": "UInt64",
                     "ofType": null
                   }
                 },
@@ -2101,7 +2377,7 @@
             ],
             "type": {
               "kind": "OBJECT",
-              "name": "RevokeTrustlineMutationResponse",
+              "name": "RevokeCreditMutationResponse",
               "ofType": null
             },
             "isDeprecated": false,
@@ -2113,7 +2389,7 @@
             "args": [
               {
                 "name": "accountId",
-                "description": "Account extending credit",
+                "description": "Account extending credit.",
                 "type": {
                   "kind": "NON_NULL",
                   "name": null,
@@ -2129,7 +2405,7 @@
               },
               {
                 "name": "subAccountId",
-                "description": "Sub-account to which credit is extended",
+                "description": "Sub-account to which credit is extended.",
                 "type": {
                   "kind": "NON_NULL",
                   "name": null,
@@ -2151,7 +2427,7 @@
                   "name": null,
                   "ofType": {
                     "kind": "SCALAR",
-                    "name": "Int",
+                    "name": "UInt64",
                     "ofType": null
                   }
                 },
@@ -2162,7 +2438,7 @@
             ],
             "type": {
               "kind": "OBJECT",
-              "name": "UtilizeTrustlineMutationResponse",
+              "name": "RevokeCreditMutationResponse",
               "ofType": null
             },
             "isDeprecated": false,
@@ -2174,7 +2450,7 @@
             "args": [
               {
                 "name": "accountId",
-                "description": "Account collecting debt",
+                "description": "Account collecting debt.",
                 "type": {
                   "kind": "NON_NULL",
                   "name": null,
@@ -2190,7 +2466,7 @@
               },
               {
                 "name": "subAccountId",
-                "description": "Sub-account settling debt",
+                "description": "Sub-account settling debt.",
                 "type": {
                   "kind": "NON_NULL",
                   "name": null,
@@ -2212,7 +2488,7 @@
                   "name": null,
                   "ofType": {
                     "kind": "SCALAR",
-                    "name": "Int",
+                    "name": "UInt64",
                     "ofType": null
                   }
                 },
@@ -2239,7 +2515,7 @@
             ],
             "type": {
               "kind": "OBJECT",
-              "name": "SettleTrustlineMutationResponse",
+              "name": "SettleDebtMutationResponse",
               "ofType": null
             },
             "isDeprecated": false,
@@ -2360,9 +2636,21 @@
                   "name": null,
                   "ofType": {
                     "kind": "SCALAR",
-                    "name": "Int",
+                    "name": "UInt64",
                     "ofType": null
                   }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "id",
+                "description": "The id of the deposit.",
+                "type": {
+                  "kind": "SCALAR",
+                  "name": "ID",
+                  "ofType": null
                 },
                 "defaultValue": null,
                 "isDeprecated": false,
@@ -2405,9 +2693,21 @@
                   "name": null,
                   "ofType": {
                     "kind": "SCALAR",
-                    "name": "Int",
+                    "name": "UInt64",
                     "ofType": null
                   }
+                },
+                "defaultValue": null,
+                "isDeprecated": false,
+                "deprecationReason": null
+              },
+              {
+                "name": "id",
+                "description": "The id of the withdrawal.",
+                "type": {
+                  "kind": "SCALAR",
+                  "name": "ID",
+                  "ofType": null
                 },
                 "defaultValue": null,
                 "isDeprecated": false,
@@ -2581,7 +2881,7 @@
           },
           {
             "kind": "OBJECT",
-            "name": "ExtendTrustlineMutationResponse",
+            "name": "ExtendCreditMutationResponse",
             "ofType": null
           },
           {
@@ -2591,7 +2891,7 @@
           },
           {
             "kind": "OBJECT",
-            "name": "RevokeTrustlineMutationResponse",
+            "name": "RevokeCreditMutationResponse",
             "ofType": null
           },
           {
@@ -2601,7 +2901,7 @@
           },
           {
             "kind": "OBJECT",
-            "name": "SettleTrustlineMutationResponse",
+            "name": "SettleDebtMutationResponse",
             "ofType": null
           },
           {
@@ -2617,11 +2917,6 @@
           {
             "kind": "OBJECT",
             "name": "UpdateWebhookMutationResponse",
-            "ofType": null
-          },
-          {
-            "kind": "OBJECT",
-            "name": "UtilizeTrustlineMutationResponse",
             "ofType": null
           }
         ]
@@ -2640,7 +2935,7 @@
               "name": null,
               "ofType": {
                 "kind": "SCALAR",
-                "name": "Int",
+                "name": "UInt64",
                 "ofType": null
               }
             },
@@ -2656,7 +2951,7 @@
               "name": null,
               "ofType": {
                 "kind": "SCALAR",
-                "name": "Int",
+                "name": "UInt64",
                 "ofType": null
               }
             },
@@ -2825,35 +3120,14 @@
                 "defaultValue": null,
                 "isDeprecated": false,
                 "deprecationReason": null
-              }
-            ],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "kind": "OBJECT",
-                "name": "IlpAccount",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "trustline",
-            "description": "Get a trustline by ID.",
-            "args": [
+              },
               {
-                "name": "id",
-                "description": "The ID of the trustline to get.",
+                "name": "withSubAccounts",
+                "description": null,
                 "type": {
-                  "kind": "NON_NULL",
-                  "name": null,
-                  "ofType": {
-                    "kind": "SCALAR",
-                    "name": "ID",
-                    "ofType": null
-                  }
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
                 },
                 "defaultValue": null,
                 "isDeprecated": false,
@@ -2865,7 +3139,7 @@
               "name": null,
               "ofType": {
                 "kind": "OBJECT",
-                "name": "Trustline",
+                "name": "IlpAccount",
                 "ofType": null
               }
             },
@@ -2979,11 +3253,27 @@
       },
       {
         "kind": "OBJECT",
-        "name": "RevokeTrustlineMutationResponse",
+        "name": "RevokeCreditMutationResponse",
         "description": null,
         "fields": [
           {
             "name": "code",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "message",
             "description": null,
             "args": [],
             "type": {
@@ -3008,22 +3298,6 @@
               "ofType": {
                 "kind": "SCALAR",
                 "name": "Boolean",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "message",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "kind": "SCALAR",
-                "name": "String",
                 "ofType": null
               }
             },
@@ -3163,8 +3437,35 @@
         "possibleTypes": null
       },
       {
+        "kind": "INPUT_OBJECT",
+        "name": "RoutingInput",
+        "description": null,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "staticIlpAddress",
+            "description": null,
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
         "kind": "OBJECT",
-        "name": "SettleTrustlineMutationResponse",
+        "name": "SettleDebtMutationResponse",
         "description": null,
         "fields": [
           {
@@ -3255,6 +3556,33 @@
         "possibleTypes": null
       },
       {
+        "kind": "INPUT_OBJECT",
+        "name": "StreamInput",
+        "description": null,
+        "fields": null,
+        "inputFields": [
+          {
+            "name": "enabled",
+            "description": null,
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "Boolean",
+                "ofType": null
+              }
+            },
+            "defaultValue": null,
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
         "kind": "OBJECT",
         "name": "TransferMutationResponse",
         "description": null,
@@ -3316,109 +3644,6 @@
             "ofType": null
           }
         ],
-        "enumValues": null,
-        "possibleTypes": null
-      },
-      {
-        "kind": "OBJECT",
-        "name": "Trustline",
-        "description": null,
-        "fields": [
-          {
-            "name": "id",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "kind": "SCALAR",
-                "name": "ID",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "createdTime",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "creditorAccountId",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "SCALAR",
-              "name": "ID",
-              "ofType": null
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "debtorAccountId",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "kind": "SCALAR",
-                "name": "ID",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "availableCredit",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "debtBalance",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "kind": "SCALAR",
-                "name": "Int",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          }
-        ],
-        "inputFields": null,
-        "interfaces": [],
         "enumValues": null,
         "possibleTypes": null
       },
@@ -3596,71 +3821,6 @@
       },
       {
         "kind": "OBJECT",
-        "name": "UtilizeTrustlineMutationResponse",
-        "description": null,
-        "fields": [
-          {
-            "name": "code",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "success",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "kind": "SCALAR",
-                "name": "Boolean",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "message",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          }
-        ],
-        "inputFields": null,
-        "interfaces": [
-          {
-            "kind": "INTERFACE",
-            "name": "MutationResponse",
-            "ofType": null
-          }
-        ],
-        "enumValues": null,
-        "possibleTypes": null
-      },
-      {
-        "kind": "OBJECT",
         "name": "Webhook",
         "description": null,
         "fields": [
@@ -3810,7 +3970,7 @@
               "name": null,
               "ofType": {
                 "kind": "SCALAR",
-                "name": "Int",
+                "name": "UInt64",
                 "ofType": null
               }
             },

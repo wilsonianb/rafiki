@@ -3,8 +3,12 @@ import Knex, { Transaction } from 'knex'
 import { createClient, Client } from 'tigerbeetle-node'
 import { v4 as uuid } from 'uuid'
 
-import { AccountFactory } from '../../accounts/testsHelpers'
+import { randomAsset, AccountFactory } from '../../accounts/testsHelpers'
 import { AccountsService } from '../../accounts/service'
+import {
+  CreateIlpAccountInput,
+  CreateIlpAccountMutationResponse
+} from '../generated/graphql'
 import { Logger } from '../../logger/service'
 import { createKnex } from '../../Knex/service'
 import { ApolloServer, gql } from 'apollo-server'
@@ -73,6 +77,119 @@ describe('Account Resolvers', (): void => {
     }
   )
 
+  describe('Create IlpAccount', (): void => {
+    test('Can create an ilp account', async (): Promise<void> => {
+      const account: CreateIlpAccountInput = {
+        asset: randomAsset()
+      }
+      const response = await apolloClient
+        .mutate({
+          mutation: gql`
+            mutation CreateIlpAccount($input: CreateIlpAccountInput!) {
+              createIlpAccount(input: $input) {
+                code
+                success
+                message
+                ilpAccount {
+                  id
+                }
+              }
+            }
+          `,
+          variables: {
+            input: account
+          }
+        })
+        .then(
+          (query): CreateIlpAccountMutationResponse => {
+            if (query.data) {
+              return query.data.createIlpAccount
+            } else {
+              throw new Error('Data was empty')
+            }
+          }
+        )
+
+      expect(response.success).toBe(true)
+      expect(response.code).toEqual('200')
+      expect(response.ilpAccount?.id).not.toBeNull()
+      const expectedAccount: IlpAccount = {
+        id: response.ilpAccount?.id,
+        asset: account.asset,
+        disabled: false,
+        stream: {
+          enabled: false
+        }
+      }
+      await expect(
+        accountsService.getAccount(response.ilpAccount?.id)
+      ).resolves.toEqual(expectedAccount)
+    })
+
+    test('Can create an ilp account with all settings', async (): Promise<void> => {
+      const id = uuid()
+      const account: CreateIlpAccountInput = {
+        id,
+        asset: randomAsset(),
+        disabled: true,
+        maxPacketAmount: '100',
+        http: {
+          incoming: {
+            authTokens: [uuid()]
+          },
+          outgoing: {
+            authToken: uuid(),
+            endpoint: '/outgoingEndpoint'
+          }
+        },
+        stream: {
+          enabled: false
+        },
+        routing: {
+          staticIlpAddress: 'g.rafiki.' + id
+        }
+      }
+      const response = await apolloClient
+        .mutate({
+          mutation: gql`
+            mutation CreateIlpAccount($input: CreateIlpAccountInput!) {
+              createIlpAccount(input: $input) {
+                code
+                success
+                message
+                ilpAccount {
+                  id
+                }
+              }
+            }
+          `,
+          variables: {
+            input: account
+          }
+        })
+        .then(
+          (query): CreateIlpAccountMutationResponse => {
+            if (query.data) {
+              return query.data.createIlpAccount
+            } else {
+              throw new Error('Data was empty')
+            }
+          }
+        )
+
+      expect(response.success).toBe(true)
+      expect(response.code).toEqual('200')
+      expect(response.ilpAccount?.id).toEqual(id)
+      await expect(accountsService.getAccount(id)).resolves.toEqual({
+        ...account,
+        http: {
+          outgoing: account.http?.outgoing
+        },
+        maxPacketAmount: BigInt(account.maxPacketAmount)
+      })
+    })
+  })
+
   describe('IlpAccount Queries', (): void => {
     let account: IlpAccount
 
@@ -93,7 +210,7 @@ describe('Account Resolvers', (): void => {
             }
           `,
           variables: {
-            accountId: account.accountId
+            accountId: account.id
           }
         })
         .then(
@@ -106,7 +223,7 @@ describe('Account Resolvers', (): void => {
           }
         )
 
-      expect(query.id).toEqual(account.accountId)
+      expect(query.id).toEqual(account.id)
     })
   })
 })
