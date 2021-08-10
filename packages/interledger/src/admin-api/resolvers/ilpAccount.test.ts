@@ -7,7 +7,9 @@ import { randomAsset, AccountFactory } from '../../accounts/testsHelpers'
 import { AccountsService } from '../../accounts/service'
 import {
   CreateIlpAccountInput,
-  CreateIlpAccountMutationResponse
+  CreateIlpAccountMutationResponse,
+  UpdateIlpAccountInput,
+  UpdateIlpAccountMutationResponse
 } from '../generated/graphql'
 import { Logger } from '../../logger/service'
 import { createKnex } from '../../Knex/service'
@@ -224,6 +226,131 @@ describe('Account Resolvers', (): void => {
         )
 
       expect(query.id).toEqual(account.id)
+    })
+  })
+
+  describe('Update IlpAccount', (): void => {
+    test('Can update an ilp account', async (): Promise<void> => {
+      const account = await accountFactory.build()
+      const updateOptions: UpdateIlpAccountInput = {
+        id: account.id,
+        disabled: true,
+        maxPacketAmount: '100',
+        http: {
+          incoming: {
+            authTokens: [uuid()]
+          },
+          outgoing: {
+            authToken: uuid(),
+            endpoint: '/outgoingEndpoint'
+          }
+        },
+        stream: {
+          enabled: false
+        },
+        routing: {
+          staticIlpAddress: 'g.rafiki.' + account.id
+        }
+      }
+      const response = await apolloClient
+        .mutate({
+          mutation: gql`
+            mutation UpdateIlpAccount($input: UpdateIlpAccountInput!) {
+              updateIlpAccount(input: $input) {
+                code
+                success
+                message
+                ilpAccount {
+                  id
+                }
+              }
+            }
+          `,
+          variables: {
+            input: updateOptions
+          }
+        })
+        .then(
+          (query): UpdateIlpAccountMutationResponse => {
+            if (query.data) {
+              return query.data.updateIlpAccount
+            } else {
+              throw new Error('Data was empty')
+            }
+          }
+        )
+
+      expect(response.success).toBe(true)
+      expect(response.code).toEqual('200')
+      expect(response.ilpAccount?.id).not.toBeNull()
+      await expect(accountsService.getAccount(account.id)).resolves.toEqual({
+        ...updateOptions,
+        asset: account.asset,
+        http: {
+          outgoing: updateOptions.http?.outgoing
+        },
+        maxPacketAmount: BigInt(updateOptions.maxPacketAmount)
+      })
+    })
+
+    test('Can update subset of fields', async (): Promise<void> => {
+      const account = await accountFactory.build({
+        maxPacketAmount: BigInt(100),
+        http: {
+          incoming: {
+            authTokens: [uuid()]
+          },
+          outgoing: {
+            authToken: uuid(),
+            endpoint: '/outgoingEndpoint'
+          }
+        },
+        stream: {
+          enabled: false
+        },
+        routing: {
+          staticIlpAddress: 'g.rafiki.' + uuid()
+        }
+      })
+      const updateOptions: UpdateIlpAccountInput = {
+        id: account.id,
+        disabled: true
+      }
+      const response = await apolloClient
+        .mutate({
+          mutation: gql`
+            mutation UpdateIlpAccount($input: UpdateIlpAccountInput!) {
+              updateIlpAccount(input: $input) {
+                code
+                success
+                message
+                ilpAccount {
+                  id
+                }
+              }
+            }
+          `,
+          variables: {
+            input: updateOptions
+          }
+        })
+        .then(
+          (query): UpdateIlpAccountMutationResponse => {
+            if (query.data) {
+              return query.data.updateIlpAccount
+            } else {
+              throw new Error('Data was empty')
+            }
+          }
+        )
+
+      expect(response.success).toBe(true)
+      expect(response.code).toEqual('200')
+      expect(response.ilpAccount?.id).not.toBeNull()
+      await expect(accountsService.getAccount(account.id)).resolves.toEqual({
+        ...account,
+        disabled: updateOptions.disabled
+      })
     })
   })
 })

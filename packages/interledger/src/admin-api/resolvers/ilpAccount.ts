@@ -46,9 +46,13 @@ export const updateIlpAccount: MutationResolvers['updateIlpAccount'] = async (
   args,
   ctx
 ): ResolversTypes['UpdateIlpAccountMutationResponse'] => {
-  // TODO:
-  console.log(ctx) // temporary to pass linting
-  return {}
+  const ilpAccount = await ctx.accountsService.updateAccount(args.input)
+  return {
+    code: '200',
+    success: true,
+    message: 'Updated ILP Account',
+    ilpAccount
+  }
 }
 
 export const deleteIlpAccount: MutationResolvers['deleteIlpAccount'] = async (
