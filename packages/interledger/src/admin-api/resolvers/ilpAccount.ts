@@ -70,9 +70,15 @@ export const createIlpSubAccount: MutationResolvers['createIlpSubAccount'] = asy
   args,
   ctx
 ): ResolversTypes['CreateIlpSubAccountMutationResponse'] => {
-  // TODO:
-  console.log(ctx) // temporary to pass linting
-  return {}
+  const ilpAccount = await ctx.accountsService.createAccount({
+    superAccountId: args.superAccountId
+  })
+  return {
+    code: '200',
+    success: true,
+    message: 'Created ILP Sub-Account',
+    ilpAccount
+  }
 }
 
 export const getSuperAccount: IlpAccountResolvers['superAccount'] = async (

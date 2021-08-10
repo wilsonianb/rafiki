@@ -336,10 +336,10 @@ describe('Accounts Service', (): void => {
       const account = await accountFactory.build()
       const expectedSubAccounts = [
         await accountFactory.build({
-          superAccountId: account.id,
+          superAccountId: account.id
         }),
         await accountFactory.build({
-          superAccountId: account.id,
+          superAccountId: account.id
         })
       ]
       const subAccounts = await accountsService.getSubAccounts(account.id)

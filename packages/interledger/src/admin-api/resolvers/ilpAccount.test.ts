@@ -8,6 +8,7 @@ import { AccountsService } from '../../accounts/service'
 import {
   CreateIlpAccountInput,
   CreateIlpAccountMutationResponse,
+  CreateIlpSubAccountMutationResponse,
   UpdateIlpAccountInput,
   UpdateIlpAccountMutationResponse
 } from '../generated/graphql'
@@ -351,6 +352,57 @@ describe('Account Resolvers', (): void => {
         ...account,
         disabled: updateOptions.disabled
       })
+    })
+  })
+
+  describe('Create Ilp Sub-Account', (): void => {
+    test('Can create an ilp sub-account', async (): Promise<void> => {
+      const superAccount = await accountFactory.build()
+      const response = await apolloClient
+        .mutate({
+          mutation: gql`
+            mutation CreateIlpSubAccount($superAccountId: ID!) {
+              createIlpSubAccount(superAccountId: $superAccountId) {
+                code
+                success
+                message
+                ilpAccount {
+                  id
+                  superAccountId
+                }
+              }
+            }
+          `,
+          variables: {
+            superAccountId: superAccount.id
+          }
+        })
+        .then(
+          (query): CreateIlpSubAccountMutationResponse => {
+            if (query.data) {
+              return query.data.createIlpSubAccount
+            } else {
+              throw new Error('Data was empty')
+            }
+          }
+        )
+
+      expect(response.success).toBe(true)
+      expect(response.code).toEqual('200')
+      expect(response.ilpAccount?.id).not.toBeNull()
+      expect(response.ilpAccount?.superAccountId).toEqual(superAccount.id)
+      const expectedAccount: IlpAccount = {
+        id: response.ilpAccount?.id,
+        asset: superAccount.asset,
+        superAccountId: superAccount.id,
+        disabled: false,
+        stream: {
+          enabled: false
+        }
+      }
+      await expect(
+        accountsService.getAccount(response.ilpAccount?.id)
+      ).resolves.toEqual(expectedAccount)
     })
   })
 })
