@@ -42,14 +42,7 @@ type Mutation {
   createIlpSubAccount(superAccountId: ID!): CreateIlpSubAccountMutationResponse!
 
   "Transfer between Interledger accounts"
-  transfer(
-    sourceAmount: UInt64!
-    sourceAccountId: ID!
-    destinationAccountId: ID!
-    destinationAmount: UInt64
-    autoCommit: Boolean
-    idempotencyKey: ID!
-  ): TransferMutationResponse
+  transfer(input: TransferInput!): TransferMutationResponse
 
   "Extend Credit"
   extendCredit(input: ExtendCreditInput!): ExtendCreditMutationResponse
@@ -242,6 +235,15 @@ enum WithdrawError {
   UnknownAsset
   UnknownWithdrawal
   WithdrawalExists
+}
+
+input TransferInput {
+  sourceAccountId: ID!
+  sourceAmount: String!
+  destinationAccountId: ID!
+  destinationAmount: String
+  autoCommit: Boolean
+  idempotencyKey: ID!
 }
 
 type IlpAccount {
