@@ -16,6 +16,7 @@ import {
   createIlpSubAccount,
   getSubAccounts
 } from './ilpAccount'
+import { transfer } from './transfer'
 
 //TODO: Implement functions for resolvers when there are the relevant services available.
 
@@ -33,7 +34,7 @@ export const resolvers: Resolvers = {
     updateIlpAccount: updateIlpAccount,
     deleteIlpAccount: deleteIlpAccount,
     createIlpSubAccount: createIlpSubAccount,
-    // transfer: createTransfer,
+    transfer: transfer,
     // extendTrustline: extendTrustline,
     // revokeTrustline: revokeTrustline,
     // utilizeTrustline: utilizeTrustline,

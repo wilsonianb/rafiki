@@ -304,12 +304,7 @@ export type MutationCreateIlpSubAccountArgs = {
 
 
 export type MutationTransferArgs = {
-  sourceAmount: Scalars['UInt64'];
-  sourceAccountId: Scalars['ID'];
-  destinationAccountId: Scalars['ID'];
-  destinationAmount?: Maybe<Scalars['UInt64']>;
-  autoCommit?: Maybe<Scalars['Boolean']>;
-  idempotencyKey: Scalars['ID'];
+  input: TransferInput;
 };
 
 
@@ -485,6 +480,15 @@ export type Stream = {
 
 export type StreamInput = {
   enabled: Scalars['Boolean'];
+};
+
+export type TransferInput = {
+  sourceAccountId: Scalars['ID'];
+  sourceAmount: Scalars['String'];
+  destinationAccountId: Scalars['ID'];
+  destinationAmount?: Maybe<Scalars['String']>;
+  autoCommit?: Maybe<Scalars['Boolean']>;
+  idempotencyKey: Scalars['ID'];
 };
 
 export type TransferMutationResponse = MutationResponse & {
@@ -683,6 +687,7 @@ export type ResolversTypes = {
   SettleDebtMutationResponse: ResolverTypeWrapper<Partial<SettleDebtMutationResponse>>;
   Stream: ResolverTypeWrapper<Partial<Stream>>;
   StreamInput: ResolverTypeWrapper<Partial<StreamInput>>;
+  TransferInput: ResolverTypeWrapper<Partial<TransferInput>>;
   TransferMutationResponse: ResolverTypeWrapper<Partial<TransferMutationResponse>>;
   UInt64: ResolverTypeWrapper<Partial<Scalars['UInt64']>>;
   UpdateIlpAccountInput: ResolverTypeWrapper<Partial<UpdateIlpAccountInput>>;
@@ -741,6 +746,7 @@ export type ResolversParentTypes = {
   SettleDebtMutationResponse: Partial<SettleDebtMutationResponse>;
   Stream: Partial<Stream>;
   StreamInput: Partial<StreamInput>;
+  TransferInput: Partial<TransferInput>;
   TransferMutationResponse: Partial<TransferMutationResponse>;
   UInt64: Partial<Scalars['UInt64']>;
   UpdateIlpAccountInput: Partial<UpdateIlpAccountInput>;
@@ -920,7 +926,7 @@ export type MutationResolvers<ContextType = any, ParentType extends ResolversPar
   updateIlpAccount?: Resolver<ResolversTypes['UpdateIlpAccountMutationResponse'], ParentType, ContextType, RequireFields<MutationUpdateIlpAccountArgs, 'input'>>;
   deleteIlpAccount?: Resolver<ResolversTypes['DeleteIlpAccountMutationResponse'], ParentType, ContextType, RequireFields<MutationDeleteIlpAccountArgs, 'id'>>;
   createIlpSubAccount?: Resolver<ResolversTypes['CreateIlpSubAccountMutationResponse'], ParentType, ContextType, RequireFields<MutationCreateIlpSubAccountArgs, 'superAccountId'>>;
-  transfer?: Resolver<Maybe<ResolversTypes['TransferMutationResponse']>, ParentType, ContextType, RequireFields<MutationTransferArgs, 'sourceAmount' | 'sourceAccountId' | 'destinationAccountId' | 'idempotencyKey'>>;
+  transfer?: Resolver<Maybe<ResolversTypes['TransferMutationResponse']>, ParentType, ContextType, RequireFields<MutationTransferArgs, 'input'>>;
   extendCredit?: Resolver<Maybe<ResolversTypes['ExtendCreditMutationResponse']>, ParentType, ContextType, RequireFields<MutationExtendCreditArgs, 'accountId' | 'subAccountId' | 'amount' | 'autoApply'>>;
   revokeCredit?: Resolver<Maybe<ResolversTypes['RevokeCreditMutationResponse']>, ParentType, ContextType, RequireFields<MutationRevokeCreditArgs, 'accountId' | 'subAccountId' | 'amount'>>;
   utilizeCredit?: Resolver<Maybe<ResolversTypes['RevokeCreditMutationResponse']>, ParentType, ContextType, RequireFields<MutationUtilizeCreditArgs, 'accountId' | 'subAccountId' | 'amount'>>;
