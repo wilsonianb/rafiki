@@ -1,6 +1,11 @@
 import { Resolvers } from '../generated/graphql'
 import { bigintScalar } from './scalars'
 import {
+  getDeposit,
+  getDepositsConnectionPageInfo,
+  createDeposit
+} from './deposit'
+import {
   getIlpAccounts,
   getIlpAccount,
   getIlpAccountsConnectionPageInfo,
@@ -17,17 +22,17 @@ import {
 export const resolvers: Resolvers = {
   Query: {
     ilpAccounts: getIlpAccounts,
-    ilpAccount: getIlpAccount
+    ilpAccount: getIlpAccount,
     // trustline: getTrustline,
     // webhook: getWebhook,
-    // deposit: getDeposit,
+    deposit: getDeposit
     // withdrawal: getWithdrawal
   },
   Mutation: {
     createIlpAccount: createIlpAccount,
     updateIlpAccount: updateIlpAccount,
     deleteIlpAccount: deleteIlpAccount,
-    createIlpSubAccount: createIlpSubAccount
+    createIlpSubAccount: createIlpSubAccount,
     // transfer: createTransfer,
     // extendTrustline: extendTrustline,
     // revokeTrustline: revokeTrustline,
@@ -36,7 +41,7 @@ export const resolvers: Resolvers = {
     // createWebhook: createWebhook,
     // updateWebhook: updateWebhook,
     // deleteWebhook: deleteWebhook,
-    // createDeposit: createDeposit,
+    createDeposit: createDeposit
     // createWithdrawal: createWithdrawal,
     // finalizePendingWithdrawal: finalizePendingWithdrawal,
     // rollbackPendingWithdrawal: rollbackPendingWithdrawal
@@ -55,7 +60,7 @@ export const resolvers: Resolvers = {
     // pageInfo: getIlpAccountsConnectionPageInfo
   },
   DepositsConnection: {
-    // pageInfo: getIlpAccountsConnectionPageInfo
+    pageInfo: getDepositsConnectionPageInfo
   },
   WithdrawalsConnection: {
     // pageInfo: getIlpAccountsConnectionPageInfo
