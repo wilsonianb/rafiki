@@ -1,5 +1,10 @@
 import { Resolvers } from '../generated/graphql'
 import {
+  getDeposit,
+  getDepositsConnectionPageInfo,
+  createDeposit
+} from './deposit'
+import {
   getIlpAccounts,
   getIlpAccount,
   getIlpAccountsConnectionPageInfo,
@@ -18,16 +23,16 @@ export const resolvers: Resolvers = {
   UInt64: GraphQLBigInt,
   Query: {
     ilpAccounts: getIlpAccounts,
-    ilpAccount: getIlpAccount
+    ilpAccount: getIlpAccount,
     // webhook: getWebhook,
-    // deposit: getDeposit,
+    deposit: getDeposit
     // withdrawal: getWithdrawal
   },
   Mutation: {
     createIlpAccount: createIlpAccount,
     updateIlpAccount: updateIlpAccount,
     deleteIlpAccount: deleteIlpAccount,
-    createIlpSubAccount: createIlpSubAccount
+    createIlpSubAccount: createIlpSubAccount,
     // transfer: createTransfer,
     // extendCredit: extendCredit,
     // revokeCredit: revokeCredit,
@@ -36,7 +41,7 @@ export const resolvers: Resolvers = {
     // createWebhook: createWebhook,
     // updateWebhook: updateWebhook,
     // deleteWebhook: deleteWebhook,
-    // createDeposit: createDeposit,
+    createDeposit: createDeposit
     // createWithdrawal: createWithdrawal,
     // finalizePendingWithdrawal: finalizePendingWithdrawal,
     // rollbackPendingWithdrawal: rollbackPendingWithdrawal
@@ -55,7 +60,7 @@ export const resolvers: Resolvers = {
     // pageInfo: getWebhooksConnectionPageInfo
   },
   DepositsConnection: {
-    // pageInfo: getDepositsConnectionPageInfo
+    pageInfo: getDepositsConnectionPageInfo
   },
   WithdrawalsConnection: {
     // pageInfo: getWithdrawalsConnectionPageInfo
