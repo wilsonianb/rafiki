@@ -3,7 +3,10 @@ import { Transaction } from 'knex'
 import { v4 as uuid } from 'uuid'
 
 import { AccountFactory } from '../../accounts/testsHelpers'
-import { ExtendCreditMutationResponse } from '../generated/graphql'
+import {
+  ExtendCreditMutationResponse,
+  RevokeCreditMutationResponse
+} from '../generated/graphql'
 import { gql } from 'apollo-server'
 
 import { createTestApp, TestContainer } from '../testsHelpers/app'
@@ -381,7 +384,7 @@ describe('Credit Resolvers', (): void => {
           }
         })
         .then(
-          (query): ExtendCreditMutationResponse => {
+          (query): RevokeCreditMutationResponse => {
             if (query.data) {
               return query.data.revokeCredit
             } else {
@@ -435,7 +438,7 @@ describe('Credit Resolvers', (): void => {
           }
         })
         .then(
-          (query): ExtendCreditMutationResponse => {
+          (query): RevokeCreditMutationResponse => {
             if (query.data) {
               return query.data.revokeCredit
             } else {
@@ -471,7 +474,7 @@ describe('Credit Resolvers', (): void => {
           }
         })
         .then(
-          (query): ExtendCreditMutationResponse => {
+          (query): RevokeCreditMutationResponse => {
             if (query.data) {
               return query.data.revokeCredit
             } else {
@@ -508,7 +511,7 @@ describe('Credit Resolvers', (): void => {
           }
         })
         .then(
-          (query): ExtendCreditMutationResponse => {
+          (query): RevokeCreditMutationResponse => {
             if (query.data) {
               return query.data.revokeCredit
             } else {
@@ -547,7 +550,7 @@ describe('Credit Resolvers', (): void => {
           }
         })
         .then(
-          (query): ExtendCreditMutationResponse => {
+          (query): RevokeCreditMutationResponse => {
             if (query.data) {
               return query.data.revokeCredit
             } else {
@@ -583,7 +586,7 @@ describe('Credit Resolvers', (): void => {
           }
         })
         .then(
-          (query): ExtendCreditMutationResponse => {
+          (query): RevokeCreditMutationResponse => {
             if (query.data) {
               return query.data.revokeCredit
             } else {
@@ -623,7 +626,7 @@ describe('Credit Resolvers', (): void => {
           }
         })
         .then(
-          (query): ExtendCreditMutationResponse => {
+          (query): RevokeCreditMutationResponse => {
             if (query.data) {
               return query.data.revokeCredit
             } else {
