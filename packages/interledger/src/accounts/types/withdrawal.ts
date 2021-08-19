@@ -14,9 +14,12 @@ export interface LiquidityWithdrawal extends WithdrawalOptions {
 
 export type Withdrawal = Required<AccountWithdrawal> & {
   // createdTime: bigint
+  // status: WithdrawalStatus
 }
 
 export enum WithdrawError {
+  AlreadyFinalized = 'AlreadyFinalized',
+  AlreadyRolledBack = 'AlreadyRolledBack',
   InsufficientBalance = 'InsufficientBalance',
   InsufficientLiquidity = 'InsufficientLiquidity',
   InsufficientSettlementBalance = 'InsufficientSettlementBalance',
@@ -24,6 +27,7 @@ export enum WithdrawError {
   UnknownAccount = 'UnknownAccount',
   UnknownLiquidityAccount = 'UnknownLiquidityAccount',
   UnknownSettlementAccount = 'UnknownSettlementAccount',
+  UnknownWithdrawal = 'UnknownWithdrawal',
   WithdrawalExists = 'WithdrawalExists'
 }
 
