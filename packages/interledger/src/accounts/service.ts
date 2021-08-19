@@ -35,13 +35,15 @@ import {
   toLiquidityId,
   toSettlementId,
   randomId,
-  uuidToBigInt
+  uuidToBigInt,
+  validateId
 } from './utils'
 import {
   AccountsService as AccountsServiceInterface,
   CreateAccountError,
   CreateOptions,
   AccountDeposit,
+  LiquidityDeposit,
   Deposit,
   DepositError,
   ExtendCreditOptions,
@@ -57,6 +59,8 @@ import {
   CreditError,
   UpdateAccountError,
   UpdateOptions,
+  AccountWithdrawal,
+  LiquidityWithdrawal,
   WithdrawError
 } from './types'
 
@@ -445,17 +449,15 @@ export class AccountsService implements AccountsServiceInterface {
     assetCode,
     assetScale,
     amount,
-    depositId
-  }: {
-    assetCode: string
-    assetScale: number
-    amount: bigint
-    depositId?: bigint
-  }): Promise<void | DepositError> {
+    id
+  }: LiquidityDeposit): Promise<void | DepositError> {
+    if (id && !validateId(id)) {
+      return DepositError.InvalidId
+    }
     await this.createCurrencyBalances(assetCode, assetScale)
     const error = await this.createTransfers([
       {
-        id: depositId,
+        id: id ? uuidToBigInt(id) : randomId(),
         sourceBalanceId: toSettlementId({
           assetCode,
           assetScale,
@@ -487,16 +489,14 @@ export class AccountsService implements AccountsServiceInterface {
     assetCode,
     assetScale,
     amount,
-    withdrawalId
-  }: {
-    assetCode: string
-    assetScale: number
-    amount: bigint
-    withdrawalId?: bigint
-  }): Promise<void | WithdrawError> {
+    id
+  }: LiquidityWithdrawal): Promise<void | WithdrawError> {
+    if (id && !validateId(id)) {
+      return WithdrawError.InvalidId
+    }
     const error = await this.createTransfers([
       {
-        id: withdrawalId,
+        id: id ? uuidToBigInt(id) : randomId(),
         sourceBalanceId: toLiquidityId({
           assetCode,
           assetScale,
@@ -613,6 +613,9 @@ export class AccountsService implements AccountsServiceInterface {
     accountId,
     amount
   }: AccountDeposit): Promise<Deposit | DepositError> {
+    if (id && !validateId(id)) {
+      return DepositError.InvalidId
+    }
     const account = await IlpAccountModel.query()
       .findById(accountId)
       .select('assetCode', 'assetScale', 'balanceId')
@@ -658,14 +661,13 @@ export class AccountsService implements AccountsServiceInterface {
   }
 
   public async withdraw({
+    id,
     accountId,
-    amount,
-    withdrawalId
-  }: {
-    accountId: string
-    amount: bigint
-    withdrawalId?: bigint
-  }): Promise<void | WithdrawError> {
+    amount
+  }: AccountWithdrawal): Promise<void | WithdrawError> {
+    if (id && !validateId(id)) {
+      return WithdrawError.InvalidId
+    }
     const account = await IlpAccountModel.query()
       .findById(accountId)
       .select('assetCode', 'assetScale', 'balanceId')
@@ -674,7 +676,7 @@ export class AccountsService implements AccountsServiceInterface {
     }
     const error = await this.createTransfers([
       {
-        id: withdrawalId,
+        id: id ? uuidToBigInt(id) : randomId(),
         sourceBalanceId: account.balanceId,
         destinationBalanceId: toSettlementId({
           assetCode: account.assetCode,
