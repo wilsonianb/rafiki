@@ -61,6 +61,7 @@ import {
   UpdateOptions,
   AccountWithdrawal,
   LiquidityWithdrawal,
+  Withdrawal,
   WithdrawError
 } from './types'
 
@@ -664,7 +665,7 @@ export class AccountsService implements AccountsServiceInterface {
     id,
     accountId,
     amount
-  }: AccountWithdrawal): Promise<void | WithdrawError> {
+  }: AccountWithdrawal): Promise<Withdrawal | WithdrawError> {
     if (id && !validateId(id)) {
       return WithdrawError.InvalidId
     }
@@ -674,9 +675,10 @@ export class AccountsService implements AccountsServiceInterface {
     if (!account) {
       return WithdrawError.UnknownAccount
     }
+    const withdrawalId = id || uuid.v4()
     const error = await this.createTransfers([
       {
-        id: id ? uuidToBigInt(id) : randomId(),
+        id: uuidToBigInt(withdrawalId),
         sourceBalanceId: account.balanceId,
         destinationBalanceId: toSettlementId({
           assetCode: account.assetCode,
@@ -705,6 +707,13 @@ export class AccountsService implements AccountsServiceInterface {
         default:
           throw new BalanceTransferError(error.code)
       }
+    }
+    return {
+      id: withdrawalId,
+      accountId,
+      amount
+      // TODO: Get tigerbeetle transfer timestamp
+      // createdTime
     }
   }
 

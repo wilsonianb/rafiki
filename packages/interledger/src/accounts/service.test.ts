@@ -24,7 +24,8 @@ import {
   CreditError,
   UpdateAccountError,
   UpdateOptions,
-  WithdrawError
+  WithdrawError,
+  isWithdrawError
 } from './types'
 import { Logger } from '../logger/service'
 import { createKnex } from '../Knex/service'
@@ -1218,11 +1219,19 @@ describe('Accounts Service', (): void => {
         amount: startingBalance
       })
       const amount = BigInt(5)
-      const error = await accountsService.withdraw({
+      const withdrawal = {
         accountId,
         amount
+      }
+      const withdrawalOrError = await accountsService.withdraw(withdrawal)
+      expect(isWithdrawError(withdrawalOrError)).toEqual(false)
+      if (isWithdrawError(withdrawalOrError)) {
+        fail()
+      }
+      expect(withdrawalOrError).toEqual({
+        ...withdrawal,
+        id: withdrawalOrError.id
       })
-      expect(error).toBeUndefined()
       const { balance } = (await accountsService.getAccountBalance(
         accountId
       )) as IlpBalance
@@ -1233,11 +1242,18 @@ describe('Accounts Service', (): void => {
       )
       expect(settlementBalance).toEqual(startingBalance - amount)
       {
-        const error = await accountsService.withdraw({
+        const withdrawalOrError = await accountsService.withdraw({
           accountId,
           amount
         })
-        expect(error).toBeUndefined()
+        expect(isWithdrawError(withdrawalOrError)).toEqual(false)
+        if (isWithdrawError(withdrawalOrError)) {
+          fail()
+        }
+        expect(withdrawalOrError).toEqual({
+          ...withdrawal,
+          id: withdrawalOrError.id
+        })
         const { balance } = (await accountsService.getAccountBalance(
           accountId
         )) as IlpBalance
@@ -1252,6 +1268,7 @@ describe('Accounts Service', (): void => {
         accountId,
         amount: BigInt(5)
       })
+      expect(isWithdrawError(error)).toEqual(true)
       expect(error).toEqual(WithdrawError.InvalidId)
     })
 
@@ -1298,26 +1315,24 @@ describe('Accounts Service', (): void => {
         amount: startingBalance
       })
       const amount = BigInt(5)
-      const id = uuid()
+      const withdrawal = {
+        id: uuid(),
+        accountId,
+        amount
+      }
       {
-        const error = await accountsService.withdraw({
-          accountId,
-          amount,
-          id
-        })
-        expect(error).toBeUndefined()
+        const withdrawalOrError = await accountsService.withdraw(withdrawal)
+        expect(isWithdrawError(withdrawalOrError)).toEqual(false)
+        expect(withdrawalOrError).toEqual(withdrawal)
         const { balance } = (await accountsService.getAccountBalance(
           accountId
         )) as IlpBalance
         expect(balance).toEqual(startingBalance - amount)
       }
       {
-        const error = await accountsService.withdraw({
-          accountId,
-          amount,
-          id
-        })
-        expect(error).toEqual(WithdrawError.WithdrawalExists)
+        const withdrawalOrError = await accountsService.withdraw(withdrawal)
+        expect(isWithdrawError(withdrawalOrError)).toEqual(true)
+        expect(withdrawalOrError).toEqual(WithdrawError.WithdrawalExists)
         const { balance } = (await accountsService.getAccountBalance(
           accountId
         )) as IlpBalance
@@ -2720,12 +2735,10 @@ describe('Accounts Service', (): void => {
       ).resolves.toBeUndefined()
 
       const withdrawAmount = BigInt(1)
-      await expect(
-        accountsService.withdraw({
-          accountId: subAccountId,
-          amount: withdrawAmount
-        })
-      ).resolves.toBeUndefined()
+      await accountsService.withdraw({
+        accountId: subAccountId,
+        amount: withdrawAmount
+      })
 
       await expect(
         accountsService.settleDebt({
