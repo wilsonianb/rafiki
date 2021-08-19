@@ -87,12 +87,21 @@ export type CreateWebhookMutationResponse = MutationResponse & {
   webhook: Webhook;
 };
 
+export type CreateWithdrawalInput = {
+  /** The id of the account to create the withdrawal for. */
+  ilpAccountId: Scalars['ID'];
+  /** Amount of deposit. */
+  amount: Scalars['UInt64'];
+  /** The id of the withdrawal. */
+  id?: Maybe<Scalars['ID']>;
+};
+
 export type CreateWithdrawalMutationResponse = MutationResponse & {
   __typename?: 'CreateWithdrawalMutationResponse';
   code: Scalars['String'];
   success: Scalars['Boolean'];
   message: Scalars['String'];
-  withdrawal: Withdrawal;
+  withdrawal?: Maybe<Withdrawal>;
 };
 
 export type DeleteIlpAccountMutationResponse = MutationResponse & {
@@ -348,9 +357,7 @@ export type MutationCreateDepositArgs = {
 
 
 export type MutationCreateWithdrawalArgs = {
-  ilpAccountId: Scalars['ID'];
-  amount: Scalars['UInt64'];
-  id?: Maybe<Scalars['ID']>;
+  input: CreateWithdrawalInput;
 };
 
 
@@ -560,8 +567,7 @@ export type Withdrawal = {
   __typename?: 'Withdrawal';
   id: Scalars['ID'];
   amount: Scalars['UInt64'];
-  createdTime: Scalars['Int'];
-  finalizedTime?: Maybe<Scalars['Int']>;
+  ilpAccountId: Scalars['ID'];
 };
 
 export type WithdrawalEdge = {
@@ -672,6 +678,7 @@ export type ResolversTypes = {
   CreateIlpAccountMutationResponse: ResolverTypeWrapper<Partial<CreateIlpAccountMutationResponse>>;
   CreateIlpSubAccountMutationResponse: ResolverTypeWrapper<Partial<CreateIlpSubAccountMutationResponse>>;
   CreateWebhookMutationResponse: ResolverTypeWrapper<Partial<CreateWebhookMutationResponse>>;
+  CreateWithdrawalInput: ResolverTypeWrapper<Partial<CreateWithdrawalInput>>;
   CreateWithdrawalMutationResponse: ResolverTypeWrapper<Partial<CreateWithdrawalMutationResponse>>;
   DeleteIlpAccountMutationResponse: ResolverTypeWrapper<Partial<DeleteIlpAccountMutationResponse>>;
   DeleteWebhookMutationResponse: ResolverTypeWrapper<Partial<DeleteWebhookMutationResponse>>;
@@ -733,6 +740,7 @@ export type ResolversParentTypes = {
   CreateIlpAccountMutationResponse: Partial<CreateIlpAccountMutationResponse>;
   CreateIlpSubAccountMutationResponse: Partial<CreateIlpSubAccountMutationResponse>;
   CreateWebhookMutationResponse: Partial<CreateWebhookMutationResponse>;
+  CreateWithdrawalInput: Partial<CreateWithdrawalInput>;
   CreateWithdrawalMutationResponse: Partial<CreateWithdrawalMutationResponse>;
   DeleteIlpAccountMutationResponse: Partial<DeleteIlpAccountMutationResponse>;
   DeleteWebhookMutationResponse: Partial<DeleteWebhookMutationResponse>;
@@ -832,7 +840,7 @@ export type CreateWithdrawalMutationResponseResolvers<ContextType = any, ParentT
   code?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   message?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
-  withdrawal?: Resolver<ResolversTypes['Withdrawal'], ParentType, ContextType>;
+  withdrawal?: Resolver<Maybe<ResolversTypes['Withdrawal']>, ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -938,7 +946,7 @@ export type MutationResolvers<ContextType = any, ParentType extends ResolversPar
   updateWebhook?: Resolver<Maybe<ResolversTypes['UpdateWebhookMutationResponse']>, ParentType, ContextType, RequireFields<MutationUpdateWebhookArgs, 'webhookId'>>;
   deleteWebhook?: Resolver<Maybe<ResolversTypes['DeleteWebhookMutationResponse']>, ParentType, ContextType, RequireFields<MutationDeleteWebhookArgs, 'webhookId'>>;
   createDeposit?: Resolver<Maybe<ResolversTypes['CreateDepositMutationResponse']>, ParentType, ContextType, RequireFields<MutationCreateDepositArgs, 'input'>>;
-  createWithdrawal?: Resolver<Maybe<ResolversTypes['CreateWithdrawalMutationResponse']>, ParentType, ContextType, RequireFields<MutationCreateWithdrawalArgs, 'ilpAccountId' | 'amount'>>;
+  createWithdrawal?: Resolver<Maybe<ResolversTypes['CreateWithdrawalMutationResponse']>, ParentType, ContextType, RequireFields<MutationCreateWithdrawalArgs, 'input'>>;
   finalizePendingWithdrawal?: Resolver<Maybe<ResolversTypes['FinalizePendingWithdrawalMutationResponse']>, ParentType, ContextType, RequireFields<MutationFinalizePendingWithdrawalArgs, 'withdrawalId'>>;
   rollbackPendingWithdrawal?: Resolver<Maybe<ResolversTypes['RollbackPendingWithdrawalMutationResponse']>, ParentType, ContextType, RequireFields<MutationRollbackPendingWithdrawalArgs, 'withdrawalId'>>;
 };
@@ -1059,8 +1067,7 @@ export type WebhooksConnectionResolvers<ContextType = any, ParentType extends Re
 export type WithdrawalResolvers<ContextType = any, ParentType extends ResolversParentTypes['Withdrawal'] = ResolversParentTypes['Withdrawal']> = {
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   amount?: Resolver<ResolversTypes['UInt64'], ParentType, ContextType>;
-  createdTime?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
-  finalizedTime?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
+  ilpAccountId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
