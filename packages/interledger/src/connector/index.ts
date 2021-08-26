@@ -22,8 +22,8 @@ import {
 } from './core'
 import { Logger } from '../logger/service'
 import { AccountsService } from '../accounts/service'
+import { Config } from '../config'
 
-const ILP_ADDRESS = process.env.ILP_ADDRESS || undefined
 const STREAM_SECRET = process.env.STREAM_SECRET
   ? Buffer.from(process.env.STREAM_SECRET, 'base64')
   : randomBytes(32)
@@ -33,20 +33,22 @@ interface ServiceDependencies {
   logger?: typeof Logger
   ratesService: RatesService
   accountsService: AccountsService
+  config: typeof Config
 }
 
 export async function createConnectorService({
   redis,
   ratesService,
-  accountsService
+  accountsService,
+  config
 }: ServiceDependencies): Promise<Rafiki> {
-  if (!ILP_ADDRESS) {
+  if (!config.ilpAddress) {
     throw new Error('ILP_ADDRESS is required')
   }
 
   const incoming = compose([
     // Incoming Rules
-    createIncomingErrorHandlerMiddleware(ILP_ADDRESS),
+    createIncomingErrorHandlerMiddleware(config.ilpAddress),
     createIncomingMaxPacketAmountMiddleware(),
     createIncomingRateLimitMiddleware({}),
     createIncomingThroughputMiddleware()
@@ -74,7 +76,7 @@ export async function createConnectorService({
     rates: ratesService,
     stream: {
       serverSecret: STREAM_SECRET,
-      serverAddress: ILP_ADDRESS
+      serverAddress: config.ilpAddress
     }
   })
 
@@ -83,7 +85,10 @@ export async function createConnectorService({
   // Default ILP routes
   // TODO Understand the priority and workings of the router... Seems to do funky stuff. Maybe worth just writing ILP one?
   appRouter.ilpRoute('test.*', middleware)
-  appRouter.ilpRoute('peer.config', createIldcpProtocolController(ILP_ADDRESS))
+  appRouter.ilpRoute(
+    'peer.config',
+    createIldcpProtocolController(config.ilpAddress)
+  )
   //appRouter.ilpRoute('peer.route.*', createCcpProtocolController())
   // TODO Handle echo
   app.use(appRouter.routes())

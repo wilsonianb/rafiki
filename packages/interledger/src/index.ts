@@ -12,12 +12,11 @@ import { Logger } from './logger/service'
 
 const logger = Logger
 
-const REDIS = process.env.REDIS || 'redis://127.0.0.1:6379'
-// TODO: connector port and admin api port use the same env variable?
-const CONNECTOR_PORT = parseInt(process.env.ADMIN_API_PORT || '3000', 10)
+const REDIS = Config.redisUrl
+const CONNECTOR_PORT = Config.port
 
 const ADMIN_API_HOST = process.env.ADMIN_API_HOST || '127.0.0.1'
-const ADMIN_API_PORT = parseInt(process.env.ADMIN_API_PORT || '3001', 10)
+const ADMIN_API_PORT = Config.adminPort
 
 const pricesUrl = process.env.PRICES_URL // optional
 const pricesLifetime = +(process.env.PRICES_LIFETIME || 15_000)
@@ -72,7 +71,8 @@ export const start = async (): Promise<void> => {
     redis,
     logger,
     ratesService,
-    accountsService
+    accountsService,
+    config: Config
   })
 
   let shuttingDown = false
