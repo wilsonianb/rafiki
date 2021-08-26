@@ -24,7 +24,7 @@ export const Config = {
   adminPort: envInt('ADMIN_API_PORT', 3003),
   postgresUrl: envString(
     'POSTGRES_URL',
-    'postgresql://postgres:password@localhost:5432/development'
+    'postgresql://postgres:password@localhost:5433/development'
   ),
   env: envString('NODE_ENV', 'development'),
   hmacSecret: envString('ACCOUNTS_HMAC_SECRET', 'test'),
@@ -39,5 +39,5 @@ export const Config = {
   ),
   tigerbeetleReplicaAddresses: process.env.TIGERBEETLE_REPLICA_ADDRESSES
     ? JSON.parse(process.env.TIGERBEETLE_REPLICA_ADDRESSES)
-    : ['3001']
+    : ['3004']
 }

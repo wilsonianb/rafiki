@@ -16,7 +16,7 @@ services:
     image: "wilsonianbcoil/tigerbeetle:latest"
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "3004:3001"
     entrypoint: ["./tigerbeetle", "--cluster-id=0a5ca1ab1ebee11e", "--replica-index=0", "--replica-addresses=0.0.0.0:3001"]
   redis:
     image: "redis"
