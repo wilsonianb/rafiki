@@ -49,7 +49,7 @@ jobs:
       - run: yarn workspace interledger lint
       - run: yarn workspace interledger format:check
       - run: yarn install --immutable --immutable-cache
-      - run: yarn build
+      - run: yarn workspace interledger build
       - run: yarn workspace interledger test
 
   frontend:

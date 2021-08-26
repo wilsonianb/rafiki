@@ -11,9 +11,9 @@
 From the monorepo root directory:
 
 ```shell
-# Build accounts service
-yarn build
+# Build interledger service
+yarn workspace interledger build
 
 # Run tests
-yarn workspace connector test
+yarn workspace interledger test
 ```

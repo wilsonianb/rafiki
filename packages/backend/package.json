@@ -1,6 +1,8 @@
 {
   "name": "backend",
   "scripts": {
+    "build": "yarn generate && yarn build:local && yarn copy-schemas",
+    "copy-schemas": "cp src/graphql/schema.graphql dist/graphql",
     "lint": "yarn lint:local",
     "format": "yarn format:local",
     "format:check": "yarn format:check:local",

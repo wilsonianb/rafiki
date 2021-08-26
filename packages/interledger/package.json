@@ -1,6 +1,8 @@
 {
   "name": "interledger",
   "scripts": {
+    "build": "yarn generate && yarn build:local && yarn copy-schemas",
+    "copy-schemas": "cp src/admin-api/schema.graphql dist/admin-api",
     "lint": "yarn lint:local",
     "format": "yarn format:local",
     "format:check": "yarn format:check:local",
