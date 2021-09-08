@@ -20,6 +20,7 @@ import {
   rollbackPendingWithdrawal
 } from './withdrawal'
 import { GraphQLBigInt } from '../scalars'
+import { transfer } from './transfer'
 
 //TODO: Implement functions for resolvers when there are the relevant services available.
 
@@ -37,7 +38,7 @@ export const resolvers: Resolvers = {
     updateIlpAccount: updateIlpAccount,
     deleteIlpAccount: deleteIlpAccount,
     createIlpSubAccount: createIlpSubAccount,
-    // transfer: createTransfer,
+    transfer: transfer,
     extendCredit: extendCredit,
     revokeCredit: revokeCredit,
     utilizeCredit: utilizeCredit,
