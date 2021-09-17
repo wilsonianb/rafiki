@@ -7203,6 +7203,8 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["pino", "npm:6.11.3"],
             ["pino-pretty", "npm:4.7.1"],
             ["testcontainers", "npm:7.11.1"],
+            ["tigerbeetle-node", "npm:0.4.1"],
+            ["tmp", "npm:0.2.1"],
             ["uuid", "npm:8.3.2"]
           ],
           "linkType": "SOFT",

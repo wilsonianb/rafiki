@@ -4951,6 +4951,8 @@ __metadata:
     pino: ^6.11.3
     pino-pretty: ^4.7.1
     testcontainers: ^7.11.1
+    tigerbeetle-node: ^0.4.1
+    tmp: ^0.2.1
     uuid: ^8.3.2
   languageName: unknown
   linkType: soft
