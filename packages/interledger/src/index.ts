@@ -12,10 +12,11 @@ import { createAssetService } from './asset/service'
 import { createBalanceService } from './balance/service'
 import { createCreditService } from './credit/service'
 import { createDepositService } from './deposit/service'
-import { createTokenService } from './token/service'
+import { createHttpTokenService } from './httpToken/service'
 import { createTransferService } from './transfer/service'
 import { createWithdrawalService } from './withdrawal/service'
 import { Logger } from './logger/service'
+import { createKnex } from './Knex/service'
 
 const logger = Logger
 
@@ -65,6 +66,7 @@ export const gracefulShutdown = async (): Promise<void> => {
 }
 
 export const start = async (): Promise<void> => {
+  const knex = await createKnex(Config.postgresUrl)
   const balanceService = createBalanceService({
     logger,
     tbClient
@@ -75,14 +77,15 @@ export const start = async (): Promise<void> => {
     balanceService
   })
 
-  const tokenService = createTokenService({
-    logger
+  const httpTokenService = await createHttpTokenService({
+    logger,
+    knex
   })
 
   const accountService = createAccountService({
     assetService,
     balanceService,
-    tokenService,
+    httpTokenService,
     ...Config,
     logger
   })

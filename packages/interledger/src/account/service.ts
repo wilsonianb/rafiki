@@ -13,7 +13,11 @@ import {
   calculateCreditBalance,
   calculateDebitBalance
 } from '../balance/service'
-import { Token, TokenError, TokenService } from '../token/service'
+import {
+  HttpTokenOptions,
+  HttpTokenError,
+  HttpTokenService
+} from '../httpToken/service'
 import { BaseService } from '../shared/baseService'
 import { UnknownBalanceError } from '../shared/errors'
 import { randomId } from '../shared/utils'
@@ -124,7 +128,7 @@ export interface AccountService {
 interface ServiceDependencies extends BaseService {
   assetService: AssetService
   balanceService: BalanceService
-  tokenService: TokenService
+  httpTokenService: HttpTokenService
   ilpAddress?: string
   peerAddresses: Peer[]
 }
@@ -133,7 +137,7 @@ export function createAccountService({
   logger,
   assetService,
   balanceService,
-  tokenService,
+  httpTokenService,
   ilpAddress,
   peerAddresses
 }: ServiceDependencies): AccountService {
@@ -144,7 +148,7 @@ export function createAccountService({
     logger: log,
     assetService,
     balanceService,
-    tokenService,
+    httpTokenService,
     ilpAddress,
     peerAddresses
   }
@@ -254,7 +258,7 @@ async function createAccount(
     const accountRow = await IlpAccount.query(trx).insertAndFetch(newAccount)
 
     const incomingTokens = account.http?.incoming?.authTokens.map(
-      (incomingToken: string): Token => {
+      (incomingToken: string): HttpTokenOptions => {
         return {
           accountId: accountRow.id,
           token: incomingToken
@@ -262,9 +266,9 @@ async function createAccount(
       }
     )
     if (incomingTokens) {
-      const err = await deps.tokenService.create(incomingTokens, trx)
+      const err = await deps.httpTokenService.create(incomingTokens, trx)
       if (err) {
-        if (err === TokenError.DuplicateToken) {
+        if (err === HttpTokenError.DuplicateToken) {
           trx.rollback()
           return AccountError.DuplicateIncomingToken
         }
@@ -277,7 +281,7 @@ async function createAccount(
     trx.rollback()
     if (
       err instanceof UniqueViolationError &&
-      err.constraint === 'ilpAccounts_pkey'
+      err.constraint === 'accounts_pkey'
     ) {
       return AccountError.DuplicateAccountId
     } else if (err instanceof NotFoundError) {
@@ -294,18 +298,18 @@ async function updateAccount(
   const trx = await IlpAccount.startTransaction()
   try {
     if (accountOptions.http?.incoming?.authTokens) {
-      await deps.tokenService.delete(accountOptions.id, trx)
+      await deps.httpTokenService.deleteByAccount(accountOptions.id, trx)
       const incomingTokens = accountOptions.http.incoming.authTokens.map(
-        (incomingToken: string): Token => {
+        (incomingToken: string): HttpTokenOptions => {
           return {
             accountId: accountOptions.id,
             token: incomingToken
           }
         }
       )
-      const err = await deps.tokenService.create(incomingTokens, trx)
+      const err = await deps.httpTokenService.create(incomingTokens, trx)
       if (err) {
-        if (err === TokenError.DuplicateToken) {
+        if (err === HttpTokenError.DuplicateToken) {
           trx.rollback()
           return AccountError.DuplicateIncomingToken
         }
@@ -606,7 +610,7 @@ async function getAccountsPage(
           : {}
       )
       .whereRaw(
-        '("createdAt", "id") > (select "createdAt" :: TIMESTAMP, "id" from "ilpAccounts" where "id" = ?)',
+        '("createdAt", "id") > (select "createdAt" :: TIMESTAMP, "id" from "accounts" where "id" = ?)',
         [pagination.after]
       )
       .orderBy([
@@ -631,7 +635,7 @@ async function getAccountsPage(
           : {}
       )
       .whereRaw(
-        '("createdAt", "id") < (select "createdAt" :: TIMESTAMP, "id" from "ilpAccounts" where "id" = ?)',
+        '("createdAt", "id") < (select "createdAt" :: TIMESTAMP, "id" from "accounts" where "id" = ?)',
         [pagination.before]
       )
       .orderBy([
