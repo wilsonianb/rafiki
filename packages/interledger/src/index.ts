@@ -1,7 +1,7 @@
 import IORedis from 'ioredis'
 import { Server } from 'http'
 import { ApolloServer } from 'apollo-server'
-import { createClient } from 'tigerbeetle-node'
+import { createTigerBeetleService } from 'tigerbeetle'
 
 import { createAdminApi } from './admin-api'
 import { createConnectorService } from './connector'
@@ -9,7 +9,6 @@ import { createRatesService, Rafiki } from './connector/core'
 import { Config } from './config'
 import { createAccountService } from './account/service'
 import { createAssetService } from './asset/service'
-import { createBalanceService } from './balance/service'
 import { createCreditService } from './credit/service'
 import { createDepositService } from './deposit/service'
 import { createHttpTokenService } from './httpToken/service'
@@ -40,10 +39,6 @@ const redis = new IORedis(REDIS, {
   // This option messes up some types, but helps with (large) number accuracy.
   stringNumbers: true
 })
-const tbClient = createClient({
-  cluster_id: Config.tigerbeetleClusterId,
-  replica_addresses: Config.tigerbeetleReplicaAddresses
-})
 
 let adminApi: ApolloServer
 let connectorApp: Rafiki
@@ -67,14 +62,14 @@ export const gracefulShutdown = async (): Promise<void> => {
 
 export const start = async (): Promise<void> => {
   const knex = await createKnex(Config.postgresUrl)
-  const balanceService = createBalanceService({
-    logger,
-    tbClient
+  const tigerbeetleService = createTigerBeetleService({
+    clusterId: Config.tigerbeetleClusterId,
+    replicaAddresses: Config.tigerbeetleReplicaAddresses
   })
 
   const assetService = createAssetService({
     logger,
-    balanceService
+    tigerbeetleService
   })
 
   const httpTokenService = await createHttpTokenService({
@@ -84,7 +79,7 @@ export const start = async (): Promise<void> => {
 
   const accountService = createAccountService({
     assetService,
-    balanceService,
+    tigerbeetleService,
     httpTokenService,
     ...Config,
     logger
@@ -93,27 +88,27 @@ export const start = async (): Promise<void> => {
   const creditService = createCreditService({
     logger,
     accountService,
-    balanceService
+    tigerbeetleService
   })
 
   const depositService = createDepositService({
     logger,
     accountService,
     assetService,
-    balanceService
+    tigerbeetleService
   })
 
   const transferService = createTransferService({
     logger,
     accountService,
-    balanceService
+    tigerbeetleService
   })
 
   const withdrawalService = createWithdrawalService({
     logger,
     accountService,
     assetService,
-    balanceService
+    tigerbeetleService
   })
 
   const ratesService = createRatesService({

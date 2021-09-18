@@ -38,6 +38,10 @@ export const Config = {
   streamSecret: process.env.STREAM_SECRET
     ? Buffer.from(process.env.STREAM_SECRET, 'base64')
     : crypto.randomBytes(32),
+  tigerbeetleClusterId: envInt('TIGERBEETLE_CLUSTER_ID', 1),
+  tigerbeetleReplicaAddresses: process.env.TIGERBEETLE_REPLICA_ADDRESSES
+    ? JSON.parse(process.env.TIGERBEETLE_REPLICA_ADDRESSES)
+    : ['3001'],
 
   /** Frontend **/
   frontendUrl: envString('FRONTEND_URL', 'http://localhost:3000')

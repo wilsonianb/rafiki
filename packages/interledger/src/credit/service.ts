@@ -1,9 +1,5 @@
 import { AccountService, IlpAccount, SubAccount } from '../account/service'
-import {
-  BalanceService,
-  BalanceTransfer,
-  CreateTransferError
-} from '../balance/service'
+import { TigerBeetleService, Transfer, CreateTransferError } from 'tigerbeetle'
 import { BaseService } from '../shared/baseService'
 import { BalanceTransferError, UnknownBalanceError } from '../shared/errors'
 
@@ -40,13 +36,13 @@ export interface CreditService {
 
 interface ServiceDependencies extends BaseService {
   accountService: AccountService
-  balanceService: BalanceService
+  tigerbeetleService: TigerBeetleService
 }
 
 export function createCreditService({
   logger,
   accountService,
-  balanceService
+  tigerbeetleService
 }: ServiceDependencies): CreditService {
   const log = logger.child({
     service: 'CreditService'
@@ -54,7 +50,7 @@ export function createCreditService({
   const deps: ServiceDependencies = {
     logger: log,
     accountService,
-    balanceService
+    tigerbeetleService
   }
   return {
     extend: (options) => extendCredit(deps, options),
@@ -90,7 +86,7 @@ async function extendCredit(
     }
     return CreditError.UnknownAccount
   }
-  const transfers: BalanceTransfer[] = []
+  const transfers: Transfer[] = []
   let account = subAccount as IlpAccount
   for (
     ;
@@ -110,7 +106,7 @@ async function extendCredit(
       amount
     })
   }
-  const err = await deps.balanceService.createTransfers(transfers)
+  const err = await deps.tigerbeetleService.createTransfers(transfers)
   if (err) {
     if (
       autoApply &&
@@ -148,7 +144,7 @@ async function utilizeCredit(
     }
     return CreditError.UnknownAccount
   }
-  const transfers: BalanceTransfer[] = []
+  const transfers: Transfer[] = []
   let account = subAccount as IlpAccount
   for (
     ;
@@ -163,7 +159,7 @@ async function utilizeCredit(
     destinationBalanceId: subAccount.balanceId,
     amount
   })
-  const err = await deps.balanceService.createTransfers(transfers)
+  const err = await deps.tigerbeetleService.createTransfers(transfers)
   if (err) {
     if (err.code === CreateTransferError.exceeds_credits) {
       if (err.index === transfers.length - 1) {
@@ -201,7 +197,7 @@ async function revokeCredit(
     }
     return CreditError.UnknownAccount
   }
-  const transfers: BalanceTransfer[] = []
+  const transfers: Transfer[] = []
   let account = subAccount as IlpAccount
   for (
     ;
@@ -210,7 +206,7 @@ async function revokeCredit(
   ) {
     transfers.push(decreaseCredit({ account, amount }))
   }
-  const err = await deps.balanceService.createTransfers(transfers)
+  const err = await deps.tigerbeetleService.createTransfers(transfers)
   if (err) {
     if (err.code === CreateTransferError.exceeds_credits) {
       return CreditError.InsufficientCredit
@@ -245,7 +241,7 @@ async function settleDebt(
     }
     return CreditError.UnknownAccount
   }
-  const transfers: BalanceTransfer[] = []
+  const transfers: Transfer[] = []
   let account = subAccount as IlpAccount
   for (
     ;
@@ -262,7 +258,7 @@ async function settleDebt(
     destinationBalanceId: account.balanceId,
     amount
   })
-  const err = await deps.balanceService.createTransfers(transfers)
+  const err = await deps.tigerbeetleService.createTransfers(transfers)
   if (err) {
     if (err.code === CreateTransferError.exceeds_credits) {
       if (err.index === transfers.length - 1) {
@@ -281,7 +277,7 @@ function increaseCredit({
 }: {
   account: SubAccount
   amount: bigint
-}): BalanceTransfer {
+}): Transfer {
   if (!account.creditBalanceId) {
     throw new UnknownBalanceError(account.id)
   } else if (!account.superAccount.creditExtendedBalanceId) {
@@ -300,7 +296,7 @@ function decreaseCredit({
 }: {
   account: SubAccount
   amount: bigint
-}): BalanceTransfer {
+}): Transfer {
   if (!account.creditBalanceId) {
     throw new UnknownBalanceError(account.id)
   } else if (!account.superAccount.creditExtendedBalanceId) {
@@ -319,7 +315,7 @@ function increaseDebt({
 }: {
   account: SubAccount
   amount: bigint
-}): BalanceTransfer {
+}): Transfer {
   if (!account.debtBalanceId) {
     throw new UnknownBalanceError(account.id)
   } else if (!account.superAccount.lentBalanceId) {
@@ -338,7 +334,7 @@ function decreaseDebt({
 }: {
   account: SubAccount
   amount: bigint
-}): BalanceTransfer {
+}): Transfer {
   if (!account.debtBalanceId) {
     throw new UnknownBalanceError(account.id)
   } else if (!account.superAccount.lentBalanceId) {

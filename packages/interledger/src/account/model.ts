@@ -1,16 +1,7 @@
 import { BaseModel } from '../shared/baseModel'
 import { Asset } from '../asset/model'
 import { HttpToken } from '../httpToken/model'
-import { bigIntToDbUuid, uuidToBigInt } from '../shared/utils'
 import { Model, Pojo } from 'objection'
-
-const BALANCE_IDS = [
-  'balanceId',
-  'creditBalanceId',
-  'creditExtendedBalanceId',
-  'debtBalanceId',
-  'lentBalanceId'
-]
 
 export class IlpAccount extends BaseModel {
   public static get tableName(): string {
@@ -57,15 +48,15 @@ export class IlpAccount extends BaseModel {
   public readonly assetId!: string
   public asset!: Asset
   // TigerBeetle account id tracking Interledger balance
-  public readonly balanceId!: bigint
+  public readonly balanceId!: string
   // TigerBeetle account id tracking credit extended by super-account
-  public readonly creditBalanceId?: bigint
+  public readonly creditBalanceId?: string
   // TigerBeetle account id tracking credit extended to sub-account(s)
-  public readonly creditExtendedBalanceId?: bigint
+  public readonly creditExtendedBalanceId?: string
   // TigerBeetle account id tracking amount loaned from super-account
-  public readonly debtBalanceId?: bigint
+  public readonly debtBalanceId?: string
   // TigerBeetle account id tracking amount(s) loaned to sub-account(s)
-  public readonly lentBalanceId?: bigint
+  public readonly lentBalanceId?: string
 
   public readonly superAccountId?: string
   public readonly subAccounts?: IlpAccount[]
@@ -90,11 +81,6 @@ export class IlpAccount extends BaseModel {
   }
 
   $formatDatabaseJson(json: Pojo): Pojo {
-    BALANCE_IDS.forEach((balanceId) => {
-      if (json[balanceId]) {
-        json[balanceId] = bigIntToDbUuid(json[balanceId])
-      }
-    })
     if (json.stream) {
       json.streamEnabled = json.stream.enabled
       delete json.stream
@@ -113,11 +99,6 @@ export class IlpAccount extends BaseModel {
 
   $parseDatabaseJson(json: Pojo): Pojo {
     const formattedJson = super.$parseDatabaseJson(json)
-    BALANCE_IDS.forEach((balanceId) => {
-      if (formattedJson[balanceId]) {
-        formattedJson[balanceId] = uuidToBigInt(json[balanceId])
-      }
-    })
     if (formattedJson.streamEnabled !== null) {
       formattedJson.stream = {
         enabled: formattedJson.streamEnabled

@@ -2991,12 +2991,32 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/docker-modem@npm:*":
+  version: 3.0.1
+  resolution: "@types/docker-modem@npm:3.0.1"
+  dependencies:
+    "@types/node": "*"
+    "@types/ssh2": "*"
+  checksum: cf735e22b730dd36fe55b451df91b1e745c12e2fec402bc066367510e18bbf499a1c8d5d010bc78c5597f9c9f2a5579be26e614e4ed62d22d349494925b05610
+  languageName: node
+  linkType: hard
+
 "@types/dockerode@npm:^3.2.1":
   version: 3.2.3
   resolution: "@types/dockerode@npm:3.2.3"
   dependencies:
     "@types/node": "*"
   checksum: b5181adfcfc0a24046fff0705fe144a4465b71d7bb3731d77876e6d96fe7b19a9aabc80e240fccd5458238a40e54d0d33c1ed953b81e0a67f5db96c5bf793e10
+  languageName: node
+  linkType: hard
+
+"@types/dockerode@npm:^3.2.5":
+  version: 3.2.7
+  resolution: "@types/dockerode@npm:3.2.7"
+  dependencies:
+    "@types/docker-modem": "*"
+    "@types/node": "*"
+  checksum: 714b98a804170ba31e8e4c060bfe38203864788f4adb77d608f4bac291c425d9b03ea42d50fddc7e594c0ffec8eca4c18621e6c7f0f3a93fa2c7a8d0c2473e2b
   languageName: node
   linkType: hard
 
@@ -3513,6 +3533,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/pino@npm:^6.3.11":
+  version: 6.3.11
+  resolution: "@types/pino@npm:6.3.11"
+  dependencies:
+    "@types/node": "*"
+    "@types/pino-pretty": "*"
+    "@types/pino-std-serializers": "*"
+    sonic-boom: ^2.1.0
+  checksum: 79b71d0edd84a003773636b3c29262baaa430b18a748a999e4667a0e9b3a5cc81004841b937ae7cf1d045f3e34186cd7e6deb56420d5d4738825db3df3837879
+  languageName: node
+  linkType: hard
+
 "@types/pino@npm:^6.3.9":
   version: 6.3.9
   resolution: "@types/pino@npm:6.3.9"
@@ -3621,6 +3653,16 @@ __metadata:
   dependencies:
     "@types/node": "*"
   checksum: 32adc38f70e525225571525959fa3ac7920400fe53032003af021281424f61dd43a727a2f4ee54d3c395656ed814dcac7e09cdc11edf8878d7acb13934ce3914
+  languageName: node
+  linkType: hard
+
+"@types/ssh2@npm:*":
+  version: 0.5.48
+  resolution: "@types/ssh2@npm:0.5.48"
+  dependencies:
+    "@types/node": "*"
+    "@types/ssh2-streams": "*"
+  checksum: bff6da0bda0d64b72ddf0867d23988aac61d83f5362b15bc8ef02152955b8ac66b628118103efe0023b28703a81469f4ac1a0a131967dd7690c352438ccb0fa7
   languageName: node
   linkType: hard
 
@@ -4951,6 +4993,8 @@ __metadata:
     pino: ^6.11.3
     pino-pretty: ^4.7.1
     testcontainers: ^7.11.1
+    tigerbeetle: "workspace:packages/tigerbeetle"
+    tmp: ^0.2.1
     uuid: ^8.3.2
   languageName: unknown
   linkType: soft
@@ -7349,6 +7393,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"fastify-warning@npm:^0.2.0":
+  version: 0.2.0
+  resolution: "fastify-warning@npm:0.2.0"
+  checksum: 17b9e2ffdfbfd40486f3395e4c33a8f997c9d23c3201624eed5596f3e3dcd3d5bf4f0c18b3bf7c32f3e80d1d573df9d59bc5c179fcfe5de52a1baa64934a54cf
+  languageName: node
+  linkType: hard
+
 "fastq@npm:^1.6.0":
   version: 1.11.0
   resolution: "fastq@npm:1.11.0"
@@ -8871,7 +8922,7 @@ __metadata:
     rosie: ^2.1.0
     rxjs: ^6.6.7
     testcontainers: ^7.14.0
-    tigerbeetle-node: ^0.4.1
+    tigerbeetle: "workspace:packages/tigerbeetle"
     tmp: ^0.2.1
     uuid: ^8.3.2
   languageName: unknown
@@ -12364,6 +12415,23 @@ __metadata:
   languageName: node
   linkType: hard
 
+"pino@npm:^6.13.2":
+  version: 6.13.2
+  resolution: "pino@npm:6.13.2"
+  dependencies:
+    fast-redact: ^3.0.0
+    fast-safe-stringify: ^2.0.8
+    fastify-warning: ^0.2.0
+    flatstr: ^1.0.12
+    pino-std-serializers: ^3.1.0
+    quick-format-unescaped: ^4.0.3
+    sonic-boom: ^1.0.2
+  bin:
+    pino: bin.js
+  checksum: bd490e31b1e6313dd277c85fee2854fd850a8c97ce2569dc973e54d03846755f4fef72d50f1f4c0ceb0894eabddd6cfeb2bb2638a5373dceaefe7e883de1d32b
+  languageName: node
+  linkType: hard
+
 "pirates@npm:^4.0.1":
   version: 4.0.1
   resolution: "pirates@npm:4.0.1"
@@ -13752,6 +13820,15 @@ resolve@^2.0.0-next.3:
   languageName: node
   linkType: hard
 
+"sonic-boom@npm:^2.1.0":
+  version: 2.2.3
+  resolution: "sonic-boom@npm:2.2.3"
+  dependencies:
+    atomic-sleep: ^1.0.0
+  checksum: 75f079ab200054ec15cb7d87893904118d503371da60368993dd6f5db57cb28f765d38a4642cac86c377439143a73b141ee67c5a925a0c00a432d3ec57431ad1
+  languageName: node
+  linkType: hard
+
 "source-map-resolve@npm:^0.5.0":
   version: 0.5.3
   resolution: "source-map-resolve@npm:0.5.3"
@@ -14439,6 +14516,26 @@ resolve@^2.0.0-next.3:
   languageName: node
   linkType: hard
 
+"testcontainers@npm:^7.20.4":
+  version: 7.20.4
+  resolution: "testcontainers@npm:7.20.4"
+  dependencies:
+    "@types/archiver": ^5.1.1
+    "@types/dockerode": ^3.2.5
+    archiver: ^5.3.0
+    byline: ^5.0.0
+    debug: ^4.3.2
+    docker-compose: ^0.23.12
+    dockerode: ^3.3.0
+    get-port: ^5.1.1
+    glob: ^7.1.7
+    slash: ^3.0.0
+    ssh-remote-port-forward: ^1.0.3
+    tar-fs: ^2.1.1
+  checksum: 32ad207f5b56d522c5f7fd0172a932f97a482979f14b8af928f1cb580bc7a093c49a4d168419e53d1af4401ecbb48d3a8b27e7e42907205a27c6f7cf5f01bba9
+  languageName: node
+  linkType: hard
+
 "text-extensions@npm:^1.0.0":
   version: 1.9.0
   resolution: "text-extensions@npm:1.9.0"
@@ -14482,6 +14579,20 @@ resolve@^2.0.0-next.3:
   checksum: 5a852655427ef9743701460b750e2bf280b10475ff2a06f58f16873b523d44624a232c33c62bccc40b0c137dbcf260c240e1b23b144ea1fce8e223277a5714f2
   languageName: node
   linkType: hard
+
+"tigerbeetle@workspace:packages/tigerbeetle":
+  version: 0.0.0-use.local
+  resolution: "tigerbeetle@workspace:packages/tigerbeetle"
+  dependencies:
+    "@types/pino": ^6.3.11
+    "@types/uuid": ^8.3.1
+    pino: ^6.13.2
+    testcontainers: ^7.20.4
+    tigerbeetle-node: ^0.4.1
+    tmp: ^0.2.1
+    uuid: ^8.3.2
+  languageName: unknown
+  linkType: soft
 
 "tildify@npm:2.0.0":
   version: 2.0.0

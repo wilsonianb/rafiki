@@ -35,6 +35,7 @@ jobs:
           key: ${{ github.sha }}
       - run: yarn workspace backend lint
       - run: yarn workspace backend format:check
+      - run: yarn build
       - run: yarn workspace backend test
 
   interledger:
@@ -77,6 +78,19 @@ jobs:
       - run: yarn workspace rates lint
       - run: yarn workspace rates format:check
       - run: yarn workspace rates test
+
+  tigerbeetle:
+    runs-on: ubuntu-latest
+    needs: checkout
+    steps:
+      - uses: actions/cache@v2
+        id: restore-build
+        with:
+          path: ./*
+          key: ${{ github.sha }}
+      - run: yarn workspace tigerbeetle lint
+      - run: yarn workspace tigerbeetle format:check
+      - run: yarn workspace tigerbeetle test
 
   build:
     runs-on: ubuntu-latest

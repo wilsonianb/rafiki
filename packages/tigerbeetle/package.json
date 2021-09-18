@@ -1,0 +1,22 @@
+{
+  "name": "tigerbeetle",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "lint": "yarn lint:local",
+    "format": "yarn format:local",
+    "format:check": "yarn format:check:local",
+    "test": "yarn test:local"
+  },
+  "devDependencies": {
+    "@types/pino": "^6.3.11",
+    "@types/uuid": "^8.3.1",
+    "testcontainers": "^7.20.4",
+    "tmp": "^0.2.1"
+  },
+  "dependencies": {
+    "pino": "^6.13.2",
+    "tigerbeetle-node": "^0.4.1",
+    "uuid": "^8.3.2"
+  }
+}

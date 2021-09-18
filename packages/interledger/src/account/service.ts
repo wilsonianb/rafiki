@@ -4,15 +4,10 @@ import {
   raw,
   UniqueViolationError
 } from 'objection'
-import * as uuid from 'uuid'
+import { v4 as uuid } from 'uuid'
 
 import { AssetService, Asset } from '../asset/service'
-import {
-  BalanceOptions,
-  BalanceService,
-  calculateCreditBalance,
-  calculateDebitBalance
-} from '../balance/service'
+import { BalanceOptions, TigerBeetleService } from 'tigerbeetle'
 import {
   HttpTokenOptions,
   HttpTokenError,
@@ -20,7 +15,7 @@ import {
 } from '../httpToken/service'
 import { BaseService } from '../shared/baseService'
 import { UnknownBalanceError } from '../shared/errors'
-import { randomId } from '../shared/utils'
+import { validateId } from '../shared/utils'
 import { UnknownAssetError } from './errors'
 import { IlpAccount, SubAccount } from './model'
 
@@ -127,7 +122,7 @@ export interface AccountService {
 
 interface ServiceDependencies extends BaseService {
   assetService: AssetService
-  balanceService: BalanceService
+  tigerbeetleService: TigerBeetleService
   httpTokenService: HttpTokenService
   ilpAddress?: string
   peerAddresses: Peer[]
@@ -136,7 +131,7 @@ interface ServiceDependencies extends BaseService {
 export function createAccountService({
   logger,
   assetService,
-  balanceService,
+  tigerbeetleService,
   httpTokenService,
   ilpAddress,
   peerAddresses
@@ -147,7 +142,7 @@ export function createAccountService({
   const deps: ServiceDependencies = {
     logger: log,
     assetService,
-    balanceService,
+    tigerbeetleService,
     httpTokenService,
     ilpAddress,
     peerAddresses
@@ -204,8 +199,8 @@ async function createAccount(
         .withGraphFetched('asset(withUnit)')
         .forUpdate()
         .throwIfNotFound()
-      newAccount.creditBalanceId = randomId()
-      newAccount.debtBalanceId = randomId()
+      newAccount.creditBalanceId = uuid()
+      newAccount.debtBalanceId = uuid()
       newBalances.push(
         {
           id: newAccount.creditBalanceId,
@@ -222,7 +217,7 @@ async function createAccount(
         deps.logger.warn(superAccount, 'missing super-account balance')
       }
       if (!superAccount.creditExtendedBalanceId) {
-        superAccountPatch.creditExtendedBalanceId = randomId()
+        superAccountPatch.creditExtendedBalanceId = uuid()
         newBalances.push({
           id: superAccountPatch.creditExtendedBalanceId,
           debitBalance: true,
@@ -230,7 +225,7 @@ async function createAccount(
         })
       }
       if (!superAccount.lentBalanceId) {
-        superAccountPatch.lentBalanceId = randomId()
+        superAccountPatch.lentBalanceId = uuid()
         newBalances.push({
           id: superAccountPatch.lentBalanceId,
           debitBalance: true,
@@ -239,14 +234,14 @@ async function createAccount(
       }
     }
 
-    newAccount.balanceId = randomId()
+    newAccount.balanceId = uuid()
     newBalances.push({
       id: newAccount.balanceId,
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       unit: newAccount.asset!.unit
     })
 
-    await deps.balanceService.create(newBalances)
+    await deps.tigerbeetleService.createBalances(newBalances)
 
     if (isSubAccount(account)) {
       await IlpAccount.query(trx)
@@ -407,7 +402,7 @@ async function getAccountBalance(
       balanceIds.push(account[balanceId])
     }
   })
-  const balances = await deps.balanceService.get(balanceIds)
+  const balances = await deps.tigerbeetleService.getBalances(balanceIds)
 
   if (balances.length === 0) {
     throw new UnknownBalanceError(accountId)
@@ -421,22 +416,22 @@ async function getAccountBalance(
     totalLent: BigInt(0)
   }
 
-  balances.forEach((balance) => {
-    switch (balance.id) {
+  balances.forEach(({ id, balance }) => {
+    switch (id) {
       case account.balanceId:
-        accountBalance.balance = calculateCreditBalance(balance)
+        accountBalance.balance = balance
         break
       case account.creditBalanceId:
-        accountBalance.availableCredit = calculateCreditBalance(balance)
+        accountBalance.availableCredit = balance
         break
       case account.creditExtendedBalanceId:
-        accountBalance.creditExtended = calculateDebitBalance(balance)
+        accountBalance.creditExtended = balance
         break
       case account.debtBalanceId:
-        accountBalance.totalBorrowed = calculateCreditBalance(balance)
+        accountBalance.totalBorrowed = balance
         break
       case account.lentBalanceId:
-        accountBalance.totalLent = calculateDebitBalance(balance)
+        accountBalance.totalLent = balance
         break
     }
   })
@@ -517,7 +512,7 @@ async function getAccountByServerAddress(
         deps.ilpAddress.length + 1,
         deps.ilpAddress.length + 1 + UUID_LENGTH
       )
-      if (uuid.validate(accountId) && uuid.version(accountId) === 4) {
+      if (validateId(accountId)) {
         const account = await IlpAccount.query()
           .findById(accountId)
           .withGraphJoined('asset(codeAndScale)')

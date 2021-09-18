@@ -1,10 +1,9 @@
 import Knex from 'knex'
-import { createClient } from 'tigerbeetle-node'
+import { TigerBeetleService, createTigerBeetleService } from 'tigerbeetle'
 import { v4 as uuid } from 'uuid'
 
 import { AccountService, createAccountService } from '../account/service'
 import { AssetService, createAssetService } from '../asset/service'
-import { BalanceService, createBalanceService } from '../balance/service'
 import { createCreditService, CreditService } from '../credit/service'
 import { createDepositService, DepositService } from '../deposit/service'
 import { createHttpTokenService } from '../httpToken/service'
@@ -20,7 +19,7 @@ import { createKnex } from '../Knex/service'
 export interface TestServices {
   accountService: AccountService
   assetService: AssetService
-  balanceService: BalanceService
+  tigerbeetleService: TigerBeetleService
   creditService: CreditService
   depositService: DepositService
   transferService: TransferService
@@ -40,49 +39,50 @@ export const createTestServices = async (): Promise<TestServices> => {
     }
   ]
 
-  const tbClient = createClient({
-    cluster_id: config.tigerbeetleClusterId,
-    replica_addresses: config.tigerbeetleReplicaAddresses
-  })
-
   const knex = await createKnex(config.postgresUrl)
-  const balanceService = createBalanceService({ tbClient, logger: Logger })
-  const assetService = createAssetService({ balanceService, logger: Logger })
+  const tigerbeetleService = createTigerBeetleService({
+    clusterId: config.tigerbeetleClusterId,
+    replicaAddresses: config.tigerbeetleReplicaAddresses
+  })
+  const assetService = createAssetService({
+    tigerbeetleService,
+    logger: Logger
+  })
   const httpTokenService = await createHttpTokenService({ logger: Logger })
   const accountService = createAccountService({
     assetService,
-    balanceService,
+    tigerbeetleService,
     httpTokenService,
     logger: Logger,
     ...config
   })
   const creditService = createCreditService({
     accountService,
-    balanceService,
+    tigerbeetleService,
     logger: Logger
   })
   const depositService = createDepositService({
     accountService,
     assetService,
-    balanceService,
+    tigerbeetleService,
     logger: Logger
   })
   const transferService = createTransferService({
     accountService,
-    balanceService,
+    tigerbeetleService,
     logger: Logger
   })
   const withdrawalService = createWithdrawalService({
     accountService,
     assetService,
-    balanceService,
+    tigerbeetleService,
     logger: Logger
   })
 
   return {
     accountService,
     assetService,
-    balanceService,
+    tigerbeetleService,
     creditService,
     depositService,
     transferService,
@@ -91,7 +91,7 @@ export const createTestServices = async (): Promise<TestServices> => {
     knex,
     shutdown: async () => {
       await knex.destroy()
-      tbClient.destroy()
+      tigerbeetleService.destroy()
     }
   }
 }

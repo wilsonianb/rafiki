@@ -4,6 +4,7 @@
 'pkg: interledger': packages/interledger/**/*
 'pkg: frontend': packages/frontend/**/*
 'pkg: rates': packages/rates/**/*
+'pkg: tigerbeetle': packages/tigerbeetle/**/*
 
 # Add 'type: documentation' label to any change to *.md files
 'type: ci':
@@ -21,6 +22,7 @@
   - packages/interledger/src/**/*
   - packages/frontend/src/**/*
   - packages/rates/src/**/*
+  - packages/tigerbeetle/src/**/*
 
 # Add 'type: tests' label to any change to *.test.ts files
 'type: tests': packages/**/*.test.ts

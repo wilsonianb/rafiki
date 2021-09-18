@@ -37,6 +37,10 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
       {
         "name": "rates",
         "reference": "workspace:packages/rates"
+      },
+      {
+        "name": "tigerbeetle",
+        "reference": "workspace:packages/tigerbeetle"
       }
     ],
     "enableTopLevelFallback": true,
@@ -46,7 +50,8 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
       ["backend", ["workspace:packages/backend"]],
       ["frontend", ["workspace:packages/frontend"]],
       ["interledger", ["workspace:packages/interledger"]],
-      ["rates", ["workspace:packages/rates"]]
+      ["rates", ["workspace:packages/rates"]],
+      ["tigerbeetle", ["workspace:packages/tigerbeetle"]]
     ],
     "fallbackPool": [
     ],
@@ -4715,11 +4720,31 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "linkType": "HARD",
         }]
       ]],
+      ["@types/docker-modem", [
+        ["npm:3.0.1", {
+          "packageLocation": "./.yarn/cache/@types-docker-modem-npm-3.0.1-688d140209-cf735e22b7.zip/node_modules/@types/docker-modem/",
+          "packageDependencies": [
+            ["@types/docker-modem", "npm:3.0.1"],
+            ["@types/node", "npm:14.14.39"],
+            ["@types/ssh2", "npm:0.5.48"]
+          ],
+          "linkType": "HARD",
+        }]
+      ]],
       ["@types/dockerode", [
         ["npm:3.2.3", {
           "packageLocation": "./.yarn/cache/@types-dockerode-npm-3.2.3-ad432ad9b4-b5181adfcf.zip/node_modules/@types/dockerode/",
           "packageDependencies": [
             ["@types/dockerode", "npm:3.2.3"],
+            ["@types/node", "npm:14.14.39"]
+          ],
+          "linkType": "HARD",
+        }],
+        ["npm:3.2.7", {
+          "packageLocation": "./.yarn/cache/@types-dockerode-npm-3.2.7-34e2652248-714b98a804.zip/node_modules/@types/dockerode/",
+          "packageDependencies": [
+            ["@types/dockerode", "npm:3.2.7"],
+            ["@types/docker-modem", "npm:3.0.1"],
             ["@types/node", "npm:14.14.39"]
           ],
           "linkType": "HARD",
@@ -5259,6 +5284,17 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
         }]
       ]],
       ["@types/pino", [
+        ["npm:6.3.11", {
+          "packageLocation": "./.yarn/cache/@types-pino-npm-6.3.11-8fff910981-79b71d0edd.zip/node_modules/@types/pino/",
+          "packageDependencies": [
+            ["@types/pino", "npm:6.3.11"],
+            ["@types/node", "npm:14.14.39"],
+            ["@types/pino-pretty", "npm:4.7.0"],
+            ["@types/pino-std-serializers", "npm:2.4.1"],
+            ["sonic-boom", "npm:2.2.3"]
+          ],
+          "linkType": "HARD",
+        }],
         ["npm:6.3.7", {
           "packageLocation": "./.yarn/cache/@types-pino-npm-6.3.7-9bd1276b6f-5c60982141.zip/node_modules/@types/pino/",
           "packageDependencies": [
@@ -5414,6 +5450,15 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "packageLocation": "./.yarn/cache/@types-ssh2-npm-0.5.46-e5331390f7-b22aea80fa.zip/node_modules/@types/ssh2/",
           "packageDependencies": [
             ["@types/ssh2", "npm:0.5.46"],
+            ["@types/node", "npm:14.14.39"],
+            ["@types/ssh2-streams", "npm:0.1.8"]
+          ],
+          "linkType": "HARD",
+        }],
+        ["npm:0.5.48", {
+          "packageLocation": "./.yarn/cache/@types-ssh2-npm-0.5.48-f50478d0cb-bff6da0bda.zip/node_modules/@types/ssh2/",
+          "packageDependencies": [
+            ["@types/ssh2", "npm:0.5.48"],
             ["@types/node", "npm:14.14.39"],
             ["@types/ssh2-streams", "npm:0.1.8"]
           ],
@@ -7203,6 +7248,8 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["pino", "npm:6.11.3"],
             ["pino-pretty", "npm:4.7.1"],
             ["testcontainers", "npm:7.11.1"],
+            ["tigerbeetle", "workspace:packages/tigerbeetle"],
+            ["tmp", "npm:0.2.1"],
             ["uuid", "npm:8.3.2"]
           ],
           "linkType": "SOFT",
@@ -9957,6 +10004,15 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "linkType": "HARD",
         }]
       ]],
+      ["fastify-warning", [
+        ["npm:0.2.0", {
+          "packageLocation": "./.yarn/cache/fastify-warning-npm-0.2.0-f9c53563fc-17b9e2ffdf.zip/node_modules/fastify-warning/",
+          "packageDependencies": [
+            ["fastify-warning", "npm:0.2.0"]
+          ],
+          "linkType": "HARD",
+        }]
+      ]],
       ["fastq", [
         ["npm:1.11.0", {
           "packageLocation": "./.yarn/cache/fastq-npm-1.11.0-840a129ad5-22822313d6.zip/node_modules/fastq/",
@@ -11797,7 +11853,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["rosie", "npm:2.1.0"],
             ["rxjs", "npm:6.6.7"],
             ["testcontainers", "npm:7.14.0"],
-            ["tigerbeetle-node", "npm:0.4.1"],
+            ["tigerbeetle", "workspace:packages/tigerbeetle"],
             ["tmp", "npm:0.2.1"],
             ["uuid", "npm:8.3.2"]
           ],
@@ -15746,6 +15802,21 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["sonic-boom", "npm:1.4.1"]
           ],
           "linkType": "HARD",
+        }],
+        ["npm:6.13.2", {
+          "packageLocation": "./.yarn/cache/pino-npm-6.13.2-60b212cb2e-bd490e31b1.zip/node_modules/pino/",
+          "packageDependencies": [
+            ["pino", "npm:6.13.2"],
+            ["fast-redact", "npm:3.0.0"],
+            ["fast-safe-stringify", "npm:2.0.8"],
+            ["fastify-warning", "npm:0.2.0"],
+            ["flatstr", "npm:1.0.12"],
+            ["pino-pretty", "npm:4.7.1"],
+            ["pino-std-serializers", "npm:3.2.0"],
+            ["quick-format-unescaped", "npm:4.0.3"],
+            ["sonic-boom", "npm:1.4.1"]
+          ],
+          "linkType": "HARD",
         }]
       ]],
       ["pino-pretty", [
@@ -17366,6 +17437,14 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["flatstr", "npm:1.0.12"]
           ],
           "linkType": "HARD",
+        }],
+        ["npm:2.2.3", {
+          "packageLocation": "./.yarn/cache/sonic-boom-npm-2.2.3-8a720fc282-75f079ab20.zip/node_modules/sonic-boom/",
+          "packageDependencies": [
+            ["sonic-boom", "npm:2.2.3"],
+            ["atomic-sleep", "npm:1.0.0"]
+          ],
+          "linkType": "HARD",
         }]
       ]],
       ["source-map", [
@@ -18140,6 +18219,25 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["tar-fs", "npm:2.1.1"]
           ],
           "linkType": "HARD",
+        }],
+        ["npm:7.20.4", {
+          "packageLocation": "./.yarn/cache/testcontainers-npm-7.20.4-706f1bf23f-32ad207f5b.zip/node_modules/testcontainers/",
+          "packageDependencies": [
+            ["testcontainers", "npm:7.20.4"],
+            ["@types/archiver", "npm:5.3.0"],
+            ["@types/dockerode", "npm:3.2.7"],
+            ["archiver", "npm:5.3.0"],
+            ["byline", "npm:5.0.0"],
+            ["debug", "virtual:901e1408cc8bfef5550e648cc3ee4f1ec6e307e3f5baab3ad60f0ba461a3df0a2fb4207ed57f6ec68edeacbb88063dcc84f3c35bb45638ba421a021eb350b42b#npm:4.3.2"],
+            ["docker-compose", "npm:0.23.13"],
+            ["dockerode", "npm:3.3.0"],
+            ["get-port", "npm:5.1.1"],
+            ["glob", "npm:7.1.7"],
+            ["slash", "npm:3.0.0"],
+            ["ssh-remote-port-forward", "npm:1.0.3"],
+            ["tar-fs", "npm:2.1.1"]
+          ],
+          "linkType": "HARD",
         }]
       ]],
       ["text-extensions", [
@@ -18186,6 +18284,22 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["readable-stream", "npm:3.6.0"]
           ],
           "linkType": "HARD",
+        }]
+      ]],
+      ["tigerbeetle", [
+        ["workspace:packages/tigerbeetle", {
+          "packageLocation": "./packages/tigerbeetle/",
+          "packageDependencies": [
+            ["tigerbeetle", "workspace:packages/tigerbeetle"],
+            ["@types/pino", "npm:6.3.11"],
+            ["@types/uuid", "npm:8.3.1"],
+            ["pino", "npm:6.13.2"],
+            ["testcontainers", "npm:7.20.4"],
+            ["tigerbeetle-node", "npm:0.4.1"],
+            ["tmp", "npm:0.2.1"],
+            ["uuid", "npm:8.3.2"]
+          ],
+          "linkType": "SOFT",
         }]
       ]],
       ["tigerbeetle-node", [

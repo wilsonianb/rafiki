@@ -1,9 +1,10 @@
 import {
-  BalanceService,
+  TigerBeetleService,
   CommitTransferError,
   CreateTransferError,
   TwoPhaseTransfer
-} from '../balance/service'
+} from 'tigerbeetle'
+import { v4 as uuid } from 'uuid'
 import { AccountService } from '../account/service'
 import { BaseService } from '../shared/baseService'
 import {
@@ -11,7 +12,6 @@ import {
   UnknownBalanceError,
   UnknownLiquidityAccountError
 } from '../shared/errors'
-import { randomId } from '../shared/utils'
 
 export interface Transfer {
   sourceAccountId: string
@@ -50,13 +50,13 @@ export interface TransferService {
 
 interface ServiceDependencies extends BaseService {
   accountService: AccountService
-  balanceService: BalanceService
+  tigerbeetleService: TigerBeetleService
 }
 
 export function createTransferService({
   logger,
   accountService,
-  balanceService
+  tigerbeetleService
 }: ServiceDependencies): TransferService {
   const log = logger.child({
     service: 'TransferService'
@@ -64,7 +64,7 @@ export function createTransferService({
   const deps: ServiceDependencies = {
     logger: log,
     accountService,
-    balanceService
+    tigerbeetleService
   }
   return {
     create: (transfer) => createTransfer(deps, transfer)
@@ -113,7 +113,7 @@ async function createTransfer(
     sourceAccount.asset.scale === destinationAccount.asset.scale
   ) {
     transfers.push({
-      id: randomId(),
+      id: uuid(),
       sourceBalanceId: sourceAccount.balanceId,
       destinationBalanceId: destinationAccount.balanceId,
       amount:
@@ -125,7 +125,7 @@ async function createTransfer(
     if (destinationAmount && sourceAmount !== destinationAmount) {
       if (destinationAmount < sourceAmount) {
         transfers.push({
-          id: randomId(),
+          id: uuid(),
           sourceBalanceId: sourceAccount.balanceId,
           destinationBalanceId: sourceAccount.asset.liquidityBalanceId,
           amount: sourceAmount - destinationAmount,
@@ -133,7 +133,7 @@ async function createTransfer(
         })
       } else {
         transfers.push({
-          id: randomId(),
+          id: uuid(),
           sourceBalanceId: destinationAccount.asset.liquidityBalanceId,
           destinationBalanceId: destinationAccount.balanceId,
           amount: destinationAmount - sourceAmount,
@@ -147,14 +147,14 @@ async function createTransfer(
     }
     transfers.push(
       {
-        id: randomId(),
+        id: uuid(),
         sourceBalanceId: sourceAccount.balanceId,
         destinationBalanceId: sourceAccount.asset.liquidityBalanceId,
         amount: sourceAmount,
         twoPhaseCommit: true
       },
       {
-        id: randomId(),
+        id: uuid(),
         sourceBalanceId: destinationAccount.asset.liquidityBalanceId,
         destinationBalanceId: destinationAccount.balanceId,
         amount: destinationAmount,
@@ -162,7 +162,7 @@ async function createTransfer(
       }
     )
   }
-  const error = await deps.balanceService.createTransfers(transfers)
+  const error = await deps.tigerbeetleService.createTransfers(transfers)
   if (error) {
     switch (error.code) {
       case CreateTransferError.debit_account_not_found:
@@ -187,11 +187,11 @@ async function createTransfer(
 
   const trx: Transaction = {
     commit: async (): Promise<void | TransferError> => {
-      const res = await deps.balanceService.commitTransfers(
+      const error = await deps.tigerbeetleService.commitTransfers(
         transfers.map((transfer) => transfer.id)
       )
-      for (const { code } of res) {
-        switch (code) {
+      if (error) {
+        switch (error.code) {
           case CommitTransferError.linked_event_failed:
             break
           case CommitTransferError.transfer_expired:
@@ -201,16 +201,16 @@ async function createTransfer(
           case CommitTransferError.already_committed_but_rejected:
             return TransferError.TransferAlreadyRejected
           default:
-            throw new BalanceTransferError(code)
+            throw new BalanceTransferError(error.code)
         }
       }
     },
     rollback: async (): Promise<void | TransferError> => {
-      const res = await deps.balanceService.rollbackTransfers(
+      const error = await deps.tigerbeetleService.rollbackTransfers(
         transfers.map((transfer) => transfer.id)
       )
-      for (const { code } of res) {
-        switch (code) {
+      if (error) {
+        switch (error.code) {
           case CommitTransferError.linked_event_failed:
             break
           case CommitTransferError.transfer_expired:
@@ -220,7 +220,7 @@ async function createTransfer(
           case CommitTransferError.already_committed:
             return TransferError.TransferAlreadyRejected
           default:
-            throw new BalanceTransferError(code)
+            throw new BalanceTransferError(error.code)
         }
       }
     }

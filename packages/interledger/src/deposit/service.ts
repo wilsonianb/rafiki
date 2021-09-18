@@ -2,7 +2,7 @@ import { v4 as uuid } from 'uuid'
 
 import { AccountService } from '../account/service'
 import { Asset, AssetService } from '../asset/service'
-import { BalanceService, CreateTransferError } from '../balance/service'
+import { TigerBeetleService, CreateTransferError } from 'tigerbeetle'
 import { BaseService } from '../shared/baseService'
 import {
   BalanceTransferError,
@@ -10,7 +10,7 @@ import {
   UnknownLiquidityAccountError,
   UnknownSettlementAccountError
 } from '../shared/errors'
-import { randomId, uuidToBigInt, validateId } from '../shared/utils'
+import { validateId } from '../shared/utils'
 
 interface DepositOptions {
   id?: string
@@ -48,14 +48,14 @@ export interface DepositService {
 interface ServiceDependencies extends BaseService {
   accountService: AccountService
   assetService: AssetService
-  balanceService: BalanceService
+  tigerbeetleService: TigerBeetleService
 }
 
 export function createDepositService({
   logger,
   accountService,
   assetService,
-  balanceService
+  tigerbeetleService
 }: ServiceDependencies): DepositService {
   const log = logger.child({
     service: 'DepositService'
@@ -64,7 +64,7 @@ export function createDepositService({
     logger: log,
     accountService,
     assetService,
-    balanceService
+    tigerbeetleService
   }
   return {
     create: (options) => createDeposit(deps, options),
@@ -85,9 +85,9 @@ async function createDeposit(
     return DepositError.UnknownAccount
   }
   const depositId = id || uuid()
-  const error = await deps.balanceService.createTransfers([
+  const error = await deps.tigerbeetleService.createTransfers([
     {
-      id: uuidToBigInt(depositId),
+      id: depositId,
       sourceBalanceId: account.asset.settlementBalanceId,
       destinationBalanceId: account.balanceId,
       amount
@@ -124,9 +124,9 @@ async function createLiquidityDeposit(
     return DepositError.InvalidId
   }
   const asset = await deps.assetService.getOrCreate({ code, scale })
-  const error = await deps.balanceService.createTransfers([
+  const error = await deps.tigerbeetleService.createTransfers([
     {
-      id: id ? uuidToBigInt(id) : randomId(),
+      id: id || uuid(),
       sourceBalanceId: asset.settlementBalanceId,
       destinationBalanceId: asset.liquidityBalanceId,
       amount

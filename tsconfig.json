@@ -1,6 +1,9 @@
 {
   "references": [
     {
+      "path": "packages/tigerbeetle"
+    },
+    {
       "path": "packages/backend"
     },
     {

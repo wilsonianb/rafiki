@@ -3,10 +3,10 @@ import { v4 as uuid } from 'uuid'
 import { AccountService } from '../account/service'
 import { Asset, AssetService } from '../asset/service'
 import {
-  BalanceService,
+  TigerBeetleService,
   CommitTransferError,
   CreateTransferError
-} from '../balance/service'
+} from 'tigerbeetle'
 import { BaseService } from '../shared/baseService'
 import {
   BalanceTransferError,
@@ -14,7 +14,7 @@ import {
   UnknownLiquidityAccountError,
   UnknownSettlementAccountError
 } from '../shared/errors'
-import { randomId, uuidToBigInt, validateId } from '../shared/utils'
+import { validateId } from '../shared/utils'
 
 interface WithdrawalOptions {
   id?: string
@@ -65,14 +65,14 @@ export interface WithdrawalService {
 interface ServiceDependencies extends BaseService {
   accountService: AccountService
   assetService: AssetService
-  balanceService: BalanceService
+  tigerbeetleService: TigerBeetleService
 }
 
 export function createWithdrawalService({
   logger,
   accountService,
   assetService,
-  balanceService
+  tigerbeetleService
 }: ServiceDependencies): WithdrawalService {
   const log = logger.child({
     service: 'WithdrawalService'
@@ -81,7 +81,7 @@ export function createWithdrawalService({
     logger: log,
     accountService,
     assetService,
-    balanceService
+    tigerbeetleService
   }
   return {
     create: (options) => createWithdrawal(deps, options),
@@ -104,9 +104,9 @@ async function createWithdrawal(
     return WithdrawalError.UnknownAccount
   }
   const withdrawalId = id || uuid()
-  const error = await deps.balanceService.createTransfers([
+  const error = await deps.tigerbeetleService.createTransfers([
     {
-      id: uuidToBigInt(withdrawalId),
+      id: withdrawalId,
       sourceBalanceId: account.balanceId,
       destinationBalanceId: account.asset.settlementBalanceId,
       amount,
@@ -151,9 +151,9 @@ async function createLiquidityWithdrawal(
   if (!asset) {
     return WithdrawalError.UnknownAsset
   }
-  const error = await deps.balanceService.createTransfers([
+  const error = await deps.tigerbeetleService.createTransfers([
     {
-      id: id ? uuidToBigInt(id) : randomId(),
+      id: id || uuid(),
       sourceBalanceId: asset.liquidityBalanceId,
       destinationBalanceId: asset.settlementBalanceId,
       amount
@@ -185,10 +185,10 @@ async function finalizeWithdrawal(
     return WithdrawalError.InvalidId
   }
   // TODO: query transfer to verify it's a withdrawal
-  const res = await deps.balanceService.commitTransfers([uuidToBigInt(id)])
+  const error = await deps.tigerbeetleService.commitTransfers([id])
 
-  for (const { code } of res) {
-    switch (code) {
+  if (error) {
+    switch (error.code) {
       case CommitTransferError.linked_event_failed:
         break
       case CommitTransferError.transfer_not_found:
@@ -198,7 +198,7 @@ async function finalizeWithdrawal(
       case CommitTransferError.already_committed_but_rejected:
         return WithdrawalError.AlreadyRolledBack
       default:
-        throw new BalanceTransferError(code)
+        throw new BalanceTransferError(error.code)
     }
   }
 }
@@ -211,10 +211,10 @@ async function rollbackWithdrawal(
     return WithdrawalError.InvalidId
   }
   // TODO: query transfer to verify it's a withdrawal
-  const res = await deps.balanceService.rollbackTransfers([uuidToBigInt(id)])
+  const error = await deps.tigerbeetleService.rollbackTransfers([id])
 
-  for (const { code } of res) {
-    switch (code) {
+  if (error) {
+    switch (error.code) {
       case CommitTransferError.linked_event_failed:
         break
       case CommitTransferError.transfer_not_found:
@@ -224,7 +224,7 @@ async function rollbackWithdrawal(
       case CommitTransferError.already_committed:
         return WithdrawalError.AlreadyRolledBack
       default:
-        throw new BalanceTransferError(code)
+        throw new BalanceTransferError(error.code)
     }
   }
 }

@@ -1,11 +1,8 @@
-import {
-  BalanceService,
-  calculateCreditBalance,
-  calculateDebitBalance
-} from '../balance/service'
+import { TigerBeetleService } from 'tigerbeetle'
+import { v4 as uuid } from 'uuid'
+
 import { BaseService } from '../shared/baseService'
 import { Asset as AssetModel } from './model'
-import { randomId } from '../shared/utils'
 
 export interface Asset {
   code: string
@@ -21,19 +18,19 @@ export interface AssetService {
 }
 
 interface ServiceDependencies extends BaseService {
-  balanceService: BalanceService
+  tigerbeetleService: TigerBeetleService
 }
 
 export function createAssetService({
   logger,
-  balanceService
+  tigerbeetleService
 }: ServiceDependencies): AssetService {
   const log = logger.child({
     service: 'AssetService'
   })
   const deps: ServiceDependencies = {
     logger: log,
-    balanceService
+    tigerbeetleService
   }
   return {
     get: (asset) => getAsset(deps, asset),
@@ -73,15 +70,15 @@ async function getOrCreateAsset(
     // 2) insert new asset row
     // 3) patch the tigerbeetle balance 'unit's
     return await AssetModel.transaction(async (trx) => {
-      const liquidityBalanceId = randomId()
-      const settlementBalanceId = randomId()
+      const liquidityBalanceId = uuid()
+      const settlementBalanceId = uuid()
       const asset = await AssetModel.query(trx).insertAndFetch({
         code,
         scale,
         settlementBalanceId,
         liquidityBalanceId
       })
-      await deps.balanceService.create([
+      await deps.tigerbeetleService.createBalances([
         {
           id: liquidityBalanceId,
           unit: asset.unit
@@ -113,9 +110,11 @@ async function getLiquidityBalance(
     .first()
     .select('liquidityBalanceId')
   if (asset) {
-    const balances = await deps.balanceService.get([asset.liquidityBalanceId])
+    const balances = await deps.tigerbeetleService.getBalances([
+      asset.liquidityBalanceId
+    ])
     if (balances.length === 1) {
-      return calculateCreditBalance(balances[0])
+      return balances[0].balance
     }
   }
 }
@@ -129,9 +128,11 @@ async function getSettlementBalance(
     .first()
     .select('settlementBalanceId')
   if (asset) {
-    const balances = await deps.balanceService.get([asset.settlementBalanceId])
+    const balances = await deps.tigerbeetleService.getBalances([
+      asset.settlementBalanceId
+    ])
     if (balances.length === 1) {
-      return calculateDebitBalance(balances[0])
+      return balances[0].balance
     }
   }
 }

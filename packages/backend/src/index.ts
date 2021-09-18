@@ -5,6 +5,7 @@ import { Model } from 'objection'
 import { makeWorkerUtils } from 'graphile-worker'
 import { Ioc, IocContract } from '@adonisjs/fold'
 import IORedis from 'ioredis'
+import { createTigerBeetleService } from 'tigerbeetle'
 
 import { App, AppServices } from './app'
 import { Config } from './config/app'
@@ -99,6 +100,13 @@ export function initIocContainer(
       knex: knex
     })
   })
+  container.singleton('tigerbeetleService', async (deps) => {
+    const config = await deps.use('config')
+    return createTigerBeetleService({
+      clusterId: config.tigerbeetleClusterId,
+      replicaAddresses: config.tigerbeetleReplicaAddresses
+    })
+  })
   container.singleton('accountService', async (deps) => {
     const logger = await deps.use('logger')
     const knex = await deps.use('knex')
@@ -169,6 +177,8 @@ export const gracefulShutdown = async (
   await knex.destroy()
   const workerUtils = await container.use('workerUtils')
   await workerUtils.release()
+  const tigerbeetleService = await container.use('tigerbeetleService')
+  await tigerbeetleService.destroy()
   const redis = await container.use('redis')
   await redis.disconnect()
 }

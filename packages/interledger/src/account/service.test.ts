@@ -1,6 +1,6 @@
 import { Model } from 'objection'
 import { Transaction } from 'knex'
-import { Account as Balance } from 'tigerbeetle-node'
+import { Balance, TigerBeetleService } from 'tigerbeetle'
 import { v4 as uuid } from 'uuid'
 
 import { Config } from '../config'
@@ -15,7 +15,6 @@ import {
 } from './service'
 import { Asset } from '../asset/model'
 import { AssetService } from '../asset/service'
-import { BalanceService } from '../balance/service'
 import {
   AccountFactory,
   createTestServices,
@@ -27,7 +26,7 @@ describe('Accounts Service', (): void => {
   let accountService: AccountService
   let accountFactory: AccountFactory
   let assetService: AssetService
-  let balanceService: BalanceService
+  let tigerbeetleService: TigerBeetleService
   let config: typeof Config
   let services: TestServices
   let trx: Transaction
@@ -35,7 +34,7 @@ describe('Accounts Service', (): void => {
   beforeAll(
     async (): Promise<void> => {
       services = await createTestServices()
-      ;({ accountService, assetService, balanceService, config } = services)
+      ;({ accountService, assetService, tigerbeetleService, config } = services)
       accountFactory = new AccountFactory(accountService)
     }
   )
@@ -82,11 +81,13 @@ describe('Accounts Service', (): void => {
       await expect(accountService.get(accountOrError.id)).resolves.toEqual(
         accountOrError
       )
-      const balances = await balanceService.get([accountOrError.balanceId])
+      const balances = await tigerbeetleService.getBalances([
+        accountOrError.balanceId
+      ])
       expect(balances.length).toBe(1)
-      balances.forEach((balance: Balance) => {
-        expect(balance.credits_reserved).toEqual(BigInt(0))
-        expect(balance.credits_accepted).toEqual(BigInt(0))
+      balances.forEach(({ balance }: Balance) => {
+        expect(balance).toEqual(BigInt(0))
+        expect(balance).toEqual(BigInt(0))
       })
     })
 
@@ -126,11 +127,13 @@ describe('Accounts Service', (): void => {
         }
       })
       await expect(accountService.get(id)).resolves.toEqual(accountOrError)
-      const balances = await balanceService.get([accountOrError.balanceId])
+      const balances = await tigerbeetleService.getBalances([
+        accountOrError.balanceId
+      ])
       expect(balances.length).toBe(1)
-      balances.forEach((balance: Balance) => {
-        expect(balance.credits_reserved).toEqual(BigInt(0))
-        expect(balance.credits_accepted).toEqual(BigInt(0))
+      balances.forEach(({ balance }: Balance) => {
+        expect(balance).toEqual(BigInt(0))
+        expect(balance).toEqual(BigInt(0))
       })
     })
 
@@ -247,14 +250,14 @@ describe('Accounts Service', (): void => {
 
       const newAsset = await Asset.query().where(asset).first()
       expect(newAsset).toBeDefined()
-      const balances = await balanceService.get([
+      const balances = await tigerbeetleService.getBalances([
         newAsset.liquidityBalanceId,
         newAsset.settlementBalanceId
       ])
       expect(balances.length).toBe(2)
-      balances.forEach((balance: Balance) => {
-        expect(balance.credits_reserved).toEqual(BigInt(0))
-        expect(balance.credits_accepted).toEqual(BigInt(0))
+      balances.forEach(({ balance }: Balance) => {
+        expect(balance).toEqual(BigInt(0))
+        expect(balance).toEqual(BigInt(0))
       })
 
       await expect(assetService.getLiquidityBalance(asset)).resolves.toEqual(
