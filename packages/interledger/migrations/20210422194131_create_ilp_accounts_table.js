@@ -1,5 +1,5 @@
 exports.up = function (knex) {
-  return knex.schema.createTable('ilpAccounts', function (table) {
+  return knex.schema.createTable('accounts', function (table) {
     table.uuid('id').notNullable().primary()
 
     table.boolean('disabled').notNullable().defaultTo(false)
@@ -19,7 +19,7 @@ exports.up = function (knex) {
     table.uuid('lentBalanceId').nullable()
 
     table.uuid('superAccountId').nullable().index()
-    table.foreign('superAccountId').references('ilpAccounts.id')
+    table.foreign('superAccountId').references('accounts.id')
 
     table.bigInteger('maxPacketAmount').nullable()
 
@@ -36,5 +36,5 @@ exports.up = function (knex) {
 }
 
 exports.down = function (knex) {
-  return knex.schema.dropTableIfExists('ilpAccounts')
+  return knex.schema.dropTableIfExists('accounts')
 }

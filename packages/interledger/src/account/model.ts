@@ -1,6 +1,6 @@
 import { BaseModel } from '../shared/baseModel'
 import { Asset } from '../asset/model'
-import { IlpHttpToken } from '../token/model'
+import { HttpToken } from '../httpToken/model'
 import { bigIntToDbUuid, uuidToBigInt } from '../shared/utils'
 import { Model, Pojo } from 'objection'
 
@@ -14,7 +14,7 @@ const BALANCE_IDS = [
 
 export class IlpAccount extends BaseModel {
   public static get tableName(): string {
-    return 'ilpAccounts'
+    return 'accounts'
   }
 
   static relationMappings = {
@@ -22,7 +22,7 @@ export class IlpAccount extends BaseModel {
       relation: Model.HasOneRelation,
       modelClass: Asset,
       join: {
-        from: 'ilpAccounts.assetId',
+        from: 'accounts.assetId',
         to: 'assets.id'
       }
     },
@@ -30,24 +30,24 @@ export class IlpAccount extends BaseModel {
       relation: Model.HasManyRelation,
       modelClass: IlpAccount,
       join: {
-        from: 'ilpAccounts.id',
-        to: 'ilpAccounts.superAccountId'
+        from: 'accounts.id',
+        to: 'accounts.superAccountId'
       }
     },
     superAccount: {
       relation: Model.HasOneRelation,
       modelClass: IlpAccount,
       join: {
-        from: 'ilpAccounts.superAccountId',
-        to: 'ilpAccounts.id'
+        from: 'accounts.superAccountId',
+        to: 'accounts.id'
       }
     },
     incomingTokens: {
       relation: Model.HasManyRelation,
-      modelClass: IlpHttpToken,
+      modelClass: HttpToken,
       join: {
-        from: 'ilpAccounts.id',
-        to: 'ilpHttpTokens.accountId'
+        from: 'accounts.id',
+        to: 'httpTokens.accountId'
       }
     }
   }
@@ -73,7 +73,7 @@ export class IlpAccount extends BaseModel {
 
   public readonly maxPacketAmount!: bigint
 
-  public readonly incomingTokens?: IlpHttpToken[]
+  public readonly incomingTokens?: HttpToken[]
   public readonly http?: {
     outgoing: {
       authToken: string
