@@ -27,11 +27,8 @@ import {
   UnknownLiquidityAccountError,
   UnknownSettlementAccountError
 } from './errors'
-import {
-  Asset as AssetModel,
-  IlpAccount as IlpAccountModel,
-  SubAccount
-} from './models'
+import { IlpAccount as IlpAccountModel, SubAccount } from './models'
+import { Asset as AssetModel } from './assetModel'
 import { HttpToken } from './httpTokenModel'
 import {
   calculateCreditBalance,
@@ -308,6 +305,8 @@ export class AccountsService implements AccountsServiceInterface {
               staticIlpAddress: accountOptions.routing?.staticIlpAddress
             })
             .throwIfNotFound()
+          // TODO
+          // assetService.getById(account.assetId)
           account.asset = await AssetModel.query()
             .findById(account.assetId)
             .modify('codeAndScale')
@@ -414,16 +413,12 @@ export class AccountsService implements AccountsServiceInterface {
     if (assetRow) {
       return assetRow
     } else {
-      const liquidityBalanceId = randomId()
-      const settlementBalanceId = randomId()
       const assetRow = await AssetModel.query(trx).insertAndFetch({
-        ...asset,
-        settlementBalanceId,
-        liquidityBalanceId
+        ...asset
       })
       await this.createBalances([
         {
-          id: liquidityBalanceId,
+          id: assetRow.liquidityBalanceId,
           flags:
             0 |
             AccountFlags.debits_must_not_exceed_credits |
@@ -431,7 +426,7 @@ export class AccountsService implements AccountsServiceInterface {
           unit: assetRow.unit
         },
         {
-          id: settlementBalanceId,
+          id: assetRow.settlementBalanceId,
           flags: 0 | AccountFlags.credits_must_not_exceed_debits,
           unit: assetRow.unit
         }

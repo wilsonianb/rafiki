@@ -1,0 +1,1 @@
+../../backend/migrations/20210917185934_create_assets_table.js

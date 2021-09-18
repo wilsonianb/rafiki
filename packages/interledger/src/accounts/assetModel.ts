@@ -1,0 +1,1 @@
+../../../backend/src/asset/model.ts

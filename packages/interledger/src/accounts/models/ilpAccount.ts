@@ -1,5 +1,5 @@
 import { BaseModel } from '../../shared/baseModel'
-import { Asset } from './asset'
+import { Asset } from '../assetModel'
 import { HttpToken } from '../httpTokenModel'
 import { bigIntToDbUuid, uuidToBigInt } from '../utils'
 import { Model, Pojo } from 'objection'

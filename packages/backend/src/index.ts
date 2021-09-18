@@ -12,6 +12,7 @@ import { Config } from './config/app'
 import { GraphileProducer } from './messaging/graphileProducer'
 import { createHttpTokenService } from './httpToken/service'
 import { createBalanceService } from './balance/service'
+import { createAssetService } from './asset/service'
 import { createAccountService } from './account/service'
 import { createSPSPService } from './spsp/service'
 import { createInvoiceService } from './invoice/service'
@@ -116,6 +117,16 @@ export function initIocContainer(
       logger: logger,
       knex: knex,
       tigerbeetle: tigerbeetle
+    })
+  })
+  container.singleton('assetService', async (deps) => {
+    const logger = await deps.use('logger')
+    const knex = await deps.use('knex')
+    const balanceService = await deps.use('balanceService')
+    return await createAssetService({
+      logger: logger,
+      knex: knex,
+      balanceService: balanceService
     })
   })
   container.singleton('accountService', async (deps) => {
