@@ -14,6 +14,7 @@ import { createHttpTokenService } from './httpToken/service'
 import { createBalanceService } from './balance/service'
 import { createAccountService } from './account/service'
 import { createSPSPService } from './spsp/service'
+import { createTransferService } from './transfer/service'
 import { createInvoiceService } from './invoice/service'
 import { StreamServer } from '@interledger/stream-receiver'
 import { createWebMonetizationService } from './webmonetization/service'
@@ -112,6 +113,14 @@ export function initIocContainer(
     const logger = await deps.use('logger')
     const tigerbeetle = await deps.use('tigerbeetle')
     return await createBalanceService({
+      logger: logger,
+      tigerbeetle: tigerbeetle
+    })
+  })
+  container.singleton('transferService', async (deps) => {
+    const logger = await deps.use('logger')
+    const tigerbeetle = await deps.use('tigerbeetle')
+    return await createTransferService({
       logger: logger,
       tigerbeetle: tigerbeetle
     })
