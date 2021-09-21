@@ -8,6 +8,7 @@ import { initIocContainer } from '../..'
 import { Config } from '../../config/app'
 import { Account as AccountModel } from '../../account/model'
 import { AccountService } from '../../account/service'
+import { AccountFactory } from '../../tests/accountFactory'
 import { truncateTables } from '../../tests/tableManager'
 import { Invoice } from '../../invoice/model'
 import { InvoiceService } from '../../invoice/service'
@@ -18,6 +19,7 @@ describe('Invoice Resolver', (): void => {
   let appContainer: TestContainer
   let invoiceService: InvoiceService
   let accountService: AccountService
+  let accountFactory: AccountFactory
   let knex: Knex
   let invoices: Invoice[]
   let account: AccountModel
@@ -29,7 +31,8 @@ describe('Invoice Resolver', (): void => {
       knex = await deps.use('knex')
       invoiceService = await deps.use('invoiceService')
       accountService = await deps.use('accountService')
-      account = await accountService.create(6, 'USD')
+      accountFactory = new AccountFactory(accountService)
+      account = await accountFactory.build()
       invoices = []
       for (let i = 0; i < 50; i++) {
         invoices.push(await invoiceService.create(account.id, `Invoice ${i}`))
@@ -90,7 +93,7 @@ describe('Invoice Resolver', (): void => {
     })
 
     test('No invoices, but invoices requested', async (): Promise<void> => {
-      const tempAccount = await accountService.create(6, 'USD')
+      const tempAccount = await accountFactory.build()
       const query = await appContainer.apolloClient
         .query({
           query: gql`

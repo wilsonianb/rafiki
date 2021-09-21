@@ -4,7 +4,7 @@ import {
   AccountService,
   CreateOptions,
   CreateSubAccountOptions,
-  IlpAccount
+  Account
 } from '../account/service'
 import { randomAsset } from './asset'
 
@@ -17,9 +17,7 @@ export function isSubAccount(
 export class AccountFactory {
   public constructor(public accounts: AccountService) {}
 
-  public async build(
-    options: Partial<CreateOptions> = {}
-  ): Promise<IlpAccount> {
+  public async build(options: Partial<CreateOptions> = {}): Promise<Account> {
     let accountOptions: CreateOptions
     if (isSubAccount(options)) {
       accountOptions = {
@@ -50,6 +48,6 @@ export class AccountFactory {
       accountOptions.routing = options.routing
     }
     const account = await this.accounts.create(accountOptions)
-    return account as IlpAccount
+    return account as Account
   }
 }

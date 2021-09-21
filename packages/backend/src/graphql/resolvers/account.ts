@@ -28,7 +28,7 @@ export const getBalance: AccountResolvers['balance'] = async (
   // TODO: implement amount when we figure out how amounts are stored.
   return {
     amount: 300,
-    currency: account.currency,
-    scale: account.scale
+    currency: account.asset.code,
+    scale: account.asset.scale
   }
 }

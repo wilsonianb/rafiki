@@ -6,9 +6,11 @@ import { IocContract } from '@adonisjs/fold'
 import { AppServices } from '../../app'
 import { initIocContainer } from '../..'
 import { Config } from '../../config/app'
+import { AccountFactory } from '../../tests/accountFactory'
 import { truncateTables } from '../../tests/tableManager'
 import { AccountService } from '../../account/service'
 import { Account as AccountModel } from '../../account/model'
+import { AccountFactory } from '../../tests/accountFactory'
 import { Account } from '../generated/graphql'
 
 describe('Account Resolvers', (): void => {
@@ -34,12 +36,19 @@ describe('Account Resolvers', (): void => {
 
   describe('Account', (): void => {
     let accountService: AccountService
+    let accountFactory: AccountFactory
     let account: AccountModel
 
     beforeEach(
       async (): Promise<void> => {
         accountService = await deps.use('accountService')
-        account = await accountService.create(6, 'USD')
+        accountFactory = new AccountFactory(accountService)
+        account = await accountFactory.build({
+          asset: {
+            scale: 6,
+            code: 'USD'
+          }
+        })
       }
     )
 

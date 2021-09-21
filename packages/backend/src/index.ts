@@ -137,13 +137,20 @@ export function initIocContainer(
     })
   })
   container.singleton('accountService', async (deps) => {
+    const config = await deps.use('config')
     const logger = await deps.use('logger')
     const knex = await deps.use('knex')
-    const connectorService = await deps.use('connectorService')
+    const assetService = await deps.use('assetService')
+    const balanceService = await deps.use('balanceService')
+    const httpTokenService = await deps.use('httpTokenService')
     return await createAccountService({
       logger: logger,
       knex: knex,
-      connectorService: connectorService
+      assetService,
+      balanceService,
+      httpTokenService,
+      ilpAddress: config.ilpAddress,
+      peerAddresses: config.peerAddresses
     })
   })
   container.singleton('SPSPService', async (deps) => {
