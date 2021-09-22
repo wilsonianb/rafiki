@@ -1,4 +1,3 @@
-import { TransactionOrKnex } from 'objection'
 import * as Pay from '@interledger/pay'
 import { RatesService } from 'rates'
 import { BaseService } from '../shared/baseService'
@@ -19,7 +18,6 @@ export interface OutgoingPaymentService {
 }
 
 export interface ServiceDependencies extends BaseService {
-  knex: TransactionOrKnex
   slippage: number
   quoteLifespan: number // milliseconds
   accountService: AccountService
@@ -50,7 +48,7 @@ async function getOutgoingPayment(
   deps: ServiceDependencies,
   id: string
 ): Promise<OutgoingPayment | undefined> {
-  return OutgoingPayment.query(deps.knex).findById(id)
+  return OutgoingPayment.query().findById(id)
 }
 
 type CreateOutgoingPaymentOptions = PaymentIntent & { superAccountId: string }
@@ -91,7 +89,7 @@ async function createOutgoingPayment(
     options.superAccountId
   )
 
-  return await OutgoingPayment.query(deps.knex).insertAndFetch({
+  return await OutgoingPayment.query().insertAndFetch({
     state: PaymentState.Inactive,
     intent: {
       paymentPointer: options.paymentPointer,
@@ -117,7 +115,7 @@ function requotePayment(
   deps: ServiceDependencies,
   id: string
 ): Promise<OutgoingPayment> {
-  return deps.knex.transaction(async (trx) => {
+  return OutgoingPayment.transaction(async (trx) => {
     const payment = await OutgoingPayment.query(trx).findById(id).forUpdate()
     if (!payment) throw new Error('payment does not exist')
     if (payment.state !== PaymentState.Cancelled) {
@@ -132,7 +130,7 @@ async function approvePayment(
   deps: ServiceDependencies,
   id: string
 ): Promise<OutgoingPayment> {
-  return deps.knex.transaction(async (trx) => {
+  return OutgoingPayment.transaction(async (trx) => {
     const payment = await OutgoingPayment.query(trx).findById(id).forUpdate()
     if (!payment) throw new Error('payment does not exist')
     if (payment.state !== PaymentState.Ready) {
@@ -147,7 +145,7 @@ async function cancelPayment(
   deps: ServiceDependencies,
   id: string
 ): Promise<OutgoingPayment> {
-  return deps.knex.transaction(async (trx) => {
+  return OutgoingPayment.transaction(async (trx) => {
     const payment = await OutgoingPayment.query(trx).findById(id).forUpdate()
     if (!payment) throw new Error('payment does not exist')
     if (payment.state !== PaymentState.Ready) {

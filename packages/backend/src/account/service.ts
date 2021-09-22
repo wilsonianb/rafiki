@@ -16,7 +16,6 @@ interface ServiceDependencies extends BaseService {
 
 export async function createAccountService({
   logger,
-  knex,
   connectorService
 }: ServiceDependencies): Promise<AccountService> {
   const log = logger.child({
@@ -24,7 +23,6 @@ export async function createAccountService({
   })
   const deps: ServiceDependencies = {
     logger: log,
-    knex: knex,
     connectorService: connectorService
   }
   return {
@@ -40,7 +38,7 @@ async function getAccount(
   id: string
 ): Promise<Account> {
   const ilpAccount = await deps.connectorService.getIlpAccount(id)
-  return Account.query(deps.knex).findById(ilpAccount.id)
+  return Account.query().findById(ilpAccount.id)
 }
 
 async function createAccount(
@@ -52,7 +50,7 @@ async function createAccount(
   if (!ilpAccountResponse.success || ilpAccountResponse.ilpAccount == null)
     throw new Error('account not created')
 
-  return Account.query(deps.knex).insertAndFetch({
+  return Account.query().insertAndFetch({
     id: ilpAccountResponse.ilpAccount.id,
     scale: scale,
     currency: currency
@@ -84,7 +82,7 @@ async function createSubAccount(
     'parent ilpAccount does not match what was requested'
   )
 
-  return Account.query(trx || deps.knex).insertAndFetch({
+  return Account.query(trx).insertAndFetch({
     id: ilpAccountResponse.ilpAccount.id,
     scale: parentAccount.scale,
     currency: parentAccount.currency,

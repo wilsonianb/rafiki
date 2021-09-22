@@ -95,11 +95,9 @@ export function initIocContainer(
    */
   container.singleton('accountService', async (deps) => {
     const logger = await deps.use('logger')
-    const knex = await deps.use('knex')
     const connectorService = await deps.use('connectorService')
     return await createAccountService({
       logger: logger,
-      knex: knex,
       connectorService: connectorService
     })
   })
@@ -117,23 +115,19 @@ export function initIocContainer(
   })
   container.singleton('invoiceService', async (deps) => {
     const logger = await deps.use('logger')
-    const knex = await deps.use('knex')
     const accountService = await deps.use('accountService')
     return await createInvoiceService({
       logger: logger,
-      knex: knex,
       accountService: accountService
     })
   })
 
   container.singleton('wmService', async (deps) => {
     const logger = await deps.use('logger')
-    const knex = await deps.use('knex')
     const invoiceService = await deps.use('invoiceService')
     const accountService = await deps.use('accountService')
     return createWebMonetizationService({
       logger: logger,
-      knex: knex,
       invoiceService,
       accountService
     })
@@ -171,7 +165,6 @@ export function initIocContainer(
       slippage: config.slippage,
       quoteLifespan: config.quoteLifespan,
       logger: await deps.use('logger'),
-      knex: await deps.use('knex'),
       accountService: await deps.use('accountService'),
       connectorService: await deps.use('connectorService'),
       makeIlpPlugin: await deps.use('makeIlpPlugin'),

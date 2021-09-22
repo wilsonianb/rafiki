@@ -21,14 +21,13 @@ const maxStateAttempts: { [key in PaymentState]: number } = {
 export async function processPendingPayment(
   deps_: ServiceDependencies
 ): Promise<string | undefined> {
-  return deps_.knex.transaction(async (trx) => {
+  return OutgoingPayment.transaction(async (trx) => {
     const payment = await getPendingPayment(trx)
     if (!payment) return
 
     await handlePaymentLifecycle(
       {
         ...deps_,
-        knex: trx,
         logger: deps_.logger.child({
           payment: payment.id,
           from_state: payment.state
@@ -99,16 +98,14 @@ export async function handlePaymentLifecycle(
         { state: payment.state, error, stateAttempts },
         'payment lifecycle failed; retrying'
       )
-      await payment.$query(deps.knex).patch({ stateAttempts })
+      await payment.$query().patch({ stateAttempts })
     } else {
       // Too many attempts or non-retryable error; cancel payment.
       deps.logger.warn(
         { state: payment.state, error, stateAttempts },
         'payment lifecycle failed; cancelling'
       )
-      await payment
-        .$query(deps.knex)
-        .patch({ state: PaymentState.Cancelling, error })
+      await payment.$query().patch({ state: PaymentState.Cancelling, error })
     }
   }
 

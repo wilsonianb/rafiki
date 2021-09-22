@@ -1,4 +1,5 @@
-import Knex from 'knex'
+import { Transaction } from 'knex'
+import { Model } from 'objection'
 
 import { WebMonetizationService } from './service'
 import { createTestApp, TestContainer } from '../tests/app'
@@ -6,7 +7,6 @@ import { Config } from '../config/app'
 import { IocContract } from '@adonisjs/fold'
 import { initIocContainer } from '../'
 import { AppServices } from '../app'
-import { truncateTables } from '../tests/tableManager'
 import { Account } from '../account/model'
 import { Invoice } from '../invoice/model'
 import { DateTime } from 'luxon'
@@ -15,7 +15,7 @@ describe('WM Service', (): void => {
   let deps: IocContract<AppServices>
   let appContainer: TestContainer
   let wmService: WebMonetizationService
-  let knex: Knex
+  let trx: Transaction
   let account: Account
   const mockMessageProducer = {
     send: jest.fn()
@@ -26,12 +26,13 @@ describe('WM Service', (): void => {
       deps = await initIocContainer(Config)
       deps.bind('messageProducer', async () => mockMessageProducer)
       appContainer = await createTestApp(deps)
-      knex = await deps.use('knex')
     }
   )
 
   beforeEach(
     async (): Promise<void> => {
+      trx = await appContainer.knex.transaction()
+      Model.knex(trx)
       wmService = await deps.use('wmService')
       account = await deps.use('accountService').then((as) => {
         return as.create(6, 'USD')
@@ -41,14 +42,14 @@ describe('WM Service', (): void => {
 
   afterEach(
     async (): Promise<void> => {
-      await truncateTables(knex)
+      await trx.rollback()
+      await trx.destroy()
       jest.useRealTimers()
     }
   )
 
   afterAll(
     async (): Promise<void> => {
-      await truncateTables(knex)
       await appContainer.shutdown()
     }
   )

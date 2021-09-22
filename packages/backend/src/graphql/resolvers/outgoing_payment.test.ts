@@ -1,6 +1,7 @@
 import nock from 'nock'
 import { gql } from 'apollo-server-koa'
-import Knex from 'knex'
+import { Transaction } from 'knex'
+import { Model } from 'objection'
 import { StreamServer } from '@interledger/stream-receiver'
 import { PaymentError, PaymentType } from '@interledger/pay'
 import { v4 as uuid } from 'uuid'
@@ -10,7 +11,6 @@ import { IocContract } from '@adonisjs/fold'
 import { AppServices } from '../../app'
 import { initIocContainer } from '../..'
 import { Config } from '../../config/app'
-import { truncateTables } from '../../tests/tableManager'
 import { OutgoingPaymentService } from '../../outgoing_payment/service'
 import {
   OutgoingPayment as OutgoingPaymentModel,
@@ -29,7 +29,7 @@ describe('OutgoingPayment Resolvers', (): void => {
   let deps: IocContract<AppServices>
   let appContainer: TestContainer
   let connectorService: MockConnectorService
-  let knex: Knex
+  let trx: Transaction
 
   const streamServer = new StreamServer({
     serverSecret: Buffer.from(
@@ -45,7 +45,6 @@ describe('OutgoingPayment Resolvers', (): void => {
       appContainer = await createTestApp(deps)
       connectorService = new MockConnectorService()
       deps.bind('connectorService', async (_deps) => connectorService)
-      knex = await deps.use('knex')
 
       const credentials = streamServer.generateCredentials({
         asset: {
@@ -62,9 +61,22 @@ describe('OutgoingPayment Resolvers', (): void => {
     }
   )
 
+  beforeEach(
+    async (): Promise<void> => {
+      trx = await appContainer.knex.transaction()
+      Model.knex(trx)
+    }
+  )
+
+  afterEach(
+    async (): Promise<void> => {
+      await trx.rollback()
+      await trx.destroy()
+    }
+  )
+
   afterAll(
     async (): Promise<void> => {
-      await truncateTables(knex)
       await appContainer.apolloClient.stop()
       await appContainer.shutdown()
     }
@@ -80,7 +92,7 @@ describe('OutgoingPayment Resolvers', (): void => {
       const accountId = (await accountService.createSubAccount(superAccountId))
         .id
       outgoingPaymentService = await deps.use('outgoingPaymentService')
-      payment = await OutgoingPaymentModel.query(knex).insertAndFetch({
+      payment = await OutgoingPaymentModel.query().insertAndFetch({
         state: PaymentState.Inactive,
         intent: {
           paymentPointer: 'http://wallet2.example/paymentpointer/bob',

@@ -1,4 +1,5 @@
-import Knex from 'knex'
+import { Transaction } from 'knex'
+import { Model } from 'objection'
 import { WorkerUtils, makeWorkerUtils } from 'graphile-worker'
 
 import { InvoiceService } from './service'
@@ -10,7 +11,6 @@ import { Config } from '../config/app'
 import { IocContract } from '@adonisjs/fold'
 import { initIocContainer } from '../'
 import { AppServices } from '../app'
-import { truncateTable, truncateTables } from '../tests/tableManager'
 import { AccountService } from '../account/service'
 import { Account } from '../account/model'
 
@@ -21,7 +21,7 @@ describe('Invoice Service', (): void => {
   let invoiceService: InvoiceService
   let accountService: AccountService
   let account: Account
-  let knex: Knex
+  let trx: Transaction
   const messageProducer = new GraphileProducer()
   const mockMessageProducer = {
     send: jest.fn()
@@ -37,22 +37,29 @@ describe('Invoice Service', (): void => {
       })
       await workerUtils.migrate()
       messageProducer.setUtils(workerUtils)
-      knex = await deps.use('knex')
     }
   )
 
   beforeEach(
     async (): Promise<void> => {
+      trx = await appContainer.knex.transaction()
+      Model.knex(trx)
       invoiceService = await deps.use('invoiceService')
       accountService = await deps.use('accountService')
       account = await accountService.create(6, 'USD')
     }
   )
 
+  afterEach(
+    async (): Promise<void> => {
+      await trx.rollback()
+      await trx.destroy()
+    }
+  )
+
   afterAll(
     async (): Promise<void> => {
-      await resetGraphileDb(knex)
-      await truncateTables(knex)
+      await resetGraphileDb(appContainer.knex)
       await appContainer.shutdown()
       await workerUtils.release()
     }
@@ -88,12 +95,6 @@ describe('Invoice Service', (): void => {
             await invoiceService.create(account.id, `Invoice ${i}`)
           )
         }
-      }
-    )
-
-    afterEach(
-      async (): Promise<void> => {
-        await truncateTable(knex, 'invoices')
       }
     )
 

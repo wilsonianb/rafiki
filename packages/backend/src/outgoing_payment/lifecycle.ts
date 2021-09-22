@@ -110,7 +110,7 @@ export async function handleQuoting(
     return
   }
 
-  await payment.$query(deps.knex).patch({
+  await payment.$query().patch({
     state: PaymentState.Ready,
     quote: {
       timestamp: new Date(),
@@ -138,7 +138,7 @@ export async function handleReady(
     throw LifecycleError.QuoteExpired
   }
   if (payment.intent.autoApprove) {
-    await payment.$query(deps.knex).patch({ state: PaymentState.Activated })
+    await payment.$query().patch({ state: PaymentState.Activated })
     deps.logger.debug('auto-approve')
     return
   }
@@ -182,7 +182,7 @@ export async function handleActivation(
     )
     throw LifecycleError.AccountServiceError
   }
-  await payment.$query(deps.knex).patch({ state: PaymentState.Sending })
+  await payment.$query().patch({ state: PaymentState.Sending })
 }
 
 export async function handleSending(
@@ -336,7 +336,7 @@ export async function handleCancelling(
   payment: OutgoingPayment
 ): Promise<void> {
   await refundLeftoverBalance(deps, payment)
-  await payment.$query(deps.knex).patch({ state: PaymentState.Cancelled })
+  await payment.$query().patch({ state: PaymentState.Cancelled })
 }
 
 async function paymentCompleted(
@@ -345,7 +345,7 @@ async function paymentCompleted(
 ): Promise<void> {
   // Restore leftover reserved money to the parent account.
   await refundLeftoverBalance(deps, payment)
-  await payment.$query(deps.knex).patch({ state: PaymentState.Completed })
+  await payment.$query().patch({ state: PaymentState.Completed })
 }
 
 // Refund money in the subaccount to the parent account.

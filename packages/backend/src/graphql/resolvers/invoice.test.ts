@@ -1,5 +1,6 @@
 import { gql } from 'apollo-server-koa'
-import Knex from 'knex'
+import { Transaction } from 'knex'
+import { Model } from 'objection'
 
 import { createTestApp, TestContainer } from '../../tests/app'
 import { IocContract } from '@adonisjs/fold'
@@ -8,7 +9,6 @@ import { initIocContainer } from '../..'
 import { Config } from '../../config/app'
 import { Account as AccountModel } from '../../account/model'
 import { AccountService } from '../../account/service'
-import { truncateTables } from '../../tests/tableManager'
 import { Invoice } from '../../invoice/model'
 import { InvoiceService } from '../../invoice/service'
 import { Account } from '../generated/graphql'
@@ -18,7 +18,7 @@ describe('Invoice Resolver', (): void => {
   let appContainer: TestContainer
   let invoiceService: InvoiceService
   let accountService: AccountService
-  let knex: Knex
+  let trx: Transaction
   let invoices: Invoice[]
   let account: AccountModel
 
@@ -26,9 +26,15 @@ describe('Invoice Resolver', (): void => {
     async (): Promise<void> => {
       deps = await initIocContainer(Config)
       appContainer = await createTestApp(deps)
-      knex = await deps.use('knex')
       invoiceService = await deps.use('invoiceService')
       accountService = await deps.use('accountService')
+    }
+  )
+
+  beforeEach(
+    async (): Promise<void> => {
+      trx = await appContainer.knex.transaction()
+      Model.knex(trx)
       account = await accountService.create(6, 'USD')
       invoices = []
       for (let i = 0; i < 50; i++) {
@@ -37,9 +43,15 @@ describe('Invoice Resolver', (): void => {
     }
   )
 
+  afterEach(
+    async (): Promise<void> => {
+      await trx.rollback()
+      await trx.destroy()
+    }
+  )
+
   afterAll(
     async (): Promise<void> => {
-      await truncateTables(knex)
       await appContainer.apolloClient.stop()
       await appContainer.shutdown()
     }

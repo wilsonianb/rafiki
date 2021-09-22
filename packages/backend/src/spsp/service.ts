@@ -12,7 +12,7 @@ export interface SPSPService {
   GETPayEndpoint(ctx: AppContext): Promise<void>
 }
 
-interface ServiceDependencies extends Omit<BaseService, 'knex'> {
+interface ServiceDependencies extends BaseService {
   accountService: AccountService
   wmService: WebMonetizationService
   streamServer: StreamServer

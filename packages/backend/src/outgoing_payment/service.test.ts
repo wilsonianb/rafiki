@@ -1,5 +1,6 @@
 import nock from 'nock'
-import Knex from 'knex'
+import { Transaction } from 'knex'
+import { Model } from 'objection'
 import * as Pay from '@interledger/pay'
 import { StreamServer, StreamCredentials } from '@interledger/stream-receiver'
 import { RatesService } from 'rates'
@@ -11,7 +12,6 @@ import { IAppConfig, Config } from '../config/app'
 import { IocContract } from '@adonisjs/fold'
 import { initIocContainer } from '../'
 import { AppServices } from '../app'
-import { truncateTables } from '../tests/tableManager'
 import { MockConnectorService } from '../tests/mockConnectorService'
 import { OutgoingPayment, PaymentIntent, PaymentState } from './model'
 import { MockPlugin } from './mock_plugin'
@@ -26,7 +26,7 @@ describe('OutgoingPaymentService', (): void => {
   let outgoingPaymentService: OutgoingPaymentService
   let ratesService: RatesService
   let connectorService: MockConnectorService
-  let knex: Knex
+  let trx: Transaction
   let superAccountId: string
   let credentials: StreamCredentials
   let invoice: Pay.Invoice
@@ -147,12 +147,10 @@ describe('OutgoingPaymentService', (): void => {
       )
       deps.bind('connectorService', async (_deps) => connectorService)
       deps.bind('ratesService', async (_deps) => ratesService)
-      knex = await deps.use('knex')
       config = await deps.use('config')
       deps.bind('accountService', async (deps) =>
         createAccountService({
           logger: await deps.use('logger'),
-          knex,
           connectorService
         })
       )
@@ -161,6 +159,8 @@ describe('OutgoingPaymentService', (): void => {
 
   beforeEach(
     async (): Promise<void> => {
+      trx = await appContainer.knex.transaction()
+      Model.knex(trx)
       credentials = streamServer.generateCredentials({
         asset: {
           code: 'XRP',
@@ -202,26 +202,28 @@ describe('OutgoingPaymentService', (): void => {
           sharedSecret: credentials.sharedSecret.toString('base64')
         }))
         .persist()
-      await knex.raw('TRUNCATE TABLE "outgoingPayments" RESTART IDENTITY')
     }
   )
 
-  afterEach((): void => {
-    nock.cleanAll()
-    jest.useRealTimers()
-    jest.restoreAllMocks()
+  afterEach(
+    async (): Promise<void> => {
+      await trx.rollback()
+      await trx.destroy()
+      nock.cleanAll()
+      jest.useRealTimers()
+      jest.restoreAllMocks()
 
-    for (const plugin of Object.values(plugins)) {
-      // Plugins must be cleaned up, otherwise ilp-plugin-http can leak http2 connections.
-      expect(plugin.isConnected()).toBe(false)
+      for (const plugin of Object.values(plugins)) {
+        // Plugins must be cleaned up, otherwise ilp-plugin-http can leak http2 connections.
+        expect(plugin.isConnected()).toBe(false)
+      }
+      plugins = {}
     }
-    plugins = {}
-  })
+  )
 
   afterAll(
     async (): Promise<void> => {
       await appContainer.shutdown()
-      await truncateTables(knex)
     }
   )
 
@@ -695,7 +697,7 @@ describe('OutgoingPaymentService', (): void => {
 
         await processNext(paymentId, PaymentState.Completed)
         // Pretend that the transaction didn't commit.
-        await OutgoingPayment.query(knex)
+        await OutgoingPayment.query()
           .findById(paymentId)
           .patch({ state: PaymentState.Sending })
         const payment = await processNext(paymentId, PaymentState.Completed)

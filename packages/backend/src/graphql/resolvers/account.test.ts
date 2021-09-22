@@ -1,12 +1,12 @@
 import { gql } from 'apollo-server-koa'
-import Knex from 'knex'
+import { Transaction } from 'knex'
+import { Model } from 'objection'
 
 import { createTestApp, TestContainer } from '../../tests/app'
 import { IocContract } from '@adonisjs/fold'
 import { AppServices } from '../../app'
 import { initIocContainer } from '../..'
 import { Config } from '../../config/app'
-import { truncateTables } from '../../tests/tableManager'
 import { AccountService } from '../../account/service'
 import { Account as AccountModel } from '../../account/model'
 import { Account } from '../generated/graphql'
@@ -14,19 +14,31 @@ import { Account } from '../generated/graphql'
 describe('Account Resolvers', (): void => {
   let deps: IocContract<AppServices>
   let appContainer: TestContainer
-  let knex: Knex
+  let trx: Transaction
 
   beforeAll(
     async (): Promise<void> => {
       deps = await initIocContainer(Config)
       appContainer = await createTestApp(deps)
-      knex = await deps.use('knex')
+    }
+  )
+
+  beforeEach(
+    async (): Promise<void> => {
+      trx = await appContainer.knex.transaction()
+      Model.knex(trx)
+    }
+  )
+
+  afterEach(
+    async (): Promise<void> => {
+      await trx.rollback()
+      await trx.destroy()
     }
   )
 
   afterAll(
     async (): Promise<void> => {
-      await truncateTables(knex)
       await appContainer.apolloClient.stop()
       await appContainer.shutdown()
     }
