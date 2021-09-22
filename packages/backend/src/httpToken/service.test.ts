@@ -1,4 +1,5 @@
-import Knex from 'knex'
+import { Transaction } from 'knex'
+import { Model } from 'objection'
 import { WorkerUtils, makeWorkerUtils } from 'graphile-worker'
 import { v4 as uuid } from 'uuid'
 
@@ -12,7 +13,6 @@ import { IocContract } from '@adonisjs/fold'
 import { initIocContainer } from '../'
 import { AppServices } from '../app'
 import { AccountFactory } from '../tests/accountFactory'
-import { truncateTables } from '../tests/tableManager'
 import { AccountService } from '../account/service'
 import { Account } from '../account/model'
 
@@ -24,7 +24,7 @@ describe('HTTP Token Service', (): void => {
   let accountService: AccountService
   let accountFactory: AccountFactory
   let account: Account
-  let knex: Knex
+  let trx: Transaction
   const messageProducer = new GraphileProducer()
   const mockMessageProducer = {
     send: jest.fn()
@@ -40,12 +40,13 @@ describe('HTTP Token Service', (): void => {
       })
       await workerUtils.migrate()
       messageProducer.setUtils(workerUtils)
-      knex = await deps.use('knex')
     }
   )
 
   beforeEach(
     async (): Promise<void> => {
+      trx = await appContainer.knex.transaction()
+      Model.knex(trx)
       httpTokenService = await deps.use('httpTokenService')
       accountService = await deps.use('accountService')
       accountFactory = new AccountFactory(accountService)
@@ -53,10 +54,16 @@ describe('HTTP Token Service', (): void => {
     }
   )
 
+  afterEach(
+    async (): Promise<void> => {
+      await trx.rollback()
+      await trx.destroy()
+    }
+  )
+
   afterAll(
     async (): Promise<void> => {
-      await resetGraphileDb(knex)
-      await truncateTables(knex)
+      await resetGraphileDb(appContainer.knex)
       await appContainer.shutdown()
       await workerUtils.release()
     }
@@ -71,9 +78,7 @@ describe('HTTP Token Service', (): void => {
       await expect(
         httpTokenService.create([httpToken])
       ).resolves.toBeUndefined()
-      await expect(
-        HttpToken.query(knex).where(httpToken)
-      ).resolves.toHaveLength(1)
+      await expect(HttpToken.query().where(httpToken)).resolves.toHaveLength(1)
 
       const httpTokens = [
         {
@@ -87,10 +92,10 @@ describe('HTTP Token Service', (): void => {
       ]
       await expect(httpTokenService.create(httpTokens)).resolves.toBeUndefined()
       await expect(
-        HttpToken.query(knex).where(httpTokens[0])
+        HttpToken.query().where(httpTokens[0])
       ).resolves.toHaveLength(1)
       await expect(
-        HttpToken.query(knex).where(httpTokens[1])
+        HttpToken.query().where(httpTokens[1])
       ).resolves.toHaveLength(1)
     })
 
@@ -102,9 +107,7 @@ describe('HTTP Token Service', (): void => {
       await expect(httpTokenService.create([httpToken])).resolves.toEqual(
         HttpTokenError.UnknownAccount
       )
-      await expect(
-        HttpToken.query(knex).where(httpToken)
-      ).resolves.toHaveLength(0)
+      await expect(HttpToken.query().where(httpToken)).resolves.toHaveLength(0)
     })
 
     test('Cannot create duplicate token', async (): Promise<void> => {
@@ -123,7 +126,7 @@ describe('HTTP Token Service', (): void => {
         HttpTokenError.DuplicateToken
       )
       await expect(
-        HttpToken.query(knex).where({ accountId: account.id })
+        HttpToken.query().where({ accountId: account.id })
       ).resolves.toHaveLength(0)
 
       const httpToken = httpTokens[0]
@@ -131,13 +134,13 @@ describe('HTTP Token Service', (): void => {
         httpTokenService.create([httpToken])
       ).resolves.toBeUndefined()
       await expect(
-        HttpToken.query(knex).where({ accountId: account.id })
+        HttpToken.query().where({ accountId: account.id })
       ).resolves.toHaveLength(1)
       await expect(httpTokenService.create([httpToken])).resolves.toEqual(
         HttpTokenError.DuplicateToken
       )
       await expect(
-        HttpToken.query(knex).where({ accountId: account.id })
+        HttpToken.query().where({ accountId: account.id })
       ).resolves.toHaveLength(1)
 
       const newAccountToken = {
@@ -148,7 +151,7 @@ describe('HTTP Token Service', (): void => {
         HttpTokenError.DuplicateToken
       )
       await expect(
-        HttpToken.query(knex).where(newAccountToken)
+        HttpToken.query().where(newAccountToken)
       ).resolves.toHaveLength(0)
     })
   })
@@ -167,13 +170,13 @@ describe('HTTP Token Service', (): void => {
       ]
       await expect(httpTokenService.create(httpTokens)).resolves.toBeUndefined()
       await expect(
-        HttpToken.query(knex).where({ accountId: account.id })
+        HttpToken.query().where({ accountId: account.id })
       ).resolves.toHaveLength(2)
       await expect(
         httpTokenService.deleteByAccount(account.id)
       ).resolves.toBeUndefined()
       await expect(
-        HttpToken.query(knex).where({ accountId: account.id })
+        HttpToken.query().where({ accountId: account.id })
       ).resolves.toHaveLength(0)
     })
   })

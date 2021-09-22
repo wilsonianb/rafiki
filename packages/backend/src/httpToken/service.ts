@@ -50,7 +50,7 @@ async function createHttpTokens(
   trx?: Transaction
 ): Promise<void | HttpTokenError> {
   try {
-    await HttpToken.query(trx || deps.knex).insert(tokens)
+    await HttpToken.query(trx).insert(tokens)
   } catch (err) {
     if (err instanceof ForeignKeyViolationError) {
       return HttpTokenError.UnknownAccount
@@ -66,9 +66,7 @@ async function deleteHttpTokensByAccount(
   accountId: string,
   trx?: Transaction
 ): Promise<void> {
-  await HttpToken.query(trx || deps.knex)
-    .delete()
-    .where({
-      accountId
-    })
+  await HttpToken.query(trx).delete().where({
+    accountId
+  })
 }

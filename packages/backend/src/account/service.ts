@@ -194,7 +194,7 @@ async function createAccount(
     newAccount.assetId = newAccount.asset.id
   }
 
-  const acctTrx = trx || (await Account.startTransaction(deps.knex))
+  const acctTrx = trx || (await Account.startTransaction())
   try {
     const newBalances: BalanceOptions[] = []
     const superAccountPatch: PartialModelObject<Account> = {}

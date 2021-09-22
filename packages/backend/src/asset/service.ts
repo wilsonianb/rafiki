@@ -53,20 +53,14 @@ async function getAsset(
   { code, scale }: AssetOptions,
   trx?: Transaction
 ): Promise<void | Asset> {
-  return await Asset.query(trx || deps.knex)
-    .where({ code, scale })
-    .limit(1)
-    .first()
+  return await Asset.query(trx).where({ code, scale }).limit(1).first()
 }
 
 async function getOrCreateAsset(
   deps: ServiceDependencies,
   { code, scale }: AssetOptions
 ): Promise<Asset> {
-  const asset = await Asset.query(deps.knex)
-    .where({ code, scale })
-    .limit(1)
-    .first()
+  const asset = await Asset.query().where({ code, scale }).limit(1).first()
   if (asset) {
     return asset
   } else {
@@ -109,7 +103,7 @@ async function getAssetById(
   id: string,
   trx?: Transaction
 ): Promise<void | Asset> {
-  return await Asset.query(trx || deps.knex).findById(id)
+  return await Asset.query(trx).findById(id)
 }
 
 async function getLiquidityBalance(
@@ -117,7 +111,7 @@ async function getLiquidityBalance(
   { code, scale }: AssetOptions,
   trx?: Transaction
 ): Promise<bigint | undefined> {
-  const asset = await Asset.query(trx || deps.knex)
+  const asset = await Asset.query(trx)
     .where({ code, scale })
     .first()
     .select('liquidityBalanceId')
@@ -136,7 +130,7 @@ async function getSettlementBalance(
   { code, scale }: AssetOptions,
   trx?: Transaction
 ): Promise<bigint | undefined> {
-  const asset = await Asset.query(trx || deps.knex)
+  const asset = await Asset.query(trx)
     .where({ code, scale })
     .first()
     .select('settlementBalanceId')

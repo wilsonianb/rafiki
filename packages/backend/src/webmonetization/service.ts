@@ -45,7 +45,7 @@ async function getCurrentInvoice(
     throw new Error('account not found')
   }
 
-  const wm = await WebMonetization.query(deps.knex)
+  const wm = await WebMonetization.query()
     .insertAndFetch({
       id: account.id
     })
@@ -72,11 +72,11 @@ async function getCurrentInvoice(
     })
   }
 
-  ok(deps.knex)
+  ok(WebMonetization.knex())
   const expectedExpiryAt = DateTime.utc().endOf('day') //Expire Every Day
   // Create an invoice
   if (!wm.currentInvoiceId) {
-    return createInvoice(deps.knex, account.id, expectedExpiryAt)
+    return createInvoice(WebMonetization.knex(), account.id, expectedExpiryAt)
   } else {
     const invoice = await deps.invoiceService.get(wm.currentInvoiceId)
     const currentInvoiceExpiry = DateTime.fromJSDate(invoice.expiresAt, {
@@ -85,7 +85,7 @@ async function getCurrentInvoice(
 
     // Check if currentInvoice has expired, if so create new invoice
     if (expectedExpiryAt.diff(currentInvoiceExpiry).toMillis() !== 0) {
-      return createInvoice(deps.knex, account.id, expectedExpiryAt)
+      return createInvoice(WebMonetization.knex(), account.id, expectedExpiryAt)
     }
 
     return invoice

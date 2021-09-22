@@ -48,7 +48,7 @@ async function getInvoice(
   deps: ServiceDependencies,
   id: string
 ): Promise<Invoice> {
-  return Invoice.query(deps.knex).findById(id)
+  return Invoice.query().findById(id)
 }
 
 async function createInvoice(
@@ -58,7 +58,7 @@ async function createInvoice(
   expiresAt?: Date,
   trx?: Transaction
 ): Promise<Invoice> {
-  const invTrx = trx || (await Invoice.startTransaction(deps.knex))
+  const invTrx = trx || (await Invoice.startTransaction())
 
   try {
     const subAccount = await deps.accountService.create(
@@ -116,7 +116,7 @@ async function getAccountInvoicesPage(
   accountId: string,
   pagination?: Pagination
 ): Promise<Invoice[]> {
-  assert.ok(deps.knex, 'Knex undefined')
+  assert.ok(Invoice.knex(), 'Knex undefined')
 
   if (
     typeof pagination?.before === 'undefined' &&
@@ -133,7 +133,7 @@ async function getAccountInvoicesPage(
    * Forward pagination
    */
   if (typeof pagination?.after === 'string') {
-    return Invoice.query(deps.knex)
+    return Invoice.query()
       .where({
         accountId: accountId
       })
@@ -152,7 +152,7 @@ async function getAccountInvoicesPage(
    * Backward pagination
    */
   if (typeof pagination?.before === 'string') {
-    return Invoice.query(deps.knex)
+    return Invoice.query()
       .where({
         accountId: accountId
       })
@@ -170,7 +170,7 @@ async function getAccountInvoicesPage(
       })
   }
 
-  return Invoice.query(deps.knex)
+  return Invoice.query()
     .where({
       accountId: accountId
     })

@@ -1,4 +1,5 @@
-import Knex from 'knex'
+import { Transaction } from 'knex'
+import { Model } from 'objection'
 import { WorkerUtils, makeWorkerUtils } from 'graphile-worker'
 import { v4 as uuid } from 'uuid'
 
@@ -23,18 +24,17 @@ import { initIocContainer } from '../'
 import { AppServices } from '../app'
 import { AccountFactory } from '../tests/accountFactory'
 import { randomAsset } from '../tests/asset'
-import { truncateTables } from '../tests/tableManager'
 
 describe('Account Service', (): void => {
   let deps: IocContract<AppServices>
   let appContainer: TestContainer
+  let trx: Transaction
   let workerUtils: WorkerUtils
   let accountService: AccountService
   let accountFactory: AccountFactory
   let assetService: AssetService
   let balanceService: BalanceService
   let config: IAppConfig
-  let knex: Knex
   const messageProducer = new GraphileProducer()
   const mockMessageProducer = {
     send: jest.fn()
@@ -58,12 +58,13 @@ describe('Account Service', (): void => {
       })
       await workerUtils.migrate()
       messageProducer.setUtils(workerUtils)
-      knex = await deps.use('knex')
     }
   )
 
   beforeEach(
     async (): Promise<void> => {
+      trx = await appContainer.knex.transaction()
+      Model.knex(trx)
       accountService = await deps.use('accountService')
       accountFactory = new AccountFactory(accountService)
       assetService = await deps.use('assetService')
@@ -72,10 +73,16 @@ describe('Account Service', (): void => {
     }
   )
 
+  afterEach(
+    async (): Promise<void> => {
+      await trx.rollback()
+      await trx.destroy()
+    }
+  )
+
   afterAll(
     async (): Promise<void> => {
-      await resetGraphileDb(knex)
-      await truncateTables(knex)
+      await resetGraphileDb(appContainer.knex)
       await appContainer.shutdown()
       await workerUtils.release()
     }

@@ -1,8 +1,9 @@
 import EventEmitter from 'events'
 import * as crypto from 'crypto'
-import Knex from 'knex'
+import { Transaction } from 'knex'
 import Koa from 'koa'
 import * as httpMocks from 'node-mocks-http'
+import { Model } from 'objection'
 import { AppContext, AppContextData, AppServices } from '../app'
 
 import { SPSPService } from './service'
@@ -17,7 +18,6 @@ import { makeWorkerUtils, WorkerUtils } from 'graphile-worker'
 import { v4 } from 'uuid'
 import { StreamServer } from '@interledger/stream-receiver'
 import { AccountFactory } from '../tests/accountFactory'
-import { truncateTables } from '../tests/tableManager'
 import { AccountService } from '../account/service'
 import { Account } from '../account/model'
 import { WebMonetizationService } from '../webmonetization/service'
@@ -25,7 +25,7 @@ import { WebMonetizationService } from '../webmonetization/service'
 describe('SPSP Service', (): void => {
   let deps: IocContract<AppServices>
   let appContainer: TestContainer
-  let knex: Knex
+  let trx: Transaction
   let workerUtils: WorkerUtils
   let accountService: AccountService
   let accountFactory: AccountFactory
@@ -49,12 +49,13 @@ describe('SPSP Service', (): void => {
       })
       await workerUtils.migrate()
       messageProducer.setUtils(workerUtils)
-      knex = await deps.use('knex')
     }
   )
 
   beforeEach(
     async (): Promise<void> => {
+      trx = await appContainer.knex.transaction()
+      Model.knex(trx)
       accountService = await deps.use('accountService')
       accountFactory = new AccountFactory(accountService)
       SPSPService = await deps.use('SPSPService')
@@ -63,10 +64,16 @@ describe('SPSP Service', (): void => {
     }
   )
 
+  afterEach(
+    async (): Promise<void> => {
+      await trx.rollback()
+      await trx.destroy()
+    }
+  )
+
   afterAll(
     async (): Promise<void> => {
-      await resetGraphileDb(knex)
-      await truncateTables(knex)
+      await resetGraphileDb(appContainer.knex)
       await appContainer.shutdown()
       await workerUtils.release()
     }
