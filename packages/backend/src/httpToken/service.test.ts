@@ -107,10 +107,9 @@ describe('HTTP Token Service', (): void => {
       await expect(httpTokenService.create([httpToken])).resolves.toEqual(
         HttpTokenError.UnknownAccount
       )
-      await expect(HttpToken.query().where(httpToken)).resolves.toHaveLength(0)
     })
 
-    test('Cannot create duplicate token', async (): Promise<void> => {
+    test('Cannot create duplicate tokens', async (): Promise<void> => {
       const token = uuid()
       const httpTokens = [
         {
@@ -125,34 +124,40 @@ describe('HTTP Token Service', (): void => {
       await expect(httpTokenService.create(httpTokens)).resolves.toEqual(
         HttpTokenError.DuplicateToken
       )
-      await expect(
-        HttpToken.query().where({ accountId: account.id })
-      ).resolves.toHaveLength(0)
+    })
 
-      const httpToken = httpTokens[0]
+    test('Cannot create duplicate token for same account', async (): Promise<void> => {
+      const httpToken = {
+        accountId: account.id,
+        token: uuid()
+      }
       await expect(
         httpTokenService.create([httpToken])
       ).resolves.toBeUndefined()
-      await expect(
-        HttpToken.query().where({ accountId: account.id })
-      ).resolves.toHaveLength(1)
       await expect(httpTokenService.create([httpToken])).resolves.toEqual(
         HttpTokenError.DuplicateToken
       )
-      await expect(
-        HttpToken.query().where({ accountId: account.id })
-      ).resolves.toHaveLength(1)
+    })
 
-      const newAccountToken = {
-        accountId: (await accountFactory.build()).id,
-        token
-      }
-      await expect(httpTokenService.create([newAccountToken])).resolves.toEqual(
-        HttpTokenError.DuplicateToken
-      )
+    test('Cannot create duplicate token for different account', async (): Promise<void> => {
+      const token = uuid()
+
       await expect(
-        HttpToken.query().where(newAccountToken)
-      ).resolves.toHaveLength(0)
+        httpTokenService.create([
+          {
+            accountId: account.id,
+            token
+          }
+        ])
+      ).resolves.toBeUndefined()
+      await expect(
+        httpTokenService.create([
+          {
+            accountId: (await accountFactory.build()).id,
+            token
+          }
+        ])
+      ).resolves.toEqual(HttpTokenError.DuplicateToken)
     })
   })
 
