@@ -1,4 +1,5 @@
 import { Asset } from './model'
+import { CreateAssetBalanceError } from './errors'
 import { BaseService } from '../shared/baseService'
 import { Transaction } from 'knex'
 import { BalanceService } from '../balance/service'
@@ -88,7 +89,7 @@ async function getOrCreateAsset(
         code,
         scale
       })
-      await deps.balanceService.create([
+      const error = await deps.balanceService.create([
         {
           id: asset.liquidityBalanceId,
           unit: asset.unit
@@ -99,6 +100,9 @@ async function getOrCreateAsset(
           unit: asset.unit
         }
       ])
+      if (error) {
+        throw new CreateAssetBalanceError(error.error)
+      }
       return asset
     })
   }

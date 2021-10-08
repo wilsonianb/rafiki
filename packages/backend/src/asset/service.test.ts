@@ -3,6 +3,7 @@ import { WorkerUtils, makeWorkerUtils } from 'graphile-worker'
 import { v4 as uuid } from 'uuid'
 
 import { AssetService } from './service'
+import { CreateAssetBalanceError } from './errors'
 import { createTestApp, TestContainer } from '../tests/app'
 import { resetGraphileDb } from '../tests/graphileDb'
 import { truncateTables } from '../tests/tableManager'
@@ -11,12 +12,15 @@ import { Config } from '../config/app'
 import { IocContract } from '@adonisjs/fold'
 import { initIocContainer } from '../'
 import { AppServices } from '../app'
+import { BalanceService } from '../balance/service'
+import { BalanceError, CreateBalanceError } from '../balance/errors'
 
 describe('Asset Service', (): void => {
   let deps: IocContract<AppServices>
   let appContainer: TestContainer
   let workerUtils: WorkerUtils
   let assetService: AssetService
+  let balanceService: BalanceService
   let knex: Knex
   const messageProducer = new GraphileProducer()
   const mockMessageProducer = {
@@ -35,6 +39,7 @@ describe('Asset Service', (): void => {
       messageProducer.setUtils(workerUtils)
       knex = await deps.use('knex')
       assetService = await deps.use('assetService')
+      balanceService = await deps.use('balanceService')
     }
   )
 
@@ -83,6 +88,28 @@ describe('Asset Service', (): void => {
       await expect(assetService.getById(asset.id)).resolves.toEqual(asset)
 
       await expect(assetService.getById(uuid())).resolves.toBeUndefined()
+    })
+
+    test('Does not create asset when balance creation fails', async (): Promise<void> => {
+      const asset = {
+        code: 'EUR',
+        scale: 3
+      }
+      jest
+        .spyOn(balanceService, 'create')
+        .mockImplementationOnce(async () => ({
+          index: 0,
+          error: BalanceError.DuplicateBalance
+        }))
+        .mockImplementationOnce(async () => {
+          throw new CreateBalanceError(5)
+        })
+      await expect(assetService.getOrCreate(asset)).rejects.toThrowError(
+        new CreateAssetBalanceError(BalanceError.DuplicateBalance)
+      )
+      await expect(assetService.getOrCreate(asset)).rejects.toThrowError(
+        new CreateBalanceError(5)
+      )
     })
   })
 
