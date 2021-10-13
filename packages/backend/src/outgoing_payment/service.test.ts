@@ -178,7 +178,12 @@ describe('OutgoingPaymentService', (): void => {
       outgoingPaymentService = await deps.use('outgoingPaymentService')
       balanceService = await deps.use('balanceService')
       transferService = await deps.use('transferService')
-      const accountFactory = new AccountFactory(accountService, transferService)
+      const assetService = await deps.use('assetService')
+      const accountFactory = new AccountFactory(
+        accountService,
+        assetService,
+        transferService
+      )
       sourceAccountId = (
         await accountFactory.build({
           asset: {

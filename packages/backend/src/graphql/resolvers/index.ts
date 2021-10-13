@@ -8,6 +8,12 @@ import {
   updateAccount,
   deleteAccount
 } from './account'
+import {
+  createAsset,
+  getAsset,
+  getAssets,
+  getAssetsConnectionPageInfo
+} from './asset'
 import { getAccountInvoices, getPageInfo } from './invoice'
 import {
   getOutgoingPayment,
@@ -32,6 +38,8 @@ export const resolvers: Resolvers = {
   Query: {
     account: getAccount,
     accounts: getAccounts,
+    asset: getAsset,
+    assets: getAssets,
     outgoingPayment: getOutgoingPayment
     // webhook: getWebhook
   },
@@ -42,6 +50,9 @@ export const resolvers: Resolvers = {
   },
   AccountsConnection: {
     pageInfo: getAccountsConnectionPageInfo
+  },
+  AssetsConnection: {
+    pageInfo: getAssetsConnectionPageInfo
   },
   InvoiceConnection: {
     pageInfo: getPageInfo
@@ -56,6 +67,7 @@ export const resolvers: Resolvers = {
     createAccount: createAccount,
     updateAccount: updateAccount,
     deleteAccount: deleteAccount,
+    createAsset: createAsset,
     createOutgoingPayment,
     approveOutgoingPayment,
     requoteOutgoingPayment,

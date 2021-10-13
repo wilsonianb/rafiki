@@ -54,7 +54,8 @@ describe('SPSP Service', (): void => {
   beforeEach(
     async (): Promise<void> => {
       const accountService = await deps.use('accountService')
-      accountFactory = new AccountFactory(accountService)
+      const assetService = await deps.use('assetService')
+      accountFactory = new AccountFactory(accountService, assetService)
       SPSPService = await deps.use('SPSPService')
       streamServer = await deps.use('streamServer')
       wmService = await deps.use('wmService')

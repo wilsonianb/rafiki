@@ -59,6 +59,12 @@ export const createAccount: MutationResolvers['createAccount'] = async (
             message: 'Incoming token already exists',
             success: false
           }
+        case AccountError.UnknownAsset:
+          return {
+            code: '404',
+            message: 'Unknown asset',
+            success: false
+          }
         default:
           throw new Error(`AccountError: ${accountOrError}`)
       }
