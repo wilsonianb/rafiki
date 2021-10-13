@@ -115,7 +115,10 @@ async function createLiquidityDeposit(
   if (id && !validateId(id)) {
     return DepositError.InvalidId
   }
-  const asset = await deps.assetService.getOrCreate({ code, scale })
+  const asset = await deps.assetService.get({ code, scale })
+  if (!asset) {
+    return DepositError.UnknownAsset
+  }
   const error = await deps.transferService.create([
     {
       id: id || uuid(),

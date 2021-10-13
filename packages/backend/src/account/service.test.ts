@@ -15,7 +15,8 @@ import {
   AccountTransferError,
   isAccountTransferError
 } from './errors'
-import { AssetService } from '../asset/service'
+import { isAssetError } from '../asset/errors'
+import { AssetOptions, AssetService } from '../asset/service'
 import { BalanceService } from '../balance/service'
 import { DepositService } from '../deposit/service'
 import { Pagination } from '../shared/pagination'
@@ -72,8 +73,12 @@ describe('Account Service', (): void => {
     async (): Promise<void> => {
       accountService = await deps.use('accountService')
       const transferService = await deps.use('transferService')
-      accountFactory = new AccountFactory(accountService, transferService)
       assetService = await deps.use('assetService')
+      accountFactory = new AccountFactory(
+        accountService,
+        assetService,
+        transferService
+      )
       balanceService = await deps.use('balanceService')
       depositService = await deps.use('depositService')
       config = await deps.use('config')
@@ -95,9 +100,24 @@ describe('Account Service', (): void => {
   )
 
   describe('Create Account', (): void => {
+    let asset: AssetOptions
+
+    beforeEach(
+      async (): Promise<void> => {
+        const newAsset = await assetService.create(randomAsset())
+        if (isAssetError(newAsset)) {
+          fail()
+        }
+        asset = {
+          code: newAsset.code,
+          scale: newAsset.scale
+        }
+      }
+    )
+
     test('Can create an account', async (): Promise<void> => {
       const account: CreateOptions = {
-        asset: randomAsset()
+        asset
       }
       const accountOrError = await accountService.create(account)
       expect(isAccountError(accountOrError)).toEqual(false)
@@ -131,7 +151,7 @@ describe('Account Service', (): void => {
       const account: CreateOptions = {
         id,
         disabled: false,
-        asset: randomAsset(),
+        asset,
         maxPacketAmount: BigInt(100),
         http: {
           incoming: {
@@ -177,11 +197,19 @@ describe('Account Service', (): void => {
       await expect(
         accountService.create({
           id: account.id,
-          asset: randomAsset()
+          asset
         })
       ).resolves.toEqual(AccountError.DuplicateAccountId)
       const retrievedAccount = await accountService.get(account.id)
       expect(retrievedAccount).toEqual(account)
+    })
+
+    test('Cannot create an account with unknown asset', async (): Promise<void> => {
+      await expect(
+        accountService.create({
+          asset: randomAsset()
+        })
+      ).resolves.toEqual(AccountError.UnknownAsset)
     })
 
     test('Cannot create an account with duplicate incoming tokens', async (): Promise<void> => {
@@ -189,7 +217,7 @@ describe('Account Service', (): void => {
       const incomingToken = uuid()
       const account = {
         id,
-        asset: randomAsset(),
+        asset,
         http: {
           incoming: {
             authTokens: [incomingToken, incomingToken]
@@ -213,7 +241,7 @@ describe('Account Service', (): void => {
       {
         const account = {
           id: uuid(),
-          asset: randomAsset(),
+          asset,
           http: {
             incoming: {
               authTokens: [incomingToken]
@@ -230,7 +258,7 @@ describe('Account Service', (): void => {
         const id = uuid()
         const account = {
           id,
-          asset: randomAsset(),
+          asset,
           http: {
             incoming: {
               authTokens: [incomingToken]
@@ -246,31 +274,6 @@ describe('Account Service', (): void => {
         )
         await expect(accountService.get(id)).resolves.toBeUndefined()
       }
-    })
-
-    test('Auto-creates corresponding asset with liquidity and settlement accounts', async (): Promise<void> => {
-      const asset = randomAsset()
-      const account: CreateOptions = {
-        asset
-      }
-
-      await expect(assetService.get(asset)).resolves.toBeUndefined()
-      await expect(
-        assetService.getLiquidityBalance(asset)
-      ).resolves.toBeUndefined()
-      await expect(
-        assetService.getSettlementBalance(asset)
-      ).resolves.toBeUndefined()
-
-      await accountService.create(account)
-
-      await expect(assetService.get(asset)).resolves.toBeDefined()
-      await expect(assetService.getLiquidityBalance(asset)).resolves.toEqual(
-        BigInt(0)
-      )
-      await expect(assetService.getSettlementBalance(asset)).resolves.toEqual(
-        BigInt(0)
-      )
     })
   })
 
@@ -291,7 +294,10 @@ describe('Account Service', (): void => {
     beforeEach(
       async (): Promise<void> => {
         accountsCreated = []
-        const asset = randomAsset()
+        const asset = await assetService.create(randomAsset())
+        if (isAssetError(asset)) {
+          fail()
+        }
         for (let i = 0; i < 40; i++) {
           accountsCreated.push(await accountFactory.build({ asset }))
         }

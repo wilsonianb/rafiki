@@ -152,7 +152,10 @@ async function createAccount(
   // Asset rows include a smallserial column that would have sequence gaps
   // if a transaction is rolled back.
   // https://www.postgresql.org/docs/current/datatype-numeric.html#DATATYPE-SERIAL
-  const asset = await deps.assetService.getOrCreate(account.asset)
+  const asset = await deps.assetService.get(account.asset)
+  if (!asset) {
+    return AccountError.UnknownAsset
+  }
   const newAccount: PartialModelObject<Account> = {
     ...account,
     asset: asset,

@@ -44,7 +44,8 @@ describe('HTTP Token Service', (): void => {
       knex = await deps.use('knex')
       httpTokenService = await deps.use('httpTokenService')
       accountService = await deps.use('accountService')
-      accountFactory = new AccountFactory(accountService)
+      const assetService = await deps.use('assetService')
+      accountFactory = new AccountFactory(accountService, assetService)
     }
   )
 

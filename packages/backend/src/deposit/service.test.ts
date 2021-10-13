@@ -5,7 +5,8 @@ import { v4 as uuid } from 'uuid'
 import { DepositService } from './service'
 import { DepositError, isDepositError } from './errors'
 import { AccountService } from '../account/service'
-import { AssetService } from '../asset/service'
+import { isAssetError } from '../asset/errors'
+import { AssetOptions, AssetService } from '../asset/service'
 import { createTestApp, TestContainer } from '../tests/app'
 import { resetGraphileDb } from '../tests/graphileDb'
 import { truncateTables } from '../tests/tableManager'
@@ -45,7 +46,7 @@ describe('Deposit Service', (): void => {
       depositService = await deps.use('depositService')
       accountService = await deps.use('accountService')
       assetService = await deps.use('assetService')
-      accountFactory = new AccountFactory(accountService)
+      accountFactory = new AccountFactory(accountService, assetService)
     }
   )
 
@@ -152,8 +153,22 @@ describe('Deposit Service', (): void => {
   })
 
   describe('Deposit liquidity', (): void => {
+    let asset: AssetOptions
+
+    beforeEach(
+      async (): Promise<void> => {
+        const newAsset = await assetService.create(randomAsset())
+        if (isAssetError(newAsset)) {
+          fail()
+        }
+        asset = {
+          code: newAsset.code,
+          scale: newAsset.scale
+        }
+      }
+    )
+
     test('Can deposit to liquidity account', async (): Promise<void> => {
-      const asset = randomAsset()
       const amount = BigInt(10)
       {
         const error = await depositService.createLiquidity({
@@ -183,14 +198,21 @@ describe('Deposit Service', (): void => {
     test('Returns error for invalid id', async (): Promise<void> => {
       const error = await depositService.createLiquidity({
         id: 'not a uuid v4',
-        asset: randomAsset(),
+        asset,
         amount: BigInt(5)
       })
       expect(error).toEqual(DepositError.InvalidId)
     })
 
+    test('Returns error for unknown asset', async (): Promise<void> => {
+      const error = await depositService.createLiquidity({
+        asset: randomAsset(),
+        amount: BigInt(5)
+      })
+      expect(error).toEqual(DepositError.UnknownAsset)
+    })
+
     test('Can deposit liquidity with idempotency key', async (): Promise<void> => {
-      const asset = randomAsset()
       const amount = BigInt(10)
       const id = uuid()
       {
