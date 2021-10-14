@@ -1,9 +1,10 @@
 import * as assert from 'assert'
 import * as Pay from '@interledger/pay'
+import { v4 as uuid } from 'uuid'
+
 import { OutgoingPayment, PaymentState } from './model'
 import { ServiceDependencies } from './service'
 import { IlpPlugin } from './ilp_plugin'
-import { TransferError } from '../transfer/errors'
 
 const MAX_INT64 = BigInt('9223372036854775807')
 
@@ -14,15 +15,12 @@ export enum LifecycleError {
   PricesUnavailable = 'PricesUnavailable',
   // Payment aborted via "cancel payment" API call.
   CancelledByAPI = 'CancelledByAPI',
-  // Not enough money in the super-account.
-  InsufficientBalance = 'InsufficientBalance',
-  // Error from the account service, except an InsufficientBalance. (see: TransferError)
-  AccountServiceError = 'AccountServiceError',
+  // Error from the liquidity service. (see: LiquidityError)
+  LiquidityError = 'LiquidityError',
   // Edge error due to retries, partial payment, and database write errors.
   BadState = 'BadState',
 
   // These errors shouldn't ever trigger (impossible states), but they exist to satisfy types:
-  MissingAccount = 'MissingAccount',
   MissingBalance = 'MissingBalance',
   MissingQuote = 'MissingQuote',
   MissingInvoice = 'MissingInvoice',
@@ -60,8 +58,8 @@ export async function handleQuoting(
   // This is the amount of money *remaining* to send, which may be less than the payment intent's amountToSend due to retries (FixedSend payments only).
   let amountToSend: bigint | undefined
   if (payment.intent.amountToSend) {
-    const balance = await deps.accountService.getBalance(payment.accountId)
-    if (balance === undefined) {
+    const balance = await deps.balanceService.get(payment.balanceId)
+    if (!balance) {
       throw LifecycleError.MissingBalance
     }
     const reservedBalance = await deps.balanceService.get(
@@ -70,7 +68,7 @@ export async function handleQuoting(
     if (!reservedBalance) {
       throw LifecycleError.MissingBalance
     }
-    const amountSent = reservedBalance.balance - balance
+    const amountSent = reservedBalance.balance - balance.balance
     amountToSend = payment.intent.amountToSend - amountSent
     if (amountToSend <= BigInt(0)) {
       // The FixedSend payment completed (in Tigerbeetle) but the backend's update to state=Completed didn't commit. Then the payment retried and ended up here.
@@ -92,8 +90,8 @@ export async function handleQuoting(
     plugin,
     destination,
     sourceAsset: {
-      scale: payment.sourceAccount.scale,
-      code: payment.sourceAccount.code
+      scale: payment.asset.scale,
+      code: payment.asset.code
     },
     amountToSend,
     slippage: deps.slippage,
@@ -175,39 +173,22 @@ export async function handleActivation(
   }
 
   await refundLeftoverBalance(deps, payment)
-  const sourceAccount = await deps.accountService.get(payment.sourceAccount.id)
-  const account = await deps.accountService.get(payment.accountId)
-  if (!sourceAccount || !account) {
-    throw LifecycleError.MissingAccount
-  }
-  const error = await deps.transferService.create([
-    {
-      sourceBalanceId: sourceAccount.balanceId,
-      destinationBalanceId: account.balanceId,
-      amount: payment.quote.maxSourceAmount
-    },
-    {
-      sourceBalanceId: sourceAccount.asset.outgoingPaymentsBalanceId,
-      destinationBalanceId: payment.reservedBalanceId,
-      amount: payment.quote.maxSourceAmount
-    }
-  ])
-  if (error) {
-    if (
-      error.index === 0 &&
-      error.error === TransferError.InsufficientBalance
-    ) {
-      throw LifecycleError.InsufficientBalance
-    }
 
-    // Unexpected account service errors: the money was not reserved.
+  // TODO: request payment liquidity from sourceAccountId at wallet
+
+  const error = await deps.liquidityService.add({
+    account: payment,
+    amount: payment.quote.maxSourceAmount
+  })
+  if (error) {
+    // Unexpected liquidity service error: the money was not reserved.
     deps.logger.warn(
       {
         error
       },
-      'reserve transfer error'
+      'reserve liquidity error'
     )
-    throw LifecycleError.AccountServiceError
+    throw LifecycleError.LiquidityError
   }
   await payment.$query(deps.knex).patch({ state: PaymentState.Sending })
 }
@@ -225,14 +206,14 @@ export async function handleSending(
     paymentPointer: payment.intent.paymentPointer,
     invoiceUrl: payment.intent.invoiceUrl
   })
-  const balance = await deps.accountService.getBalance(payment.accountId)
-  if (balance === undefined) {
+  const balance = await deps.balanceService.get(payment.balanceId)
+  if (!balance) {
     throw LifecycleError.MissingBalance
   }
 
   // Due to Sending→Sending retries, the quote's amount parameters may need adjusting.
-  const amountSentSinceQuote = payment.quote.maxSourceAmount - balance
-  const newMaxSourceAmount = balance
+  const amountSentSinceQuote = payment.quote.maxSourceAmount - balance.balance
+  const newMaxSourceAmount = balance.balance
 
   let newMinDeliveryAmount
   switch (payment.quote.targetType) {
@@ -366,42 +347,46 @@ async function paymentCompleted(
   await payment.$query(deps.knex).patch({ state: PaymentState.Completed })
 }
 
-// Refund money in the subaccount to the parent account.
+// Refund money to the wallet account.
 async function refundLeftoverBalance(
   deps: ServiceDependencies,
   payment: OutgoingPayment
 ): Promise<void> {
-  const balance = await deps.accountService.getBalance(payment.accountId)
-  if (balance === undefined) {
+  const balance = await deps.balanceService.get(payment.balanceId)
+  if (!balance) {
     throw LifecycleError.MissingBalance
   }
-  if (balance === BigInt(0)) return
+  if (balance.balance === BigInt(0)) return
 
-  const account = await deps.accountService.get(payment.accountId)
-  const sourceAccount = await deps.accountService.get(payment.sourceAccount.id)
-  if (!account || !sourceAccount) {
-    throw LifecycleError.MissingAccount
-  }
-  const error = await deps.transferService.create([
-    {
-      sourceBalanceId: account.balanceId,
-      destinationBalanceId: sourceAccount.balanceId,
-      amount: balance
-    },
-    {
-      sourceBalanceId: payment.reservedBalanceId,
-      destinationBalanceId: sourceAccount.asset.outgoingPaymentsBalanceId,
-      amount: balance
-    }
-  ])
+  const withdrawalId = uuid()
+  const error = await deps.liquidityService.createWithdrawal({
+    id: withdrawalId,
+    account: payment,
+    amount: balance.balance
+  })
   if (error) {
     deps.logger.warn(
       {
         error
       },
-      'refund transfer error'
+      'refund liquidity error'
     )
-    throw LifecycleError.AccountServiceError
+    throw LifecycleError.LiquidityError
+  }
+
+  // TODO: notify wallet to finalize payment liquidity withdrawal to sourceAccountId
+
+  {
+    const error = await deps.liquidityService.finalizeWithdrawal(withdrawalId)
+    if (error) {
+      deps.logger.warn(
+        {
+          error
+        },
+        'refund liquidity error'
+      )
+      throw LifecycleError.LiquidityError
+    }
   }
 }
 

@@ -232,8 +232,8 @@ export function initIocContainer(
       quoteLifespan: config.quoteLifespan,
       logger: await deps.use('logger'),
       knex: await deps.use('knex'),
-      accountService: await deps.use('accountService'),
       balanceService: await deps.use('balanceService'),
+      liquidityService: await deps.use('liquidityService'),
       makeIlpPlugin: await deps.use('makeIlpPlugin'),
       ratesService: await deps.use('ratesService'),
       transferService: await deps.use('transferService')

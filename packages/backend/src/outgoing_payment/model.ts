@@ -1,14 +1,9 @@
-import { Pojo, ModelOptions, QueryContext } from 'objection'
+import { Model, Pojo, ModelOptions, QueryContext } from 'objection'
 import * as Pay from '@interledger/pay'
+import { Asset } from '../asset/model'
 import { BaseModel } from '../shared/baseModel'
 
-const fieldPrefixes = [
-  'intent',
-  'quote',
-  'sourceAccount',
-  'destinationAccount',
-  'outcome'
-]
+const fieldPrefixes = ['intent', 'quote', 'destinationAccount', 'outcome']
 
 const ratioFields = [
   'quoteMinExchangeRate',
@@ -46,17 +41,27 @@ export class OutgoingPayment extends BaseModel {
     // (Pay.PositiveRatio, but validated later)
     highExchangeRateEstimate: Pay.Ratio
   }
-  public accountId!: string
+  public balanceId!: string
   public reservedBalanceId!: string
-  public sourceAccount!: {
-    id: string
-    scale: number
-    code: string
-  }
+  public sourceAccountId!: string
+  public assetId!: string
+  public asset!: Asset
+
   public destinationAccount!: {
     scale: number
     code: string
     url?: string
+  }
+
+  static relationMappings = {
+    asset: {
+      relation: Model.HasOneRelation,
+      modelClass: Asset,
+      join: {
+        from: 'outgoingPayments.assetId',
+        to: 'assets.id'
+      }
+    }
   }
 
   $beforeUpdate(opts: ModelOptions, queryContext: QueryContext): void {

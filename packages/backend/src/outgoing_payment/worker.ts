@@ -116,7 +116,7 @@ export async function handlePaymentLifecycle(
   let plugin: IlpPlugin
   switch (payment.state) {
     case PaymentState.Inactive:
-      plugin = deps.makeIlpPlugin(payment.accountId)
+      plugin = deps.makeIlpPlugin(payment)
       return plugin
         .connect()
         .then(() => lifecycle.handleQuoting(deps, payment, plugin))

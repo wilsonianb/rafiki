@@ -299,9 +299,10 @@ type OutgoingPayment {
   stateAttempts: Int!
   intent: PaymentIntent
   quote: PaymentQuote
-  accountId: String!
+  balanceId: String!
   reservedBalanceId: String!
-  sourceAccount: PaymentSourceAccount!
+  asset: Asset!
+  sourceAccountId: ID!
   destinationAccount: PaymentDestinationAccount!
   outcome: OutgoingPaymentOutcome!
 }
@@ -345,12 +346,6 @@ type PaymentQuote {
   minExchangeRate: Float!
   lowExchangeRateEstimate: Float!
   highExchangeRateEstimate: Float!
-}
-
-type PaymentSourceAccount {
-  id: String!
-  scale: Int!
-  code: String!
 }
 
 type PaymentDestinationAccount {

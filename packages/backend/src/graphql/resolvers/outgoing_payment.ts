@@ -180,9 +180,9 @@ function paymentToGraphql(
       lowExchangeRateEstimate: payment.quote.lowExchangeRateEstimate.valueOf(),
       highExchangeRateEstimate: payment.quote.highExchangeRateEstimate.valueOf()
     },
-    accountId: payment.accountId,
+    balanceId: payment.balanceId,
     reservedBalanceId: payment.reservedBalanceId,
-    sourceAccount: payment.sourceAccount,
+    sourceAccountId: payment.sourceAccountId,
     destinationAccount: payment.destinationAccount
   }
 }

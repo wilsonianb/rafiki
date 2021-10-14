@@ -11,18 +11,19 @@ import { IAppConfig, Config } from '../config/app'
 import { IocContract } from '@adonisjs/fold'
 import { initIocContainer } from '../'
 import { AppServices } from '../app'
-import { AccountFactory } from '../tests/accountFactory'
 import { truncateTables } from '../tests/tableManager'
 import { OutgoingPayment, PaymentIntent, PaymentState } from './model'
 import { MockPlugin } from './mock_plugin'
 import { LifecycleError } from './lifecycle'
 import { RETRY_BACKOFF_SECONDS } from './worker'
 import { AccountService } from '../account/service'
+import { Asset } from '../asset/model'
 import { BalanceService, Balance } from '../balance/service'
+import { LiquidityError } from '../liquidity/errors'
+import { LiquidityService } from '../liquidity/service'
 import { RatesService } from '../rates/service'
 import { TransferService } from '../transfer/service'
 import { TransferError } from '../transfer/errors'
-import { LiquidityService } from '../liquidity/service'
 
 describe('OutgoingPaymentService', (): void => {
   let deps: IocContract<AppServices>
@@ -35,6 +36,7 @@ describe('OutgoingPaymentService', (): void => {
   let liquidityService: LiquidityService
   let knex: Knex
   let sourceAccountId: string
+  let asset: Asset
   let credentials: StreamCredentials
   let invoice: Pay.Invoice
   let plugins: { [accountId: string]: MockPlugin } = {}
@@ -149,14 +151,13 @@ describe('OutgoingPaymentService', (): void => {
       appContainer = await createTestApp(deps)
       accountService = await deps.use('accountService')
       liquidityService = await deps.use('liquidityService')
-      deps.bind('makeIlpPlugin', async (_deps) => (accountId: string) =>
-        (plugins[accountId] =
-          plugins[accountId] ||
+      deps.bind('makeIlpPlugin', async (_deps) => (payment: OutgoingPayment) =>
+        (plugins[payment] =
+          plugins[payment] ||
           new MockPlugin({
             streamServer,
             exchangeRate: 0.5,
-            accountId,
-            accountService,
+            payment,
             liquidityService,
             invoice
           }))
@@ -178,16 +179,12 @@ describe('OutgoingPaymentService', (): void => {
       outgoingPaymentService = await deps.use('outgoingPaymentService')
       balanceService = await deps.use('balanceService')
       transferService = await deps.use('transferService')
-      const accountFactory = new AccountFactory(accountService, transferService)
-      sourceAccountId = (
-        await accountFactory.build({
-          asset: {
-            scale: 9,
-            code: 'USD'
-          },
-          balance: BigInt(200)
-        })
-      ).id
+      sourceAccountId = uuid()
+      const assetService = await deps.use('assetService')
+      asset = await assetService.getOrCreate({
+        scale: 9,
+        code: 'USD'
+      })
       invoice = {
         invoiceUrl: 'http://wallet.example/bob/invoices/1',
         accountUrl: 'http://wallet.example/bob',
@@ -252,6 +249,7 @@ describe('OutgoingPaymentService', (): void => {
     it('creates an OutgoingPayment', async () => {
       const payment = await outgoingPaymentService.create({
         sourceAccountId,
+        assetId: asset.id,
         paymentPointer: 'http://wallet.example/paymentpointer/bob',
         amountToSend: BigInt(123),
         autoApprove: false
@@ -264,8 +262,9 @@ describe('OutgoingPaymentService', (): void => {
       })
       expect(payment.sourceAccount.id).toBe(sourceAccountId)
       await expectOutcome(payment, { accountBalance: BigInt(0) })
-      expect(payment.sourceAccount.code).toBe('USD')
-      expect(payment.sourceAccount.scale).toBe(9)
+      expect(payment.assetId).toBe(asset.id)
+      expect(payment.asset.code).toBe('USD')
+      expect(payment.asset.scale).toBe(9)
       expect(payment.destinationAccount).toEqual({
         scale: 9,
         code: 'XRP',
@@ -281,6 +280,7 @@ describe('OutgoingPaymentService', (): void => {
       await expect(
         outgoingPaymentService.create({
           sourceAccountId,
+          assetId: asset.id,
           invoiceUrl: 'http://wallet.example/bob/invoices/1',
           paymentPointer: 'http://wallet.example/paymentpointer/bob',
           autoApprove: false
@@ -294,6 +294,7 @@ describe('OutgoingPaymentService', (): void => {
       await expect(
         outgoingPaymentService.create({
           sourceAccountId,
+          assetId: asset.id,
           invoiceUrl: 'http://wallet.example/bob/invoices/1',
           amountToSend: BigInt(123),
           autoApprove: false
@@ -303,10 +304,11 @@ describe('OutgoingPaymentService', (): void => {
       )
     })
 
-    it('fails to create with nonexistent source account', async () => {
+    it('fails to create with nonexistent asset', async () => {
       await expect(
         outgoingPaymentService.create({
-          sourceAccountId: uuid(),
+          sourceAccountId,
+          assetId: uuid(),
           paymentPointer: 'http://wallet.example/paymentpointer/bob',
           amountToSend: BigInt(123),
           autoApprove: false
@@ -321,6 +323,7 @@ describe('OutgoingPaymentService', (): void => {
         const paymentId = (
           await outgoingPaymentService.create({
             sourceAccountId,
+            assetId: asset.id,
             paymentPointer: 'http://wallet.example/paymentpointer/bob',
             amountToSend: BigInt(123),
             autoApprove: false
@@ -357,6 +360,7 @@ describe('OutgoingPaymentService', (): void => {
         const paymentId = (
           await outgoingPaymentService.create({
             sourceAccountId,
+            assetId: asset.id,
             invoiceUrl: 'http://wallet.example/bob/invoices/1',
             autoApprove: false
           })
@@ -385,6 +389,7 @@ describe('OutgoingPaymentService', (): void => {
         const paymentId = (
           await outgoingPaymentService.create({
             sourceAccountId,
+            assetId: asset.id,
             paymentPointer: 'http://wallet.example/paymentpointer/bob',
             amountToSend: BigInt(123),
             autoApprove: false
@@ -411,6 +416,7 @@ describe('OutgoingPaymentService', (): void => {
       it('Ready (FixedSend, 0<intent.amountToSend<amountSent)', async (): Promise<void> => {
         const payment = await outgoingPaymentService.create({
           sourceAccountId,
+          assetId: asset.id,
           paymentPointer: 'http://wallet.example/paymentpointer/bob',
           amountToSend: BigInt(123),
           autoApprove: false
@@ -437,6 +443,7 @@ describe('OutgoingPaymentService', (): void => {
       it('Completed (FixedSend, intent.amountToSend===amountSent)', async (): Promise<void> => {
         const payment = await outgoingPaymentService.create({
           sourceAccountId,
+          assetId: asset.id,
           paymentPointer: 'http://wallet.example/paymentpointer/bob',
           amountToSend: BigInt(123),
           autoApprove: false
@@ -464,6 +471,7 @@ describe('OutgoingPaymentService', (): void => {
         const paymentId = (
           await outgoingPaymentService.create({
             sourceAccountId,
+            assetId: asset.id,
             invoiceUrl: 'http://wallet.example/bob/invoices/1',
             autoApprove: false
           })
@@ -481,6 +489,7 @@ describe('OutgoingPaymentService', (): void => {
         const paymentId = (
           await outgoingPaymentService.create({
             sourceAccountId,
+            assetId: asset.id,
             paymentPointer: 'http://wallet.example/paymentpointer/bob',
             amountToSend: BigInt(123),
             autoApprove
@@ -521,6 +530,7 @@ describe('OutgoingPaymentService', (): void => {
           paymentId = (
             await outgoingPaymentService.create({
               sourceAccountId,
+              assetId: asset.id,
               paymentPointer: 'http://wallet.example/paymentpointer/bob',
               amountToSend: BigInt(123),
               autoApprove: true
@@ -555,13 +565,13 @@ describe('OutgoingPaymentService', (): void => {
       })
 
       it('Cancelling (account service error)', async (): Promise<void> => {
-        jest.spyOn(transferService, 'create').mockImplementation(async () => ({
+        jest.spyOn(liquidityService, 'add').mockImplementation(async () => ({
           index: 0,
-          error: TransferError.SameBalances
+          error: LiquidityError.InvalidId
         }))
 
         const payment = await processNext(paymentId, PaymentState.Cancelling)
-        expect(payment.error).toBe(LifecycleError.AccountServiceError)
+        expect(payment.error).toBe(LifecycleError.LiquidityError)
       })
 
       it('Sending (money is reserved)', async (): Promise<void> => {
@@ -584,6 +594,7 @@ describe('OutgoingPaymentService', (): void => {
         const paymentId = (
           await outgoingPaymentService.create({
             sourceAccountId,
+            assetId: asset.id,
             autoApprove: true,
             ...opts
           })
@@ -788,6 +799,7 @@ describe('OutgoingPaymentService', (): void => {
           paymentId = (
             await outgoingPaymentService.create({
               sourceAccountId,
+              assetId: asset.id,
               paymentPointer: 'http://wallet.example/paymentpointer/bob',
               amountToSend: BigInt(123),
               autoApprove: true
@@ -877,6 +889,7 @@ describe('OutgoingPaymentService', (): void => {
       async (): Promise<void> => {
         payment = await outgoingPaymentService.create({
           sourceAccountId,
+          assetId: asset.id,
           paymentPointer: 'http://wallet.example/paymentpointer/bob',
           amountToSend: BigInt(123),
           autoApprove: false
@@ -931,6 +944,7 @@ describe('OutgoingPaymentService', (): void => {
       async (): Promise<void> => {
         payment = await outgoingPaymentService.create({
           sourceAccountId,
+          assetId: asset.id,
           paymentPointer: 'http://wallet.example/paymentpointer/bob',
           amountToSend: BigInt(123),
           autoApprove: false
@@ -977,6 +991,7 @@ describe('OutgoingPaymentService', (): void => {
       async (): Promise<void> => {
         payment = await outgoingPaymentService.create({
           sourceAccountId,
+          assetId: asset.id,
           paymentPointer: 'http://wallet.example/paymentpointer/bob',
           amountToSend: BigInt(123),
           autoApprove: false

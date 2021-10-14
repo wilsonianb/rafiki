@@ -2,9 +2,8 @@ import { TransactionOrKnex } from 'objection'
 import * as Pay from '@interledger/pay'
 import { BaseService } from '../shared/baseService'
 import { OutgoingPayment, PaymentIntent, PaymentState } from './model'
-import { AccountService } from '../account/service'
-import { isAccountError } from '../account/errors'
 import { BalanceService } from '../balance/service'
+import { LiquidityService } from '../liquidity/service'
 import { RatesService } from '../rates/service'
 import { TransferService } from '../transfer/service'
 import { IlpPlugin } from './ilp_plugin'
@@ -24,8 +23,8 @@ export interface ServiceDependencies extends BaseService {
   knex: TransactionOrKnex
   slippage: number
   quoteLifespan: number // milliseconds
-  accountService: AccountService
   balanceService: BalanceService
+  liquidityService: LiquidityService
   ratesService: RatesService
   transferService: TransferService
   makeIlpPlugin: (sourceAccountId: string) => IlpPlugin
@@ -53,10 +52,13 @@ async function getOutgoingPayment(
   deps: ServiceDependencies,
   id: string
 ): Promise<OutgoingPayment | undefined> {
-  return OutgoingPayment.query(deps.knex).findById(id)
+  return OutgoingPayment.query(deps.knex).findById(id).withGraphJoined('asset')
 }
 
-type CreateOutgoingPaymentOptions = PaymentIntent & { sourceAccountId: string }
+type CreateOutgoingPaymentOptions = PaymentIntent & {
+  sourceAccountId: string
+  assetId: string
+}
 
 // TODO ensure this is idempotent/safe for autoApprove:true payments
 async function createOutgoingPayment(
@@ -90,50 +92,36 @@ async function createOutgoingPayment(
     })
   })
 
-  const sourceAccount = await deps.accountService.get(options.sourceAccountId)
-  if (!sourceAccount) {
-    throw new Error('outgoing payment source account does not exist')
-  }
-  const account = await deps.accountService.create({
-    asset: sourceAccount.asset
-  })
-  if (isAccountError(account)) {
-    deps.logger.warn(
-      {
-        sourceAccountId: options.sourceAccountId,
-        error: sourceAccount
-      },
-      'createOutgoingPayment account creation failed'
-    )
-    throw new Error('unable to create account, err=' + account)
-  }
+  const balanceId = (
+    await deps.balanceService.create({
+      unit: asset.unit
+    })
+  ).id
   const reservedBalanceId = (
     await deps.balanceService.create({
       unit: sourceAccount.asset.unit
     })
   ).id
 
-  return await OutgoingPayment.query(deps.knex).insertAndFetch({
-    state: PaymentState.Inactive,
-    intent: {
-      paymentPointer: options.paymentPointer,
-      invoiceUrl: options.invoiceUrl,
-      amountToSend: options.amountToSend,
-      autoApprove: options.autoApprove
-    },
-    accountId: account.id,
-    reservedBalanceId,
-    sourceAccount: {
-      id: options.sourceAccountId,
-      code: sourceAccount.asset.code,
-      scale: sourceAccount.asset.scale
-    },
-    destinationAccount: {
-      scale: destination.destinationAsset.scale,
-      code: destination.destinationAsset.code,
-      url: destination.accountUrl
-    }
-  })
+  return await OutgoingPayment.query(deps.knex)
+    .insertAndFetch({
+      state: PaymentState.Inactive,
+      intent: {
+        paymentPointer: options.paymentPointer,
+        invoiceUrl: options.invoiceUrl,
+        amountToSend: options.amountToSend,
+        autoApprove: options.autoApprove
+      },
+      balanceId,
+      reservedBalanceId,
+      assetId: asset.id,
+      destinationAccount: {
+        scale: destination.destinationAsset.scale,
+        code: destination.destinationAsset.code,
+        url: destination.accountUrl
+      }
+    })
+    .withGraphJoined('asset')
 }
 
 function requotePayment(

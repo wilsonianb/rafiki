@@ -10,15 +10,14 @@ import { Invoice } from '@interledger/pay'
 import { v4 as uuid } from 'uuid'
 
 import { IlpPlugin } from './ilp_plugin'
-import { AccountService } from '../account/service'
+import { OutgoingPayment } from './model'
 import { LiquidityService } from '../liquidity/service'
 
 export class MockPlugin implements IlpPlugin {
   public totalReceived = BigInt(0)
   private streamServer: StreamServer
   public exchangeRate: number
-  private accountId: string
-  private accountService: AccountService
+  private payment: OutgoingPayment
   private liquidityService: LiquidityService
   private connected = true
   private invoice: Invoice
@@ -26,22 +25,19 @@ export class MockPlugin implements IlpPlugin {
   constructor({
     streamServer,
     exchangeRate,
-    accountId,
-    accountService,
+    payment,
     liquidityService,
     invoice
   }: {
     streamServer: StreamServer
     exchangeRate: number
-    accountId: string
-    accountService: AccountService
+    payment: OutgoingPayment
     liquidityService: LiquidityService
     invoice: Invoice
   }) {
     this.streamServer = streamServer
     this.exchangeRate = exchangeRate
-    this.accountId = accountId
-    this.accountService = accountService
+    this.payment = payment
     this.liquidityService = liquidityService
     this.invoice = invoice
   }
@@ -77,19 +73,9 @@ export class MockPlugin implements IlpPlugin {
         return serializeIlpReply(moneyOrReject)
       }
 
-      const account = await this.accountService.get(this.accountId)
-      if (!account) {
-        return serializeIlpReply({
-          code: 'F00',
-          triggeredBy: '',
-          message: 'missing account',
-          data: Buffer.alloc(0)
-        })
-      }
-
       const error = await this.liquidityService.createWithdrawal({
         id: uuid(),
-        account,
+        account: payment,
         amount: BigInt(sourceAmount)
       })
       if (error) {
