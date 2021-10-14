@@ -1,3 +1,4 @@
+import assert from 'assert'
 import nock from 'nock'
 import Knex from 'knex'
 import * as Pay from '@interledger/pay'
@@ -17,6 +18,7 @@ import { MockPlugin } from './mock_plugin'
 import { LifecycleError } from './lifecycle'
 import { RETRY_BACKOFF_SECONDS } from './worker'
 import { AccountService } from '../account/service'
+import { AssetService } from '../asset/service'
 import { BalanceService, Balance } from '../balance/service'
 import { RatesService } from '../rates/service'
 import { TransferService } from '../transfer/service'
@@ -30,11 +32,13 @@ describe('OutgoingPaymentService', (): void => {
   let outgoingPaymentService: OutgoingPaymentService
   let ratesService: RatesService
   let accountService: AccountService
+  let assetService: AssetService
   let balanceService: BalanceService
   let transferService: TransferService
   let withdrawalService: WithdrawalService
   let knex: Knex
   let sourceAccountId: string
+  let assetId: string
   let credentials: StreamCredentials
   let invoice: Pay.Invoice
   let plugins: { [accountId: string]: MockPlugin } = {}
@@ -121,7 +125,7 @@ describe('OutgoingPaymentService', (): void => {
     }
     if (sourceAccountBalance !== undefined) {
       await expect(
-        accountService.getBalance(payment.sourceAccount.id)
+        accountService.getBalance(payment.sourceAccountId)
       ).resolves.toEqual(sourceAccountBalance)
     }
     if (accountBalance !== undefined) {
@@ -177,16 +181,19 @@ describe('OutgoingPaymentService', (): void => {
       accountService = await deps.use('accountService')
       balanceService = await deps.use('balanceService')
       transferService = await deps.use('transferService')
-      const accountFactory = new AccountFactory(accountService, transferService)
-      sourceAccountId = (
-        await accountFactory.build({
-          asset: {
-            scale: 9,
-            code: 'USD'
-          },
-          balance: BigInt(200)
-        })
-      ).id
+      assetService = await deps.use('assetService')
+      const accountFactory = new AccountFactory(
+        accountService,
+        assetService,
+        transferService
+      )
+      ;({ id: sourceAccountId, assetId } = await accountFactory.build({
+        asset: {
+          scale: 9,
+          code: 'USD'
+        },
+        balance: BigInt(200)
+      }))
       invoice = {
         invoiceUrl: 'http://wallet.example/bob/invoices/1',
         accountUrl: 'http://wallet.example/bob',
@@ -261,10 +268,13 @@ describe('OutgoingPaymentService', (): void => {
         amountToSend: BigInt(123),
         autoApprove: false
       })
-      expect(payment.sourceAccount.id).toBe(sourceAccountId)
+      expect(payment.sourceAccountId).toBe(sourceAccountId)
       await expectOutcome(payment, { accountBalance: BigInt(0) })
-      expect(payment.sourceAccount.code).toBe('USD')
-      expect(payment.sourceAccount.scale).toBe(9)
+      expect(payment.assetId).toEqual(assetId)
+      const asset = await assetService.getById(payment.assetId)
+      assert.ok(asset)
+      expect(asset.code).toBe('USD')
+      expect(asset.scale).toBe(9)
       expect(payment.destinationAccount).toEqual({
         scale: 9,
         code: 'XRP',

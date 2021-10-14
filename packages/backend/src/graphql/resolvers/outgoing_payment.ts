@@ -34,10 +34,10 @@ export const getOutcome: OutgoingPaymentResolvers['outcome'] = async (
   const accountService = await ctx.container.use('accountService')
   const balanceService = await ctx.container.use('balanceService')
   const payment =
-    parent.sourceAccount?.id && parent.reservedBalanceId
+    parent.sourceAccountId && parent.reservedBalanceId
       ? parent
       : await outgoingPaymentService.get(parent.id)
-  const balance = await accountService.getBalance(payment.sourceAccount.id)
+  const balance = await accountService.getBalance(payment.sourceAccountId)
   if (balance === undefined) throw new Error('source account does not exist')
   const reservedBalance = await balanceService.get(payment.reservedBalanceId)
   if (!reservedBalance) throw new Error('reserved balance does not exist')
@@ -164,7 +164,7 @@ export const cancelOutgoingPayment: MutationResolvers['cancelOutgoingPayment'] =
 
 function paymentToGraphql(
   payment: OutgoingPayment
-): Omit<SchemaOutgoingPayment, 'outcome'> {
+): Omit<SchemaOutgoingPayment, 'outcome' | 'asset'> {
   return {
     id: payment.id,
     state: SchemaPaymentState[payment.state],
@@ -182,7 +182,7 @@ function paymentToGraphql(
     },
     accountId: payment.accountId,
     reservedBalanceId: payment.reservedBalanceId,
-    sourceAccount: payment.sourceAccount,
+    sourceAccountId: payment.sourceAccountId,
     destinationAccount: payment.destinationAccount
   }
 }

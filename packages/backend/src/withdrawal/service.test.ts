@@ -1,3 +1,4 @@
+import assert from 'assert'
 import Knex from 'knex'
 import { WorkerUtils, makeWorkerUtils } from 'graphile-worker'
 import { v4 as uuid } from 'uuid'
@@ -5,7 +6,8 @@ import { v4 as uuid } from 'uuid'
 import { WithdrawalService } from './service'
 import { isWithdrawalError, WithdrawalError } from './errors'
 import { AccountService } from '../account/service'
-import { AssetService } from '../asset/service'
+import { isAssetError } from '../asset/errors'
+import { AssetOptions, AssetService } from '../asset/service'
 import { DepositService } from '../deposit/service'
 import { createTestApp, TestContainer } from '../tests/app'
 import { resetGraphileDb } from '../tests/graphileDb'
@@ -49,7 +51,11 @@ describe('Withdrawal Service', (): void => {
       assetService = await deps.use('assetService')
       depositService = await deps.use('depositService')
       const transferService = await deps.use('transferService')
-      accountFactory = new AccountFactory(accountService, transferService)
+      accountFactory = new AccountFactory(
+        accountService,
+        assetService,
+        transferService
+      )
     }
   )
 
@@ -70,9 +76,11 @@ describe('Withdrawal Service', (): void => {
   describe('Account Withdraw', (): void => {
     test('Can withdraw from account', async (): Promise<void> => {
       const startingBalance = BigInt(10)
-      const { id: accountId, asset } = await accountFactory.build({
+      const { id: accountId, assetId } = await accountFactory.build({
         balance: startingBalance
       })
+      const asset = await assetService.getById(assetId)
+      assert.ok(asset)
       const amount = BigInt(5)
       const withdrawal = {
         accountId,
@@ -127,9 +135,11 @@ describe('Withdrawal Service', (): void => {
 
     test('Returns error for insufficient balance', async (): Promise<void> => {
       const startingBalance = BigInt(5)
-      const { id: accountId, asset } = await accountFactory.build({
+      const { id: accountId, assetId } = await accountFactory.build({
         balance: startingBalance
       })
+      const asset = await assetService.getById(assetId)
+      assert.ok(asset)
       const amount = BigInt(10)
       await expect(
         withdrawalService.create({
@@ -304,8 +314,22 @@ describe('Withdrawal Service', (): void => {
   })
 
   describe('Withdraw liquidity', (): void => {
+    let asset: AssetOptions
+
+    beforeEach(
+      async (): Promise<void> => {
+        const newAsset = await assetService.create(randomAsset())
+        if (isAssetError(newAsset)) {
+          fail()
+        }
+        asset = {
+          code: newAsset.code,
+          scale: newAsset.scale
+        }
+      }
+    )
+
     test('Can withdraw liquidity account', async (): Promise<void> => {
-      const asset = randomAsset()
       const startingBalance = BigInt(10)
       await depositService.createLiquidity({
         asset,
@@ -340,14 +364,13 @@ describe('Withdrawal Service', (): void => {
     test('Returns error for invalid id', async (): Promise<void> => {
       const error = await withdrawalService.createLiquidity({
         id: 'not a uuid v4',
-        asset: randomAsset(),
+        asset,
         amount: BigInt(5)
       })
       expect(error).toEqual(WithdrawalError.InvalidId)
     })
 
     test('Can withdraw liquidity with idempotency key', async (): Promise<void> => {
-      const asset = randomAsset()
       const startingBalance = BigInt(10)
       await depositService.createLiquidity({
         asset,
@@ -378,7 +401,6 @@ describe('Withdrawal Service', (): void => {
     })
 
     test('Returns error for insufficient balance', async (): Promise<void> => {
-      const asset = randomAsset()
       const startingBalance = BigInt(5)
       await depositService.createLiquidity({
         asset,

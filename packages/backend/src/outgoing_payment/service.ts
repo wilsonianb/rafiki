@@ -4,8 +4,10 @@ import { BaseService } from '../shared/baseService'
 import { OutgoingPayment, PaymentIntent, PaymentState } from './model'
 import { AccountService } from '../account/service'
 import { isAccountError } from '../account/errors'
+import { AssetService } from '../asset/service'
 import { BalanceService } from '../balance/service'
 import { RatesService } from '../rates/service'
+import { UnknownAssetError } from '../shared/errors'
 import { TransferService } from '../transfer/service'
 import { IlpPlugin } from './ilp_plugin'
 import * as lifecycle from './lifecycle'
@@ -25,6 +27,7 @@ export interface ServiceDependencies extends BaseService {
   slippage: number
   quoteLifespan: number // milliseconds
   accountService: AccountService
+  assetService: AssetService
   balanceService: BalanceService
   ratesService: RatesService
   transferService: TransferService
@@ -94,8 +97,12 @@ async function createOutgoingPayment(
   if (!sourceAccount) {
     throw new Error('outgoing payment source account does not exist')
   }
+  const sourceAsset = await deps.assetService.getById(sourceAccount.assetId)
+  if (!sourceAsset) {
+    throw new UnknownAssetError(sourceAccount.assetId)
+  }
   const account = await deps.accountService.create({
-    asset: sourceAccount.asset
+    asset: sourceAsset
   })
   if (isAccountError(account)) {
     deps.logger.warn(
@@ -109,7 +116,7 @@ async function createOutgoingPayment(
   }
   const reservedBalanceId = (
     await deps.balanceService.create({
-      unit: sourceAccount.asset.unit
+      unit: sourceAsset.unit
     })
   ).id
 
@@ -123,11 +130,8 @@ async function createOutgoingPayment(
     },
     accountId: account.id,
     reservedBalanceId,
-    sourceAccount: {
-      id: options.sourceAccountId,
-      code: sourceAccount.asset.code,
-      scale: sourceAccount.asset.scale
-    },
+    sourceAccountId: options.sourceAccountId,
+    assetId: sourceAccount.assetId,
     destinationAccount: {
       scale: destination.destinationAsset.scale,
       code: destination.destinationAsset.code,

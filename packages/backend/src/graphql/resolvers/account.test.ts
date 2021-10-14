@@ -12,6 +12,9 @@ import { Config } from '../../config/app'
 import { truncateTables } from '../../tests/tableManager'
 import { Account as AccountModel, AccountService } from '../../account/service'
 import { AccountFactory } from '../../tests/accountFactory'
+import { isAssetError } from '../../asset/errors'
+import { Asset } from '../../asset/model'
+import { AssetService } from '../../asset/service'
 import { randomAsset } from '../../tests/asset'
 import {
   CreateAccountInput,
@@ -28,6 +31,7 @@ describe('Account Resolvers', (): void => {
   let knex: Knex
   let accountService: AccountService
   let accountFactory: AccountFactory
+  let assetService: AssetService
 
   beforeAll(
     async (): Promise<void> => {
@@ -35,8 +39,13 @@ describe('Account Resolvers', (): void => {
       appContainer = await createTestApp(deps)
       knex = await deps.use('knex')
       accountService = await deps.use('accountService')
+      assetService = await deps.use('assetService')
       const transferService = await deps.use('transferService')
-      accountFactory = new AccountFactory(accountService, transferService)
+      accountFactory = new AccountFactory(
+        accountService,
+        assetService,
+        transferService
+      )
     }
   )
 
@@ -54,9 +63,23 @@ describe('Account Resolvers', (): void => {
   )
 
   describe('Create Account', (): void => {
+    let asset: Asset
+
+    beforeEach(
+      async (): Promise<void> => {
+        asset = (await assetService.create(randomAsset())) as Asset
+        if (isAssetError(asset)) {
+          fail()
+        }
+      }
+    )
+
     test('Can create an account', async (): Promise<void> => {
       const account: CreateAccountInput = {
-        asset: randomAsset()
+        asset: {
+          code: asset.code,
+          scale: asset.scale
+        }
       }
       const response = await appContainer.apolloClient
         .mutate({
@@ -94,7 +117,7 @@ describe('Account Resolvers', (): void => {
           accountService.get(response.account.id)
         ).resolves.toMatchObject({
           id: response.account.id,
-          asset: account.asset,
+          assetId: asset.id,
           disabled: false,
           stream: {
             enabled: false
@@ -109,7 +132,7 @@ describe('Account Resolvers', (): void => {
       const id = uuid()
       const account = {
         id,
-        asset: randomAsset(),
+        asset,
         disabled: true,
         maxPacketAmount: '100',
         http: {
@@ -173,7 +196,7 @@ describe('Account Resolvers', (): void => {
       const { id } = await accountFactory.build()
       const account: CreateAccountInput = {
         id,
-        asset: randomAsset()
+        asset
       }
       const response = await appContainer.apolloClient
         .mutate({
@@ -208,6 +231,43 @@ describe('Account Resolvers', (): void => {
       expect(response.message).toEqual('Account already exists')
     })
 
+    test('Returns error for unknown asset', async (): Promise<void> => {
+      const account: CreateAccountInput = {
+        asset: randomAsset()
+      }
+      const response = await appContainer.apolloClient
+        .mutate({
+          mutation: gql`
+            mutation CreateAccount($input: CreateAccountInput!) {
+              createAccount(input: $input) {
+                code
+                success
+                message
+                account {
+                  id
+                }
+              }
+            }
+          `,
+          variables: {
+            input: account
+          }
+        })
+        .then(
+          (query): CreateAccountMutationResponse => {
+            if (query.data) {
+              return query.data.createAccount
+            } else {
+              throw new Error('Data was empty')
+            }
+          }
+        )
+
+      expect(response.success).toBe(false)
+      expect(response.code).toEqual('404')
+      expect(response.message).toEqual('Unknown asset')
+    })
+
     test('Returns error for duplicate incoming token', async (): Promise<void> => {
       const http = {
         incoming: {
@@ -220,7 +280,7 @@ describe('Account Resolvers', (): void => {
       }
       await accountFactory.build({ http })
       const account: CreateAccountInput = {
-        asset: randomAsset(),
+        asset,
         http
       }
       const response = await appContainer.apolloClient
@@ -259,7 +319,8 @@ describe('Account Resolvers', (): void => {
 
   describe('Account Queries', (): void => {
     test('Can get an account', async (): Promise<void> => {
-      const account = await accountFactory.build()
+      const asset = randomAsset()
+      const account = await accountFactory.build({ asset })
       const query = await appContainer.apolloClient
         .query({
           query: gql`
@@ -296,8 +357,8 @@ describe('Account Resolvers', (): void => {
         id: account.id,
         asset: {
           __typename: 'Asset',
-          code: account.asset.code,
-          scale: account.asset.scale
+          code: asset.code,
+          scale: asset.scale
         },
         disabled: account.disabled,
         stream: {
@@ -309,7 +370,9 @@ describe('Account Resolvers', (): void => {
 
     test('Can get all account fields', async (): Promise<void> => {
       const balance = BigInt(10)
+      const asset = randomAsset()
       const account = await accountFactory.build({
+        asset,
         maxPacketAmount: BigInt(100),
         http: {
           incoming: {
@@ -375,8 +438,8 @@ describe('Account Resolvers', (): void => {
         id: account.id,
         asset: {
           __typename: 'Asset',
-          code: account.asset.code,
-          scale: account.asset.scale
+          code: asset.code,
+          scale: asset.scale
         },
         disabled: account.disabled,
         stream: {
@@ -438,8 +501,9 @@ describe('Account Resolvers', (): void => {
   describe('Accounts Queries', (): void => {
     test('Can get accounts', async (): Promise<void> => {
       const accounts: AccountModel[] = []
+      const asset = randomAsset()
       for (let i = 0; i < 2; i++) {
-        accounts.push(await accountFactory.build())
+        accounts.push(await accountFactory.build({ asset }))
       }
       const query = await appContainer.apolloClient
         .query({
@@ -483,8 +547,8 @@ describe('Account Resolvers', (): void => {
           id: account.id,
           asset: {
             __typename: 'Asset',
-            code: account.asset.code,
-            scale: account.asset.scale
+            code: asset.code,
+            scale: asset.scale
           },
           disabled: account.disabled,
           stream: {
@@ -497,9 +561,11 @@ describe('Account Resolvers', (): void => {
 
     test('Can get all accounts fields', async (): Promise<void> => {
       const accounts: AccountModel[] = []
+      const asset = randomAsset()
       for (let i = 0; i < 2; i++) {
         accounts.push(
           await accountFactory.build({
+            asset,
             maxPacketAmount: BigInt(100),
             http: {
               incoming: {
@@ -572,8 +638,8 @@ describe('Account Resolvers', (): void => {
           id: account.id,
           asset: {
             __typename: 'Asset',
-            code: account.asset.code,
-            scale: account.asset.scale
+            code: asset.code,
+            scale: asset.scale
           },
           disabled: account.disabled,
           stream: {
@@ -598,8 +664,9 @@ describe('Account Resolvers', (): void => {
 
     test('pageInfo is correct on default query without params', async (): Promise<void> => {
       const accounts = []
+      const asset = randomAsset()
       for (let i = 0; i < 50; i++) {
-        accounts.push(await accountFactory.build())
+        accounts.push(await accountFactory.build({ asset }))
       }
       const query = await appContainer.apolloClient
         .query({
@@ -678,8 +745,9 @@ describe('Account Resolvers', (): void => {
 
     test('pageInfo is correct on pagination from start', async (): Promise<void> => {
       const accounts = []
+      const asset = randomAsset()
       for (let i = 0; i < 50; i++) {
-        accounts.push(await accountFactory.build())
+        accounts.push(await accountFactory.build({ asset }))
       }
       const query = await appContainer.apolloClient
         .query({
@@ -720,8 +788,9 @@ describe('Account Resolvers', (): void => {
 
     test('pageInfo is correct on pagination from middle', async (): Promise<void> => {
       const accounts = []
+      const asset = randomAsset()
       for (let i = 0; i < 50; i++) {
-        accounts.push(await accountFactory.build())
+        accounts.push(await accountFactory.build({ asset }))
       }
       const query = await appContainer.apolloClient
         .query({
@@ -765,8 +834,9 @@ describe('Account Resolvers', (): void => {
 
     test('pageInfo is correct on pagination near end', async (): Promise<void> => {
       const accounts = []
+      const asset = randomAsset()
       for (let i = 0; i < 50; i++) {
-        accounts.push(await accountFactory.build())
+        accounts.push(await accountFactory.build({ asset }))
       }
       const query = await appContainer.apolloClient
         .query({
@@ -898,7 +968,7 @@ describe('Account Resolvers', (): void => {
       })
       await expect(accountService.get(account.id)).resolves.toMatchObject({
         ...updateOptions,
-        asset: account.asset,
+        assetId: account.assetId,
         http: {
           outgoing: updateOptions.http.outgoing
         },

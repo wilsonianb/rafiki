@@ -35,7 +35,8 @@ describe('WM Service', (): void => {
     async (): Promise<void> => {
       wmService = await deps.use('wmService')
       const accountFactory = new AccountFactory(
-        await deps.use('accountService')
+        await deps.use('accountService'),
+        await deps.use('assetService')
       )
       account = await accountFactory.build()
     }

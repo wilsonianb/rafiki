@@ -15,6 +15,8 @@ import {
   AccountTransferError,
   isAccountTransferError
 } from './errors'
+import { isAssetError } from '../asset/errors'
+import { Asset } from '../asset/model'
 import { AssetService } from '../asset/service'
 import { BalanceService } from '../balance/service'
 import { DepositService } from '../deposit/service'
@@ -72,8 +74,12 @@ describe('Account Service', (): void => {
     async (): Promise<void> => {
       accountService = await deps.use('accountService')
       const transferService = await deps.use('transferService')
-      accountFactory = new AccountFactory(accountService, transferService)
       assetService = await deps.use('assetService')
+      accountFactory = new AccountFactory(
+        accountService,
+        assetService,
+        transferService
+      )
       balanceService = await deps.use('balanceService')
       depositService = await deps.use('depositService')
       config = await deps.use('config')
@@ -95,9 +101,23 @@ describe('Account Service', (): void => {
   )
 
   describe('Create Account', (): void => {
+    let asset: Asset
+
+    beforeEach(
+      async (): Promise<void> => {
+        asset = (await assetService.create(randomAsset())) as Asset
+        if (isAssetError(asset)) {
+          fail()
+        }
+      }
+    )
+
     test('Can create an account', async (): Promise<void> => {
       const account: CreateOptions = {
-        asset: randomAsset()
+        asset: {
+          code: asset.code,
+          scale: asset.scale
+        }
       }
       const accountOrError = await accountService.create(account)
       expect(isAccountError(accountOrError)).toEqual(false)
@@ -105,8 +125,8 @@ describe('Account Service', (): void => {
         fail()
       }
       const expectedAccount = {
-        ...account,
         id: accountOrError.id,
+        assetId: asset.id,
         disabled: false,
         stream: {
           enabled: false
@@ -121,7 +141,7 @@ describe('Account Service', (): void => {
       ).resolves.toEqual({
         id: accountOrError.balanceId,
         balance: BigInt(0),
-        unit: accountOrError.asset.unit,
+        unit: asset.unit,
         debitBalance: false
       })
     })
@@ -131,7 +151,10 @@ describe('Account Service', (): void => {
       const account: CreateOptions = {
         id,
         disabled: false,
-        asset: randomAsset(),
+        asset: {
+          code: asset.code,
+          scale: asset.scale
+        },
         maxPacketAmount: BigInt(100),
         http: {
           incoming: {
@@ -157,6 +180,8 @@ describe('Account Service', (): void => {
       }
       expect(accountOrError).toMatchObject({
         ...account,
+        asset: undefined,
+        assetId: asset.id,
         http: {
           outgoing: account.http.outgoing
         }
@@ -167,7 +192,7 @@ describe('Account Service', (): void => {
       ).resolves.toEqual({
         id: accountOrError.balanceId,
         balance: BigInt(0),
-        unit: accountOrError.asset.unit,
+        unit: asset.unit,
         debitBalance: false
       })
     })
@@ -177,11 +202,19 @@ describe('Account Service', (): void => {
       await expect(
         accountService.create({
           id: account.id,
-          asset: randomAsset()
+          asset
         })
       ).resolves.toEqual(AccountError.DuplicateAccountId)
       const retrievedAccount = await accountService.get(account.id)
       expect(retrievedAccount).toEqual(account)
+    })
+
+    test('Cannot create an account with unknown asset', async (): Promise<void> => {
+      await expect(
+        accountService.create({
+          asset: randomAsset()
+        })
+      ).resolves.toEqual(AccountError.UnknownAsset)
     })
 
     test('Cannot create an account with duplicate incoming tokens', async (): Promise<void> => {
@@ -189,7 +222,7 @@ describe('Account Service', (): void => {
       const incomingToken = uuid()
       const account = {
         id,
-        asset: randomAsset(),
+        asset,
         http: {
           incoming: {
             authTokens: [incomingToken, incomingToken]
@@ -213,7 +246,7 @@ describe('Account Service', (): void => {
       {
         const account = {
           id: uuid(),
-          asset: randomAsset(),
+          asset,
           http: {
             incoming: {
               authTokens: [incomingToken]
@@ -230,7 +263,7 @@ describe('Account Service', (): void => {
         const id = uuid()
         const account = {
           id,
-          asset: randomAsset(),
+          asset,
           http: {
             incoming: {
               authTokens: [incomingToken]
@@ -246,31 +279,6 @@ describe('Account Service', (): void => {
         )
         await expect(accountService.get(id)).resolves.toBeUndefined()
       }
-    })
-
-    test('Auto-creates corresponding asset with liquidity and settlement accounts', async (): Promise<void> => {
-      const asset = randomAsset()
-      const account: CreateOptions = {
-        asset
-      }
-
-      await expect(assetService.get(asset)).resolves.toBeUndefined()
-      await expect(
-        assetService.getLiquidityBalance(asset)
-      ).resolves.toBeUndefined()
-      await expect(
-        assetService.getSettlementBalance(asset)
-      ).resolves.toBeUndefined()
-
-      await accountService.create(account)
-
-      await expect(assetService.get(asset)).resolves.toBeDefined()
-      await expect(assetService.getLiquidityBalance(asset)).resolves.toEqual(
-        BigInt(0)
-      )
-      await expect(assetService.getSettlementBalance(asset)).resolves.toEqual(
-        BigInt(0)
-      )
     })
   })
 
@@ -291,7 +299,10 @@ describe('Account Service', (): void => {
     beforeEach(
       async (): Promise<void> => {
         accountsCreated = []
-        const asset = randomAsset()
+        const asset = await assetService.create(randomAsset())
+        if (isAssetError(asset)) {
+          fail()
+        }
         for (let i = 0; i < 40; i++) {
           accountsCreated.push(await accountFactory.build({ asset }))
         }
@@ -421,7 +432,7 @@ describe('Account Service', (): void => {
 
   describe('Update Account', (): void => {
     test('Can update an account', async (): Promise<void> => {
-      const { id, asset } = await accountFactory.build({
+      const { id, assetId } = await accountFactory.build({
         disabled: false,
         http: {
           incoming: {
@@ -462,7 +473,7 @@ describe('Account Service', (): void => {
       delete updateOptions.http.incoming
       const expectedAccount = {
         ...updateOptions,
-        asset
+        assetId
       }
       expect(accountOrError as Account).toMatchObject(expectedAccount)
       await expect(accountService.get(id)).resolves.toEqual(accountOrError)
@@ -708,16 +719,18 @@ describe('Account Service', (): void => {
       'Can transfer asset with two-phase commit { srcAmt: $srcAmt, destAmt: $destAmt, accepted: $accept }',
       async ({ srcAmt, destAmt, accept }): Promise<void> => {
         const startingSourceBalance = BigInt(10)
+        const asset = randomAsset()
         const sourceAccount = await accountFactory.build({
+          asset,
           balance: startingSourceBalance
         })
         const destinationAccount = await accountFactory.build({
-          asset: sourceAccount.asset
+          asset
         })
 
         const startingLiquidity = BigInt(100)
         await depositService.createLiquidity({
-          asset: sourceAccount.asset,
+          asset,
           amount: startingLiquidity
         })
 
@@ -740,9 +753,7 @@ describe('Account Service', (): void => {
           accountService.getBalance(sourceAccount.id)
         ).resolves.toEqual(startingSourceBalance - sourceAmount)
 
-        await expect(
-          assetService.getLiquidityBalance(sourceAccount.asset)
-        ).resolves.toEqual(
+        await expect(assetService.getLiquidityBalance(asset)).resolves.toEqual(
           sourceAmount < destinationAmount
             ? startingLiquidity - amountDiff
             : startingLiquidity
@@ -764,9 +775,7 @@ describe('Account Service', (): void => {
           accept ? startingSourceBalance - sourceAmount : startingSourceBalance
         )
 
-        await expect(
-          assetService.getLiquidityBalance(sourceAccount.asset)
-        ).resolves.toEqual(
+        await expect(assetService.getLiquidityBalance(asset)).resolves.toEqual(
           accept ? startingLiquidity - amountDiff : startingLiquidity
         )
 
@@ -797,23 +806,25 @@ describe('Account Service', (): void => {
       'Can transfer funds cross-currrency with two-phase commit { sameAssetCode: $sameCode, accepted: $accept }',
       async ({ sameCode, accept }): Promise<void> => {
         const startingSourceBalance = BigInt(10)
+        const sourceAsset = {
+          code: randomAsset().code,
+          scale: 10
+        }
         const sourceAccount = await accountFactory.build({
-          asset: {
-            code: randomAsset().code,
-            scale: 10
-          },
+          asset: sourceAsset,
           balance: startingSourceBalance
         })
+        const destinationAsset = {
+          code: sameCode ? sourceAsset.code : randomAsset().code,
+          scale: sourceAsset.scale + 2
+        }
         const destinationAccount = await accountFactory.build({
-          asset: {
-            code: sameCode ? sourceAccount.asset.code : randomAsset().code,
-            scale: sourceAccount.asset.scale + 2
-          }
+          asset: destinationAsset
         })
 
         const startingDestinationLiquidity = BigInt(100)
         await depositService.createLiquidity({
-          asset: destinationAccount.asset,
+          asset: destinationAsset,
           amount: startingDestinationLiquidity
         })
 
@@ -836,11 +847,11 @@ describe('Account Service', (): void => {
         ).resolves.toEqual(startingSourceBalance - sourceAmount)
 
         await expect(
-          assetService.getLiquidityBalance(sourceAccount.asset)
+          assetService.getLiquidityBalance(sourceAsset)
         ).resolves.toEqual(BigInt(0))
 
         await expect(
-          assetService.getLiquidityBalance(destinationAccount.asset)
+          assetService.getLiquidityBalance(destinationAsset)
         ).resolves.toEqual(startingDestinationLiquidity - destinationAmount)
 
         await expect(
@@ -860,11 +871,11 @@ describe('Account Service', (): void => {
         )
 
         await expect(
-          assetService.getLiquidityBalance(sourceAccount.asset)
+          assetService.getLiquidityBalance(sourceAsset)
         ).resolves.toEqual(accept ? sourceAmount : BigInt(0))
 
         await expect(
-          assetService.getLiquidityBalance(destinationAccount.asset)
+          assetService.getLiquidityBalance(destinationAsset)
         ).resolves.toEqual(
           accept
             ? startingDestinationLiquidity - destinationAmount
@@ -889,9 +900,10 @@ describe('Account Service', (): void => {
     )
 
     test('Returns error for insufficient source balance', async (): Promise<void> => {
-      const sourceAccount = await accountFactory.build()
+      const asset = randomAsset()
+      const sourceAccount = await accountFactory.build({ asset })
       const destinationAccount = await accountFactory.build({
-        asset: sourceAccount.asset
+        asset
       })
       const transfer = {
         sourceAccount,
@@ -918,11 +930,14 @@ describe('Account Service', (): void => {
       'Returns error for insufficient destination liquidity balance { sameAsset: $sameAsset }',
       async ({ sameAsset }): Promise<void> => {
         const startingSourceBalance = BigInt(10)
+        const sourceAsset = randomAsset()
         const sourceAccount = await accountFactory.build({
+          asset: sourceAsset,
           balance: startingSourceBalance
         })
+        const destinationAsset = sameAsset ? sourceAsset : randomAsset()
         const destinationAccount = await accountFactory.build({
-          asset: sameAsset ? sourceAccount.asset : randomAsset()
+          asset: destinationAsset
         })
         const sourceAmount = BigInt(5)
         const destinationAmount = BigInt(10)
@@ -943,11 +958,11 @@ describe('Account Service', (): void => {
         ).resolves.toEqual(startingSourceBalance)
 
         await expect(
-          assetService.getLiquidityBalance(sourceAccount.asset)
+          assetService.getLiquidityBalance(sourceAsset)
         ).resolves.toEqual(BigInt(0))
 
         await expect(
-          assetService.getLiquidityBalance(destinationAccount.asset)
+          assetService.getLiquidityBalance(destinationAsset)
         ).resolves.toEqual(BigInt(0))
 
         await expect(
@@ -971,11 +986,13 @@ describe('Account Service', (): void => {
 
     test('Returns error for invalid source amount', async (): Promise<void> => {
       const startingSourceBalance = BigInt(10)
+      const asset = randomAsset()
       const sourceAccount = await accountFactory.build({
+        asset,
         balance: startingSourceBalance
       })
       const destinationAccount = await accountFactory.build({
-        asset: sourceAccount.asset
+        asset
       })
 
       await expect(
@@ -1027,19 +1044,20 @@ describe('Account Service', (): void => {
 
     test('Returns error for missing destination amount', async (): Promise<void> => {
       const startingSourceBalance = BigInt(10)
+      const sourceAsset = {
+        code: randomAsset().code,
+        scale: 10
+      }
       const sourceAccount = await accountFactory.build({
-        asset: {
-          code: randomAsset().code,
-          scale: 10
-        },
+        asset: sourceAsset,
         balance: startingSourceBalance
       })
 
       {
         const destinationAccount = await accountFactory.build({
           asset: {
-            code: sourceAccount.asset.code,
-            scale: sourceAccount.asset.scale + 1
+            code: sourceAsset.code,
+            scale: sourceAsset.scale + 1
           }
         })
         await expect(

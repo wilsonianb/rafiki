@@ -5,6 +5,7 @@ import base64url from 'base64url'
 import { StreamServer } from '@interledger/stream-receiver'
 import { WebMonetizationService } from '../webmonetization/service'
 import { AccountService } from '../account/service'
+import { AssetService } from '../asset/service'
 
 const CONTENT_TYPE_V4 = 'application/spsp4+json'
 
@@ -14,6 +15,7 @@ export interface SPSPService {
 
 interface ServiceDependencies extends Omit<BaseService, 'knex'> {
   accountService: AccountService
+  assetService: AssetService
   wmService: WebMonetizationService
   streamServer: StreamServer
 }
@@ -21,6 +23,7 @@ interface ServiceDependencies extends Omit<BaseService, 'knex'> {
 export async function createSPSPService({
   logger,
   accountService,
+  assetService,
   wmService,
   streamServer
 }: ServiceDependencies): Promise<SPSPService> {
@@ -31,6 +34,7 @@ export async function createSPSPService({
   const deps: ServiceDependencies = {
     logger: log,
     accountService,
+    assetService,
     wmService,
     streamServer
   }
@@ -75,6 +79,11 @@ async function getPay(
     return
   }
 
+  const asset = await deps.assetService.getById(account.assetId)
+  if (!asset) {
+    ctx.throw(500, 'Unknown asset')
+  }
+
   try {
     const invoice = await deps.wmService.getCurrentInvoice(accountId)
     const { ilpAddress, sharedSecret } = deps.streamServer.generateCredentials({
@@ -87,8 +96,8 @@ async function getPay(
             }
           : undefined,
       asset: {
-        code: account.asset.code,
-        scale: account.asset.scale
+        code: asset.code,
+        scale: asset.scale
       }
     })
 

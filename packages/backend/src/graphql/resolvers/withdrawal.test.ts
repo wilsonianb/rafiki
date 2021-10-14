@@ -31,8 +31,13 @@ describe('Withdrawal Resolvers', (): void => {
       knex = await deps.use('knex')
       withdrawalService = await deps.use('withdrawalService')
       const accountService = await deps.use('accountService')
+      const assetService = await deps.use('assetService')
       const transferService = await deps.use('transferService')
-      accountFactory = new AccountFactory(accountService, transferService)
+      accountFactory = new AccountFactory(
+        accountService,
+        assetService,
+        transferService
+      )
     }
   )
 

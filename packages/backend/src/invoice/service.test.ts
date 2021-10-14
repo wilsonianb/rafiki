@@ -48,7 +48,8 @@ describe('Invoice Service', (): void => {
     async (): Promise<void> => {
       invoiceService = await deps.use('invoiceService')
       accountService = await deps.use('accountService')
-      accountFactory = new AccountFactory(accountService)
+      const assetService = await deps.use('assetService')
+      accountFactory = new AccountFactory(accountService, assetService)
       account = await accountFactory.build()
     }
   )

@@ -21,6 +21,7 @@ import {
 import { AccountService } from '../../account/service'
 import { Balance, BalanceService } from '../../balance/service'
 import {
+  Asset,
   OutgoingPayment,
   OutgoingPaymentResponse,
   PaymentState as SchemaPaymentState,
@@ -73,13 +74,21 @@ describe('OutgoingPayment Resolvers', (): void => {
 
   let outgoingPaymentService: OutgoingPaymentService
   let payment: OutgoingPaymentModel
+  let asset: Asset
 
   beforeEach(
     async (): Promise<void> => {
       accountService = await deps.use('accountService')
       balanceService = await deps.use('balanceService')
-      const accountFactory = new AccountFactory(accountService)
-      const { id: sourceAccountId, asset } = await accountFactory.build()
+      const assetService = await deps.use('assetService')
+      const accountFactory = new AccountFactory(accountService, assetService)
+      asset = (await assetService.create({
+        scale: 9,
+        code: 'USD'
+      })) as Asset
+      const { id: sourceAccountId, assetId } = await accountFactory.build({
+        asset
+      })
       const accountId = (await accountFactory.build({ asset })).id
       outgoingPaymentService = await deps.use('outgoingPaymentService')
       payment = await OutgoingPaymentModel.query(knex).insertAndFetch({
@@ -105,11 +114,8 @@ describe('OutgoingPayment Resolvers', (): void => {
         },
         accountId,
         reservedBalanceId: uuid(),
-        sourceAccount: {
-          id: sourceAccountId,
-          scale: 9,
-          code: 'USD'
-        },
+        sourceAccountId,
+        assetId,
         destinationAccount: {
           scale: 9,
           code: 'XRP',
@@ -168,8 +174,8 @@ describe('OutgoingPayment Resolvers', (): void => {
                 }
                 accountId
                 reservedBalanceId
-                sourceAccount {
-                  id
+                sourceAccountId
+                asset {
                   scale
                   code
                 }
@@ -215,9 +221,10 @@ describe('OutgoingPayment Resolvers', (): void => {
       })
       expect(query.accountId).toBe(payment.accountId)
       expect(query.reservedBalanceId).toBe(payment.reservedBalanceId)
-      expect(query.sourceAccount).toEqual({
-        ...payment.sourceAccount,
-        __typename: 'PaymentSourceAccount'
+      expect(query.sourceAccountId).toBe(payment.sourceAccountId)
+      expect(query.asset).toEqual({
+        ...asset,
+        __typename: 'Asset'
       })
       expect(query.destinationAccount).toEqual({
         ...payment.destinationAccount,

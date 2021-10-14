@@ -13,6 +13,20 @@ type Query {
     last: Int
   ): AccountsConnection!
 
+  asset(id: String!): Asset
+
+  "Fetch a page of assets."
+  assets(
+    "Paginating forwards: the cursor before the the requested page."
+    after: String
+    "Paginating backwards: the cursor after the the requested page."
+    before: String
+    "Paginating forwards: The first **n** elements from the page."
+    first: Int
+    "Paginating backwards: The last **n** elements from the page."
+    last: Int
+  ): AssetsConnection!
+
   outgoingPayment(id: String!): OutgoingPayment
 
   "Get a webhook by ID."
@@ -34,6 +48,9 @@ type Mutation {
 
   "Delete account"
   deleteAccount(id: String!): DeleteAccountMutationResponse!
+
+  "Create asset"
+  createAsset(input: AssetInput!): CreateAssetMutationResponse!
 
   createOutgoingPayment(
     input: CreateOutgoingPaymentInput!
@@ -148,6 +165,16 @@ input HttpOutgoingInput {
   endpoint: String!
 }
 
+type AssetsConnection {
+  pageInfo: PageInfo!
+  edges: [AssetEdge!]!
+}
+
+type AssetEdge {
+  node: Asset!
+  cursor: String!
+}
+
 input AssetInput {
   code: String!
   scale: Int!
@@ -180,6 +207,7 @@ input CreateWithdrawalInput {
 }
 
 type Asset {
+  id: ID!
   code: String!
   scale: Int!
 }
@@ -288,7 +316,8 @@ type OutgoingPayment {
   quote: PaymentQuote
   accountId: String!
   reservedBalanceId: String!
-  sourceAccount: PaymentSourceAccount!
+  sourceAccountId: String!
+  asset: Asset!
   destinationAccount: PaymentDestinationAccount!
   outcome: OutgoingPaymentOutcome!
 }
@@ -332,12 +361,6 @@ type PaymentQuote {
   minExchangeRate: Float!
   lowExchangeRateEstimate: Float!
   highExchangeRateEstimate: Float!
-}
-
-type PaymentSourceAccount {
-  id: String!
-  scale: Int!
-  code: String!
 }
 
 type PaymentDestinationAccount {
@@ -432,6 +455,13 @@ type DeleteAccountMutationResponse implements MutationResponse {
   code: String!
   success: Boolean!
   message: String!
+}
+
+type CreateAssetMutationResponse implements MutationResponse {
+  code: String!
+  success: Boolean!
+  message: String!
+  asset: Asset
 }
 
 type TransferMutationResponse implements MutationResponse {

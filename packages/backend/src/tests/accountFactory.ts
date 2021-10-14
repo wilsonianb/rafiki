@@ -2,6 +2,8 @@ import { v4 as uuid } from 'uuid'
 
 import { Account, AccountService, CreateOptions } from '../account/service'
 import { isAccountError } from '../account/errors'
+import { Asset } from '../asset/model'
+import { AssetService } from '../asset/service'
 import { TransferService } from '../transfer/service'
 import { randomAsset } from './asset'
 
@@ -12,6 +14,7 @@ type BuildOptions = Partial<CreateOptions> & {
 export class AccountFactory {
   public constructor(
     private accounts: AccountService,
+    private assets: AssetService,
     private transfers?: TransferService
   ) {}
 
@@ -24,6 +27,9 @@ export class AccountFactory {
         enabled: options.stream?.enabled || false
       }
     }
+    const asset =
+      (await this.assets.get(accountOptions.asset)) ||
+      ((await this.assets.create(accountOptions.asset)) as Asset)
     if (options.maxPacketAmount) {
       accountOptions.maxPacketAmount = options.maxPacketAmount
     }
@@ -45,7 +51,7 @@ export class AccountFactory {
       await this.transfers.create([
         {
           id: uuid(),
-          sourceBalanceId: account.asset.settlementBalanceId,
+          sourceBalanceId: asset.settlementBalanceId,
           destinationBalanceId: account.balanceId,
           amount: options.balance
         }

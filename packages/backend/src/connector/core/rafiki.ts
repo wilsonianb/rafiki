@@ -26,10 +26,7 @@ import { AccountTransferError } from '../../account/errors'
 export interface RafikiAccount {
   id: string
   disabled: boolean
-  asset: {
-    code: string
-    scale: number
-  }
+  assetId: string
   http?: {
     outgoing: {
       authToken: string
@@ -43,6 +40,13 @@ export interface RafikiAccount {
     staticIlpAddress: string
   }
   maxPacketAmount?: bigint
+}
+
+export interface RafikiAsset {
+  asset: {
+    code: string
+    scale: number
+  }
 }
 
 export interface TransferOptions {
@@ -95,6 +99,10 @@ export type RafikiContextMixin = {
   accounts: {
     readonly incoming: RafikiAccount
     readonly outgoing: RafikiAccount
+  }
+  assets: {
+    readonly incoming: RafikiAsset
+    readonly outgoing: RafikiAsset
   }
   request: RafikiRequest
   response: RafikiResponse
@@ -171,6 +179,7 @@ export class Rafiki<T = any> {
     this.use(createIlpPacketMiddleware())
     this.use(createStreamAddressMiddleware())
     this.use(createAccountMiddleware())
+    this.use(createAssetMiddleware())
   }
 
   public use(middleware: Koa.Middleware<T, RafikiContextMixin>): void {

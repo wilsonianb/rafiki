@@ -27,7 +27,8 @@ describe('Deposit Resolvers', (): void => {
       knex = await deps.use('knex')
       depositService = await deps.use('depositService')
       const accountService = await deps.use('accountService')
-      accountFactory = new AccountFactory(accountService)
+      const assetService = await deps.use('assetService')
+      accountFactory = new AccountFactory(accountService, assetService)
     }
   )
 

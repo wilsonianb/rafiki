@@ -23,6 +23,7 @@ export enum LifecycleError {
 
   // These errors shouldn't ever trigger (impossible states), but they exist to satisfy types:
   MissingAccount = 'MissingAccount',
+  MissingAsset = 'MissingAsset',
   MissingBalance = 'MissingBalance',
   MissingQuote = 'MissingQuote',
   MissingInvoice = 'MissingInvoice',
@@ -88,12 +89,16 @@ export async function handleQuoting(
     }
   }
 
+  const asset = await deps.assetService.getById(payment.assetId)
+  if (!asset) {
+    throw LifecycleError.MissingAsset
+  }
   const quote = await Pay.startQuote({
     plugin,
     destination,
     sourceAsset: {
-      scale: payment.sourceAccount.scale,
-      code: payment.sourceAccount.code
+      scale: asset.scale,
+      code: asset.code
     },
     amountToSend,
     slippage: deps.slippage,
@@ -175,10 +180,14 @@ export async function handleActivation(
   }
 
   await refundLeftoverBalance(deps, payment)
-  const sourceAccount = await deps.accountService.get(payment.sourceAccount.id)
+  const sourceAccount = await deps.accountService.get(payment.sourceAccountId)
   const account = await deps.accountService.get(payment.accountId)
   if (!sourceAccount || !account) {
     throw LifecycleError.MissingAccount
+  }
+  const asset = await deps.assetService.getById(payment.assetId)
+  if (!asset) {
+    throw LifecycleError.MissingAsset
   }
   const error = await deps.transferService.create([
     {
@@ -187,7 +196,7 @@ export async function handleActivation(
       amount: payment.quote.maxSourceAmount
     },
     {
-      sourceBalanceId: sourceAccount.asset.outgoingPaymentsBalanceId,
+      sourceBalanceId: asset.outgoingPaymentsBalanceId,
       destinationBalanceId: payment.reservedBalanceId,
       amount: payment.quote.maxSourceAmount
     }
@@ -378,9 +387,13 @@ async function refundLeftoverBalance(
   if (balance === BigInt(0)) return
 
   const account = await deps.accountService.get(payment.accountId)
-  const sourceAccount = await deps.accountService.get(payment.sourceAccount.id)
+  const sourceAccount = await deps.accountService.get(payment.sourceAccountId)
   if (!account || !sourceAccount) {
     throw LifecycleError.MissingAccount
+  }
+  const asset = await deps.assetService.getById(payment.assetId)
+  if (!asset) {
+    throw LifecycleError.MissingAsset
   }
   const error = await deps.transferService.create([
     {
@@ -390,7 +403,7 @@ async function refundLeftoverBalance(
     },
     {
       sourceBalanceId: payment.reservedBalanceId,
-      destinationBalanceId: sourceAccount.asset.outgoingPaymentsBalanceId,
+      destinationBalanceId: asset.outgoingPaymentsBalanceId,
       amount: balance
     }
   ])
