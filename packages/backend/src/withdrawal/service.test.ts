@@ -1,3 +1,4 @@
+import assert from 'assert'
 import Knex from 'knex'
 import { WorkerUtils, makeWorkerUtils } from 'graphile-worker'
 import { v4 as uuid } from 'uuid'
@@ -75,9 +76,11 @@ describe('Withdrawal Service', (): void => {
   describe('Account Withdraw', (): void => {
     test('Can withdraw from account', async (): Promise<void> => {
       const startingBalance = BigInt(10)
-      const { id: accountId, asset } = await accountFactory.build({
+      const { id: accountId, assetId } = await accountFactory.build({
         balance: startingBalance
       })
+      const asset = await assetService.getById(assetId)
+      assert.ok(asset)
       const amount = BigInt(5)
       const withdrawal = {
         accountId,
@@ -132,9 +135,11 @@ describe('Withdrawal Service', (): void => {
 
     test('Returns error for insufficient balance', async (): Promise<void> => {
       const startingBalance = BigInt(5)
-      const { id: accountId, asset } = await accountFactory.build({
+      const { id: accountId, assetId } = await accountFactory.build({
         balance: startingBalance
       })
+      const asset = await assetService.getById(assetId)
+      assert.ok(asset)
       const amount = BigInt(10)
       await expect(
         withdrawalService.create({

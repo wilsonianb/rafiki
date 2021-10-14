@@ -1,7 +1,9 @@
 import { Invoice } from './model'
 import { AccountService } from '../account/service'
 import { isAccountError } from '../account/errors'
+import { AssetService } from '../asset/service'
 import { BaseService } from '../shared/baseService'
+import { UnknownAssetError } from '../shared/errors'
 import { Pagination } from '../shared/pagination'
 import assert from 'assert'
 import { Transaction } from 'knex'
@@ -22,12 +24,14 @@ export interface InvoiceService {
 
 interface ServiceDependencies extends BaseService {
   accountService: AccountService
+  assetService: AssetService
 }
 
 export async function createInvoiceService({
   logger,
   knex,
-  accountService
+  accountService,
+  assetService
 }: ServiceDependencies): Promise<InvoiceService> {
   const log = logger.child({
     service: 'InvoiceService'
@@ -35,7 +39,8 @@ export async function createInvoiceService({
   const deps: ServiceDependencies = {
     logger: log,
     knex,
-    accountService
+    accountService,
+    assetService
   }
   return {
     get: (id) => getInvoice(deps, id),
@@ -67,10 +72,11 @@ async function createInvoice(
     if (!account) {
       throw new Error('unable to create invoice, account does not exist')
     }
-    const invoiceAccount = await deps.accountService.create(
-      { asset: account.asset },
-      invTrx
-    )
+    const asset = await deps.assetService.getById(account.assetId)
+    if (!asset) {
+      throw new UnknownAssetError(account.assetId)
+    }
+    const invoiceAccount = await deps.accountService.create({ asset }, invTrx)
     if (isAccountError(invoiceAccount)) {
       throw new Error('unable to create invoice account, err=' + invoiceAccount)
     }

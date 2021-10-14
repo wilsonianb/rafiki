@@ -66,7 +66,8 @@ describe('Deposit Service', (): void => {
 
   describe('Account Deposit', (): void => {
     test('Can deposit to account', async (): Promise<void> => {
-      const { id: accountId, asset } = await accountFactory.build()
+      const asset = randomAsset()
+      const { id: accountId } = await accountFactory.build({ asset })
       const amount = BigInt(10)
       const deposit = {
         accountId,

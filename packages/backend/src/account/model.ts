@@ -30,7 +30,7 @@ export class Account extends BaseModel {
   public readonly disabled!: boolean
 
   public readonly assetId!: string
-  public asset!: Asset
+  // public asset?: Asset
   // TigerBeetle account id tracking Interledger balance
   public readonly balanceId!: string
 

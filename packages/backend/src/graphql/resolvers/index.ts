@@ -39,6 +39,7 @@ export const resolvers: Resolvers = {
     asset: getAsset,
     assets: getAssets,
     outgoingPayment: getOutgoingPayment
+    // asset: getAccountAsset,
     // deposit: getDeposit,
     // webhook: getWebhook
     // withdrawal: getWithdrawal

@@ -13,7 +13,8 @@ import { truncateTables } from '../../tests/tableManager'
 import { Account as AccountModel, AccountService } from '../../account/service'
 import { AccountFactory } from '../../tests/accountFactory'
 import { isAssetError } from '../../asset/errors'
-import { AssetOptions, AssetService } from '../../asset/service'
+import { Asset } from '../../asset/model'
+import { AssetService } from '../../asset/service'
 import { randomAsset } from '../../tests/asset'
 import {
   CreateAccountInput,
@@ -62,24 +63,23 @@ describe('Account Resolvers', (): void => {
   )
 
   describe('Create Account', (): void => {
-    let asset: AssetOptions
+    let asset: Asset
 
     beforeEach(
       async (): Promise<void> => {
-        const newAsset = await assetService.create(randomAsset())
-        if (isAssetError(newAsset)) {
+        asset = (await assetService.create(randomAsset())) as Asset
+        if (isAssetError(asset)) {
           fail()
-        }
-        asset = {
-          code: newAsset.code,
-          scale: newAsset.scale
         }
       }
     )
 
     test('Can create an account', async (): Promise<void> => {
       const account: CreateAccountInput = {
-        asset
+        asset: {
+          code: asset.code,
+          scale: asset.scale
+        }
       }
       const response = await appContainer.apolloClient
         .mutate({
@@ -117,7 +117,7 @@ describe('Account Resolvers', (): void => {
           accountService.get(response.account.id)
         ).resolves.toMatchObject({
           id: response.account.id,
-          asset: account.asset,
+          assetId: asset.id,
           disabled: false,
           stream: {
             enabled: false
@@ -319,7 +319,8 @@ describe('Account Resolvers', (): void => {
 
   describe('Account Queries', (): void => {
     test('Can get an account', async (): Promise<void> => {
-      const account = await accountFactory.build()
+      const asset = randomAsset()
+      const account = await accountFactory.build({ asset })
       const query = await appContainer.apolloClient
         .query({
           query: gql`
@@ -356,8 +357,8 @@ describe('Account Resolvers', (): void => {
         id: account.id,
         asset: {
           __typename: 'Asset',
-          code: account.asset.code,
-          scale: account.asset.scale
+          code: asset.code,
+          scale: asset.scale
         },
         disabled: account.disabled,
         stream: {
@@ -369,7 +370,9 @@ describe('Account Resolvers', (): void => {
 
     test('Can get all account fields', async (): Promise<void> => {
       const balance = BigInt(10)
+      const asset = randomAsset()
       const account = await accountFactory.build({
+        asset,
         maxPacketAmount: BigInt(100),
         http: {
           incoming: {
@@ -435,8 +438,8 @@ describe('Account Resolvers', (): void => {
         id: account.id,
         asset: {
           __typename: 'Asset',
-          code: account.asset.code,
-          scale: account.asset.scale
+          code: asset.code,
+          scale: asset.scale
         },
         disabled: account.disabled,
         stream: {
@@ -498,8 +501,9 @@ describe('Account Resolvers', (): void => {
   describe('Accounts Queries', (): void => {
     test('Can get accounts', async (): Promise<void> => {
       const accounts: AccountModel[] = []
+      const asset = randomAsset()
       for (let i = 0; i < 2; i++) {
-        accounts.push(await accountFactory.build())
+        accounts.push(await accountFactory.build({ asset }))
       }
       const query = await appContainer.apolloClient
         .query({
@@ -543,8 +547,8 @@ describe('Account Resolvers', (): void => {
           id: account.id,
           asset: {
             __typename: 'Asset',
-            code: account.asset.code,
-            scale: account.asset.scale
+            code: asset.code,
+            scale: asset.scale
           },
           disabled: account.disabled,
           stream: {
@@ -557,9 +561,11 @@ describe('Account Resolvers', (): void => {
 
     test('Can get all accounts fields', async (): Promise<void> => {
       const accounts: AccountModel[] = []
+      const asset = randomAsset()
       for (let i = 0; i < 2; i++) {
         accounts.push(
           await accountFactory.build({
+            asset,
             maxPacketAmount: BigInt(100),
             http: {
               incoming: {
@@ -632,8 +638,8 @@ describe('Account Resolvers', (): void => {
           id: account.id,
           asset: {
             __typename: 'Asset',
-            code: account.asset.code,
-            scale: account.asset.scale
+            code: asset.code,
+            scale: asset.scale
           },
           disabled: account.disabled,
           stream: {
@@ -962,7 +968,7 @@ describe('Account Resolvers', (): void => {
       })
       await expect(accountService.get(account.id)).resolves.toMatchObject({
         ...updateOptions,
-        asset: account.asset,
+        assetId: account.assetId,
         http: {
           outgoing: updateOptions.http.outgoing
         },

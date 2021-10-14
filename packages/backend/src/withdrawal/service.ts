@@ -8,6 +8,7 @@ import { TransferError, TransfersError } from '../transfer/errors'
 import { BaseService } from '../shared/baseService'
 import {
   BalanceTransferError,
+  UnknownAssetError,
   UnknownBalanceError,
   UnknownLiquidityAccountError,
   UnknownSettlementAccountError
@@ -84,12 +85,16 @@ async function createWithdrawal(
   if (!account) {
     return WithdrawalError.UnknownAccount
   }
+  const asset = await deps.assetService.getById(account.assetId)
+  if (!asset) {
+    throw new UnknownAssetError(account.assetId)
+  }
   const withdrawalId = id || uuid()
   const error = await deps.transferService.create([
     {
       id: withdrawalId,
       sourceBalanceId: account.balanceId,
-      destinationBalanceId: account.asset.settlementBalanceId,
+      destinationBalanceId: asset.settlementBalanceId,
       amount,
       timeout: BigInt(60e9) // 1 minute
     }
@@ -103,7 +108,7 @@ async function createWithdrawal(
       case TransferError.UnknownSourceBalance:
         throw new UnknownBalanceError(accountId)
       case TransferError.UnknownDestinationBalance:
-        throw new UnknownSettlementAccountError(account.asset)
+        throw new UnknownSettlementAccountError(asset.id)
       case TransferError.InsufficientBalance:
         return WithdrawalError.InsufficientBalance
       default:
@@ -143,9 +148,9 @@ async function createLiquidityWithdrawal(
       case TransferError.TransferExists:
         return WithdrawalError.WithdrawalExists
       case TransferError.UnknownSourceBalance:
-        throw new UnknownLiquidityAccountError(asset)
+        throw new UnknownLiquidityAccountError(asset.id)
       case TransferError.UnknownDestinationBalance:
-        throw new UnknownSettlementAccountError(asset)
+        throw new UnknownSettlementAccountError(asset.id)
       case TransferError.InsufficientBalance:
         return WithdrawalError.InsufficientLiquidity
       default:

@@ -8,6 +8,7 @@ import { TransferError } from '../transfer/errors'
 import { BaseService } from '../shared/baseService'
 import {
   BalanceTransferError,
+  UnknownAssetError,
   UnknownBalanceError,
   UnknownLiquidityAccountError,
   UnknownSettlementAccountError
@@ -76,11 +77,15 @@ async function createDeposit(
   if (!account) {
     return DepositError.UnknownAccount
   }
+  const asset = await deps.assetService.getById(account.assetId)
+  if (!asset) {
+    throw new UnknownAssetError(account.assetId)
+  }
   const depositId = id || uuid()
   const error = await deps.transferService.create([
     {
       id: depositId,
-      sourceBalanceId: account.asset.settlementBalanceId,
+      sourceBalanceId: asset.settlementBalanceId,
       destinationBalanceId: account.balanceId,
       amount
     }
@@ -92,7 +97,7 @@ async function createDeposit(
       case TransferError.TransferExists:
         return DepositError.DepositExists
       case TransferError.UnknownSourceBalance:
-        throw new UnknownSettlementAccountError(account.asset)
+        throw new UnknownSettlementAccountError(asset.id)
       case TransferError.UnknownDestinationBalance:
         throw new UnknownBalanceError(accountId)
       default:
@@ -132,9 +137,9 @@ async function createLiquidityDeposit(
       case TransferError.TransferExists:
         return DepositError.DepositExists
       case TransferError.UnknownSourceBalance:
-        throw new UnknownSettlementAccountError(asset)
+        throw new UnknownSettlementAccountError(asset.id)
       case TransferError.UnknownDestinationBalance:
-        throw new UnknownLiquidityAccountError(asset)
+        throw new UnknownLiquidityAccountError(asset.id)
       default:
         throw new BalanceTransferError(error.error)
     }

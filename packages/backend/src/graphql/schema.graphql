@@ -316,7 +316,8 @@ type OutgoingPayment {
   quote: PaymentQuote
   accountId: String!
   reservedBalanceId: String!
-  sourceAccount: PaymentSourceAccount!
+  sourceAccountId: String!
+  asset: Asset!
   destinationAccount: PaymentDestinationAccount!
   outcome: OutgoingPaymentOutcome!
 }
@@ -360,12 +361,6 @@ type PaymentQuote {
   minExchangeRate: Float!
   lowExchangeRateEstimate: Float!
   highExchangeRateEstimate: Float!
-}
-
-type PaymentSourceAccount {
-  id: String!
-  scale: Int!
-  code: String!
 }
 
 type PaymentDestinationAccount {

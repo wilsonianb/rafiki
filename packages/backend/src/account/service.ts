@@ -1,4 +1,3 @@
-import assert from 'assert'
 import {
   NotFoundError,
   PartialModelObject,
@@ -15,6 +14,7 @@ import { HttpTokenError } from '../httpToken/errors'
 import { BaseService } from '../shared/baseService'
 import {
   BalanceTransferError,
+  UnknownAssetError,
   UnknownBalanceError,
   UnknownLiquidityAccountError
 } from '../shared/errors'
@@ -22,7 +22,7 @@ import { Pagination } from '../shared/pagination'
 import { validateId } from '../shared/utils'
 import { TransferService, TwoPhaseTransfer } from '../transfer/service'
 import { TransferError, TransfersError } from '../transfer/errors'
-import { AccountError, AccountTransferError, UnknownAssetError } from './errors'
+import { AccountError, AccountTransferError } from './errors'
 import { Account } from './model'
 
 export { Account }
@@ -158,16 +158,14 @@ async function createAccount(
   }
   const newAccount: PartialModelObject<Account> = {
     ...account,
-    asset: asset,
     assetId: asset.id
   }
-  assert.ok(newAccount.asset)
 
   const acctTrx = trx || (await Account.startTransaction())
   try {
     newAccount.balanceId = (
       await deps.balanceService.create({
-        unit: newAccount.asset.unit
+        unit: asset.unit
       })
     ).id
 
@@ -239,11 +237,6 @@ async function updateAccount(
     const account = await Account.query(deps.knex)
       .patchAndFetchById(accountOptions.id, accountOptions)
       .throwIfNotFound()
-    const asset = await deps.assetService.getById(account.assetId)
-    if (!asset) {
-      throw new UnknownAssetError(account.id)
-    }
-    account.asset = asset
     await trx.commit()
     return account
   } catch (err) {
@@ -270,7 +263,7 @@ async function getAccounts(
   deps: ServiceDependencies,
   ids: string[]
 ): Promise<Account[]> {
-  return await Account.query(deps.knex).findByIds(ids).withGraphJoined('asset')
+  return await Account.query(deps.knex).findByIds(ids)
 }
 
 async function getAccountBalance(
@@ -299,7 +292,7 @@ async function getAccountByToken(
   token: string
 ): Promise<Account | undefined> {
   const account = await Account.query(deps.knex)
-    .withGraphJoined('[asset, incomingTokens]')
+    .withGraphJoined('[incomingTokens]')
     .where('incomingTokens.token', token)
     .first()
   return account || undefined
@@ -313,7 +306,6 @@ async function getAccountByStaticIlpAddress(
   // for `staticIlpAddress`s in the accounts table:
   // new RegExp('^' + staticIlpAddress + '($|\\.)')).test(destinationAddress)
   const account = await Account.query(deps.knex)
-    .withGraphJoined('asset')
     .where(
       raw('?', [destinationAddress]),
       'like',
@@ -348,9 +340,9 @@ async function getAccountByPeerAddress(
         destinationAddress[peer.ilpAddress.length] === '.')
   )
   if (peerAddress) {
-    const account = await Account.query(deps.knex)
-      .findById(peerAddress.accountId)
-      .withGraphJoined('asset')
+    const account = await Account.query(deps.knex).findById(
+      peerAddress.accountId
+    )
     return account || undefined
   }
 }
@@ -370,9 +362,7 @@ async function getAccountByServerAddress(
         deps.ilpAddress.length + 1 + UUID_LENGTH
       )
       if (validateId(accountId)) {
-        const account = await Account.query(deps.knex)
-          .findById(accountId)
-          .withGraphJoined('asset')
+        const account = await Account.query(deps.knex).findById(accountId)
         return account || undefined
       }
     }
@@ -435,10 +425,7 @@ async function transferFunds(
   const transfers: TwoPhaseTransfer[] = []
 
   // Same asset
-  if (
-    sourceAccount.asset.code === destinationAccount.asset.code &&
-    sourceAccount.asset.scale === destinationAccount.asset.scale
-  ) {
+  if (sourceAccount.assetId === destinationAccount.assetId) {
     transfers.push({
       id: uuid(),
       sourceBalanceId: sourceAccount.balanceId,
@@ -453,18 +440,30 @@ async function transferFunds(
     if (destinationAmount && sourceAmount !== destinationAmount) {
       // Send excess source amount to liquidity account
       if (destinationAmount < sourceAmount) {
+        const sourceAsset = await deps.assetService.getById(
+          sourceAccount.assetId
+        )
+        if (!sourceAsset) {
+          throw new UnknownAssetError(sourceAccount.assetId)
+        }
         transfers.push({
           id: uuid(),
           sourceBalanceId: sourceAccount.balanceId,
-          destinationBalanceId: sourceAccount.asset.liquidityBalanceId,
+          destinationBalanceId: sourceAsset.liquidityBalanceId,
           amount: sourceAmount - destinationAmount,
           timeout
         })
         // Deliver excess destination amount from liquidity account
       } else {
+        const destinationAsset = await deps.assetService.getById(
+          destinationAccount.assetId
+        )
+        if (!destinationAsset) {
+          throw new UnknownAssetError(sourceAccount.assetId)
+        }
         transfers.push({
           id: uuid(),
-          sourceBalanceId: destinationAccount.asset.liquidityBalanceId,
+          sourceBalanceId: destinationAsset.liquidityBalanceId,
           destinationBalanceId: destinationAccount.balanceId,
           amount: destinationAmount - sourceAmount,
           timeout
@@ -479,17 +478,27 @@ async function transferFunds(
     }
     // Send to source liquidity account
     // Deliver from destination liquidity account
+    const sourceAsset = await deps.assetService.getById(sourceAccount.assetId)
+    if (!sourceAsset) {
+      throw new UnknownAssetError(sourceAccount.assetId)
+    }
+    const destinationAsset = await deps.assetService.getById(
+      destinationAccount.assetId
+    )
+    if (!destinationAsset) {
+      throw new UnknownAssetError(sourceAccount.assetId)
+    }
     transfers.push(
       {
         id: uuid(),
         sourceBalanceId: sourceAccount.balanceId,
-        destinationBalanceId: sourceAccount.asset.liquidityBalanceId,
+        destinationBalanceId: sourceAsset.liquidityBalanceId,
         amount: sourceAmount,
         timeout
       },
       {
         id: uuid(),
-        sourceBalanceId: destinationAccount.asset.liquidityBalanceId,
+        sourceBalanceId: destinationAsset.liquidityBalanceId,
         destinationBalanceId: destinationAccount.balanceId,
         amount: destinationAmount,
         timeout
@@ -501,14 +510,14 @@ async function transferFunds(
     switch (error.error) {
       case TransferError.UnknownSourceBalance:
         if (error.index === 1) {
-          throw new UnknownLiquidityAccountError(destinationAccount.asset)
+          throw new UnknownLiquidityAccountError(destinationAccount.assetId)
         }
         throw new UnknownBalanceError(sourceAccount.id)
       case TransferError.UnknownDestinationBalance:
         if (error.index === 1) {
           throw new UnknownBalanceError(destinationAccount.id)
         }
-        throw new UnknownLiquidityAccountError(sourceAccount.asset)
+        throw new UnknownLiquidityAccountError(sourceAccount.assetId)
       case TransferError.InsufficientBalance:
         if (error.index === 1) {
           return AccountTransferError.InsufficientLiquidity
@@ -587,7 +596,6 @@ async function getAccountsPage(
    */
   if (typeof pagination?.after === 'string') {
     const accounts = await Account.query(deps.knex)
-      .withGraphFetched('asset')
       .whereRaw(
         '("createdAt", "id") > (select "createdAt" :: TIMESTAMP, "id" from "accounts" where "id" = ?)',
         [pagination.after]
@@ -605,7 +613,6 @@ async function getAccountsPage(
    */
   if (typeof pagination?.before === 'string') {
     const accounts = await Account.query(deps.knex)
-      .withGraphFetched('asset')
       .whereRaw(
         '("createdAt", "id") < (select "createdAt" :: TIMESTAMP, "id" from "accounts" where "id" = ?)',
         [pagination.before]
@@ -622,7 +629,6 @@ async function getAccountsPage(
   }
 
   const accounts = await Account.query(deps.knex)
-    .withGraphFetched('asset')
     .orderBy([
       { column: 'createdAt', order: 'asc' },
       { column: 'id', order: 'asc' }

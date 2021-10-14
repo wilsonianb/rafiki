@@ -2,13 +2,7 @@ import { Pojo, ModelOptions, QueryContext } from 'objection'
 import * as Pay from '@interledger/pay'
 import { BaseModel } from '../shared/baseModel'
 
-const fieldPrefixes = [
-  'intent',
-  'quote',
-  'sourceAccount',
-  'destinationAccount',
-  'outcome'
-]
+const fieldPrefixes = ['intent', 'quote', 'destinationAccount', 'outcome']
 
 const ratioFields = [
   'quoteMinExchangeRate',
@@ -48,11 +42,8 @@ export class OutgoingPayment extends BaseModel {
   }
   public accountId!: string
   public reservedBalanceId!: string
-  public sourceAccount!: {
-    id: string
-    scale: number
-    code: string
-  }
+  public sourceAccountId!: string
+  public assetId!: string
   public destinationAccount!: {
     scale: number
     code: string

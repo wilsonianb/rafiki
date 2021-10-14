@@ -194,10 +194,12 @@ export function initIocContainer(
     const logger = await deps.use('logger')
     const streamServer = await deps.use('streamServer')
     const accountService = await deps.use('accountService')
+    const assetService = await deps.use('assetService')
     const wmService = await deps.use('wmService')
     return await createSPSPService({
       logger: logger,
       accountService: accountService,
+      assetService: assetService,
       wmService,
       streamServer: streamServer
     })
@@ -206,10 +208,12 @@ export function initIocContainer(
     const logger = await deps.use('logger')
     const knex = await deps.use('knex')
     const accountService = await deps.use('accountService')
+    const assetService = await deps.use('assetService')
     return await createInvoiceService({
       logger: logger,
       knex: knex,
-      accountService: accountService
+      accountService: accountService,
+      assetService: assetService
     })
   })
 
@@ -250,6 +254,7 @@ export function initIocContainer(
       logger: await deps.use('logger'),
       knex: await deps.use('knex'),
       accountService: await deps.use('accountService'),
+      assetService: await deps.use('assetService'),
       balanceService: await deps.use('balanceService'),
       makeIlpPlugin: await deps.use('makeIlpPlugin'),
       ratesService: await deps.use('ratesService'),
