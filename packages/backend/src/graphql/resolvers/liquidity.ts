@@ -12,7 +12,7 @@ import { TransferError } from '../../accounting/errors'
 import { ApolloContext } from '../../app'
 
 export const addPeerLiquidity: MutationResolvers<ApolloContext>['addPeerLiquidity'] = async (
-  parent,
+  _,
   args,
   ctx
 ): ResolversTypes['LiquidityMutationResponse'] => {
@@ -56,7 +56,7 @@ export const addPeerLiquidity: MutationResolvers<ApolloContext>['addPeerLiquidit
 }
 
 export const addAssetLiquidity: MutationResolvers<ApolloContext>['addAssetLiquidity'] = async (
-  parent,
+  _,
   args,
   ctx
 ): ResolversTypes['LiquidityMutationResponse'] => {
@@ -102,7 +102,7 @@ export const addAssetLiquidity: MutationResolvers<ApolloContext>['addAssetLiquid
 }
 
 export const createPeerLiquidityWithdrawal: MutationResolvers<ApolloContext>['createPeerLiquidityWithdrawal'] = async (
-  parent,
+  _,
   args,
   ctx
 ): ResolversTypes['LiquidityMutationResponse'] => {
@@ -147,7 +147,7 @@ export const createPeerLiquidityWithdrawal: MutationResolvers<ApolloContext>['cr
 }
 
 export const createAssetLiquidityWithdrawal: MutationResolvers<ApolloContext>['createAssetLiquidityWithdrawal'] = async (
-  parent,
+  _,
   args,
   ctx
 ): ResolversTypes['LiquidityMutationResponse'] => {
@@ -194,7 +194,7 @@ export const createAssetLiquidityWithdrawal: MutationResolvers<ApolloContext>['c
 }
 
 export const createAccountWithdrawal: MutationResolvers<ApolloContext>['createAccountWithdrawal'] = async (
-  parent,
+  _,
   args,
   ctx
 ): ResolversTypes['AccountWithdrawalMutationResponse'] => {
@@ -252,7 +252,7 @@ export const createAccountWithdrawal: MutationResolvers<ApolloContext>['createAc
 }
 
 export const createInvoiceWithdrawal: MutationResolvers<ApolloContext>['createInvoiceWithdrawal'] = async (
-  parent,
+  _,
   args,
   ctx
 ): ResolversTypes['InvoiceWithdrawalMutationResponse'] => {
@@ -392,7 +392,7 @@ export const finalizeLiquidityWithdrawal: MutationResolvers<ApolloContext>['fina
 }
 
 export const rollbackLiquidityWithdrawal: MutationResolvers<ApolloContext>['rollbackLiquidityWithdrawal'] = async (
-  parent,
+  _,
   args,
   ctx
 ): ResolversTypes['LiquidityMutationResponse'] => {
