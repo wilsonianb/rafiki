@@ -6,7 +6,7 @@ import {
 import { LiquidityError } from '../../liquidity/errors'
 
 export const addAccountLiquidity: MutationResolvers['addAccountLiquidity'] = async (
-  parent,
+  _,
   args,
   ctx
 ): ResolversTypes['AddAccountLiquidityMutationResponse'] => {
@@ -52,7 +52,7 @@ export const addAccountLiquidity: MutationResolvers['addAccountLiquidity'] = asy
 }
 
 export const addAssetLiquidity: MutationResolvers['addAssetLiquidity'] = async (
-  parent,
+  _,
   args,
   ctx
 ): ResolversTypes['AddAssetLiquidityMutationResponse'] => {
@@ -98,7 +98,7 @@ export const addAssetLiquidity: MutationResolvers['addAssetLiquidity'] = async (
 }
 
 export const createAccountLiquidityWithdrawal: MutationResolvers['createAccountLiquidityWithdrawal'] = async (
-  parent,
+  _,
   args,
   ctx
 ): ResolversTypes['CreateAccountLiquidityWithdrawalMutationResponse'] => {
@@ -144,7 +144,7 @@ export const createAccountLiquidityWithdrawal: MutationResolvers['createAccountL
 }
 
 export const createAssetLiquidityWithdrawal: MutationResolvers['createAssetLiquidityWithdrawal'] = async (
-  parent,
+  _,
   args,
   ctx
 ): ResolversTypes['CreateAssetLiquidityWithdrawalMutationResponse'] => {
@@ -190,7 +190,7 @@ export const createAssetLiquidityWithdrawal: MutationResolvers['createAssetLiqui
 }
 
 export const finalizeLiquidityWithdrawal: MutationResolvers['finalizeLiquidityWithdrawal'] = async (
-  parent,
+  _,
   args,
   ctx
 ): ResolversTypes['FinalizeLiquidityWithdrawalMutationResponse'] => {
@@ -207,7 +207,7 @@ export const finalizeLiquidityWithdrawal: MutationResolvers['finalizeLiquidityWi
 }
 
 export const rollbackLiquidityWithdrawal: MutationResolvers['rollbackLiquidityWithdrawal'] = async (
-  parent,
+  _,
   args,
   ctx
 ): ResolversTypes['RollbackLiquidityWithdrawalMutationResponse'] => {
