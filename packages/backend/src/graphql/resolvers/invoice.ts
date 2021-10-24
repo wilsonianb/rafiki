@@ -1,17 +1,17 @@
 import {
   ResolversTypes,
   InvoiceConnectionResolvers,
-  AccountResolvers
+  PaymentPointerResolvers
 } from '../generated/graphql'
 import { Invoice } from '../../invoice/model'
 import { ApolloContext } from '../../app'
 
-export const getAccountInvoices: AccountResolvers<ApolloContext>['invoices'] = async (
+export const getAccountInvoices: PaymentPointerResolvers<ApolloContext>['invoices'] = async (
   parent,
   args,
   ctx
 ): ResolversTypes['InvoiceConnection'] => {
-  if (!parent.id) throw new Error('missing account id')
+  if (!parent.id) throw new Error('missing payment pointer id')
   const invoiceService = await ctx.container.use('invoiceService')
   const invoices = await invoiceService.getAccountInvoicesPage(parent.id, args)
 
@@ -52,7 +52,7 @@ export const getPageInfo: InvoiceConnectionResolvers<ApolloContext>['pageInfo'] 
   let hasNextPageInvoices, hasPreviousPageInvoices
   try {
     hasNextPageInvoices = await invoiceService.getAccountInvoicesPage(
-      firstInvoice.accountId,
+      firstInvoice.paymentPointerId,
       {
         after: lastEdge,
         first: 1
@@ -63,7 +63,7 @@ export const getPageInfo: InvoiceConnectionResolvers<ApolloContext>['pageInfo'] 
   }
   try {
     hasPreviousPageInvoices = await invoiceService.getAccountInvoicesPage(
-      firstInvoice.accountId,
+      firstInvoice.paymentPointerId,
       {
         before: firstEdge,
         last: 1

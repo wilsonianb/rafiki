@@ -41,7 +41,6 @@ export const resolvers: Resolvers = {
   },
   Account: {
     balance: getBalance,
-    invoices: getAccountInvoices,
     outgoingPayments: getAccountOutgoingPayments
     // webhooks: getWebhooks,
   },
@@ -56,6 +55,9 @@ export const resolvers: Resolvers = {
   },
   OutgoingPayment: {
     outcome: getOutcome
+  },
+  PaymentPointer: {
+    invoices: getAccountInvoices
   },
   WebhooksConnection: {
     // pageInfo: getWebhooksConnectionPageInfo
