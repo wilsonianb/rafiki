@@ -17,12 +17,7 @@ export const addAccountLiquidity: MutationResolvers<ApolloContext>['addAccountLi
     const accountingService = await ctx.container.use('accountingService')
     const account = await accountingService.getAccount(args.input.accountId)
     if (!account) {
-      return {
-        code: '404',
-        message: 'Unknown account',
-        success: false,
-        error: LiquidityError.UnknownAccount
-      }
+      return responses[LiquidityError.UnknownAccount]
     }
     const error = await accountingService.createTransfer({
       id: args.input.id,
@@ -68,12 +63,7 @@ export const addAssetLiquidity: MutationResolvers<ApolloContext>['addAssetLiquid
     const assetService = await ctx.container.use('assetService')
     const asset = await assetService.getById(args.input.assetId)
     if (!asset) {
-      return {
-        code: '404',
-        message: 'Unknown asset',
-        success: false,
-        error: LiquidityError.UnknownAsset
-      }
+      return responses[LiquidityError.UnknownAsset]
     }
     const accountingService = await ctx.container.use('accountingService')
     const error = await accountingService.createTransfer({
@@ -116,6 +106,53 @@ export const addAssetLiquidity: MutationResolvers<ApolloContext>['addAssetLiquid
   }
 }
 
+export const addPeerLiquidity: MutationResolvers<ApolloContext>['addPeerLiquidity'] = async (
+  parent,
+  args,
+  ctx
+): ResolversTypes['LiquidityMutationResponse'] => {
+  try {
+    const peerService = await ctx.container.use('peerService')
+    const peer = await peerService.get(args.input.peerId)
+    if (!peer) {
+      return responses[LiquidityError.UnknownPeer]
+    }
+    const accountingService = await ctx.container.use('accountingService')
+    const error = await accountingService.createTransfer({
+      id: args.input.id,
+      sourceAccount: {
+        asset: {
+          unit: peer.asset.unit,
+          account: AssetAccount.Settlement
+        }
+      },
+      destinationAccount: peer,
+      amount: args.input.amount
+    })
+    if (error) {
+      return errorToResponse(error)
+    }
+    return {
+      code: '200',
+      success: true,
+      message: 'Added peer liquidity'
+    }
+  } catch (error) {
+    ctx.logger.error(
+      {
+        input: args.input,
+        error
+      },
+      'error adding peer liquidity'
+    )
+    return {
+      code: '400',
+      message: 'Error trying to add peer liquidity',
+      success: false
+    }
+  }
+}
+
 export const createAccountLiquidityWithdrawal: MutationResolvers<ApolloContext>['createAccountLiquidityWithdrawal'] = async (
   parent,
   args,
@@ -125,12 +162,7 @@ export const createAccountLiquidityWithdrawal: MutationResolvers<ApolloContext>[
     const accountingService = await ctx.container.use('accountingService')
     const account = await accountingService.getAccount(args.input.accountId)
     if (!account) {
-      return {
-        code: '404',
-        message: 'Unknown account',
-        success: false,
-        error: LiquidityError.UnknownAccount
-      }
+      return responses[LiquidityError.UnknownAccount]
     }
     const error = await accountingService.createTransfer({
       id: args.input.id,
@@ -177,12 +209,7 @@ export const createAssetLiquidityWithdrawal: MutationResolvers<ApolloContext>['c
     const assetService = await ctx.container.use('assetService')
     const asset = await assetService.getById(args.input.assetId)
     if (!asset) {
-      return {
-        code: '404',
-        message: 'Unknown asset',
-        success: false,
-        error: LiquidityError.UnknownAsset
-      }
+      return responses[LiquidityError.UnknownAsset]
     }
     const accountingService = await ctx.container.use('accountingService')
     const error = await accountingService.createTransfer({
@@ -221,6 +248,54 @@ export const createAssetLiquidityWithdrawal: MutationResolvers<ApolloContext>['c
     return {
       code: '400',
       message: 'Error trying to create asset liquidity withdrawal',
+      success: false
+    }
+  }
+}
+
+export const createPeerLiquidityWithdrawal: MutationResolvers<ApolloContext>['createPeerLiquidityWithdrawal'] = async (
+  parent,
+  args,
+  ctx
+): ResolversTypes['LiquidityMutationResponse'] => {
+  try {
+    const peerService = await ctx.container.use('peerService')
+    const peer = await peerService.get(args.input.peerId)
+    if (!peer) {
+      return responses[LiquidityError.UnknownPeer]
+    }
+    const accountingService = await ctx.container.use('accountingService')
+    const error = await accountingService.createTransfer({
+      id: args.input.id,
+      sourceAccount: peer,
+      destinationAccount: {
+        asset: {
+          unit: peer.asset.unit,
+          account: AssetAccount.Settlement
+        }
+      },
+      amount: args.input.amount,
+      timeout: BigInt(60e9) // 1 minute
+    })
+    if (error) {
+      return errorToResponse(error)
+    }
+    return {
+      code: '200',
+      success: true,
+      message: 'Created peer liquidity withdrawal'
+    }
+  } catch (error) {
+    ctx.logger.error(
+      {
+        input: args.input,
+        error
+      },
+      'error creating peer liquidity withdrawal'
+    )
+    return {
+      code: '400',
+      message: 'Error trying to create peer liquidity withdrawal',
       success: false
     }
   }
@@ -315,6 +390,12 @@ const responses: {
     message: 'Unknown asset',
     success: false,
     error: LiquidityError.UnknownAsset
+  },
+  [LiquidityError.UnknownPeer]: {
+    code: '404',
+    message: 'Unknown peer',
+    success: false,
+    error: LiquidityError.UnknownPeer
   },
   [LiquidityError.UnknownTransfer]: {
     code: '404',

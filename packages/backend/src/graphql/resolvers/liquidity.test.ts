@@ -15,6 +15,7 @@ import {
 import { AssetService } from '../../asset/service'
 import { AccountFactory } from '../../tests/accountFactory'
 import { randomAsset, randomUnit } from '../../tests/asset'
+import { PeerFactory } from '../../tests/peerFactory'
 import { truncateTables } from '../../tests/tableManager'
 import { LiquidityError, LiquidityMutationResponse } from '../generated/graphql'
 
@@ -24,6 +25,7 @@ describe('Withdrawal Resolvers', (): void => {
   let accountFactory: AccountFactory
   let accountingService: AccountingService
   let assetService: AssetService
+  let peerFactory: PeerFactory
   let knex: Knex
   const timeout = BigInt(10e9) // 10 seconds
 
@@ -82,6 +84,8 @@ describe('Withdrawal Resolvers', (): void => {
       accountingService = await deps.use('accountingService')
       assetService = await deps.use('assetService')
       accountFactory = new AccountFactory(accountingService)
+      const peerService = await deps.use('peerService')
+      peerFactory = new PeerFactory(peerService)
     }
   )
 
@@ -404,6 +408,168 @@ describe('Withdrawal Resolvers', (): void => {
           (query): LiquidityMutationResponse => {
             if (query.data) {
               return query.data.addAssetLiquidity
+            } else {
+              throw new Error('Data was empty')
+            }
+          }
+        )
+
+      expect(response.success).toBe(false)
+      expect(response.code).toEqual('409')
+      expect(response.message).toEqual('Transfer exists')
+      expect(response.error).toEqual(LiquidityError.TransferExists)
+    })
+  })
+
+  describe('Add peer liquidity', (): void => {
+    let peerId: string
+
+    beforeEach(
+      async (): Promise<void> => {
+        peerId = (await peerFactory.build()).id
+      }
+    )
+
+    test('Can add liquidity to ppeer', async (): Promise<void> => {
+      const response = await appContainer.apolloClient
+        .mutate({
+          mutation: gql`
+            mutation AddPeerLiquidity($input: AddPeerLiquidityInput!) {
+              addPeerLiquidity(input: $input) {
+                code
+                success
+                message
+                error
+              }
+            }
+          `,
+          variables: {
+            input: {
+              peerId,
+              amount: '100'
+            }
+          }
+        })
+        .then(
+          (query): LiquidityMutationResponse => {
+            if (query.data) {
+              return query.data.addPeerLiquidity
+            } else {
+              throw new Error('Data was empty')
+            }
+          }
+        )
+
+      expect(response.success).toBe(true)
+      expect(response.code).toEqual('200')
+      expect(response.error).toBeNull()
+    })
+
+    test('Returns an error for invalid id', async (): Promise<void> => {
+      const response = await appContainer.apolloClient
+        .mutate({
+          mutation: gql`
+            mutation AddPeerLiquidity($input: AddPeerLiquidityInput!) {
+              addPeerLiquidity(input: $input) {
+                code
+                success
+                message
+                error
+              }
+            }
+          `,
+          variables: {
+            input: {
+              id: 'not a uuid v4',
+              peerId,
+              amount: '100'
+            }
+          }
+        })
+        .then(
+          (query): LiquidityMutationResponse => {
+            if (query.data) {
+              return query.data.addPeerLiquidity
+            } else {
+              throw new Error('Data was empty')
+            }
+          }
+        )
+
+      expect(response.success).toBe(false)
+      expect(response.code).toEqual('400')
+      expect(response.message).toEqual('Invalid id')
+      expect(response.error).toEqual(LiquidityError.InvalidId)
+    })
+
+    test('Returns an error for unknown peer', async (): Promise<void> => {
+      const response = await appContainer.apolloClient
+        .mutate({
+          mutation: gql`
+            mutation AddPeerLiquidity($input: AddPeerLiquidityInput!) {
+              addPeerLiquidity(input: $input) {
+                code
+                success
+                message
+                error
+              }
+            }
+          `,
+          variables: {
+            input: {
+              peerId: uuid(),
+              amount: '100'
+            }
+          }
+        })
+        .then(
+          (query): LiquidityMutationResponse => {
+            if (query.data) {
+              return query.data.addPeerLiquidity
+            } else {
+              throw new Error('Data was empty')
+            }
+          }
+        )
+
+      expect(response.success).toBe(false)
+      expect(response.code).toEqual('404')
+      expect(response.message).toEqual('Unknown peer')
+      expect(response.error).toEqual(LiquidityError.UnknownPeer)
+    })
+
+    test('Returns an error for existing transfer', async (): Promise<void> => {
+      const account = await accountFactory.build()
+      const id = uuid()
+      await addLiquidity({
+        id,
+        account,
+        amount: BigInt(10)
+      })
+      const response = await appContainer.apolloClient
+        .mutate({
+          mutation: gql`
+            mutation AddPeerLiquidity($input: AddPeerLiquidityInput!) {
+              addPeerLiquidity(input: $input) {
+                code
+                success
+                message
+                error
+              }
+            }
+          `,
+          variables: {
+            input: {
+              id,
+              peerId,
+              amount: '100'
+            }
+          }
+        })
+        .then(
+          (query): LiquidityMutationResponse => {
+            if (query.data) {
+              return query.data.addPeerLiquidity
             } else {
               throw new Error('Data was empty')
             }
@@ -850,7 +1016,223 @@ describe('Withdrawal Resolvers', (): void => {
     })
   })
 
-  describe.each(['account', 'asset'])(
+  describe('Create peer liquidity withdrawal', (): void => {
+    let peerId: string
+    const startingBalance = BigInt(100)
+
+    beforeEach(
+      async (): Promise<void> => {
+        const peer = await peerFactory.build()
+        await addLiquidity({
+          account: peer,
+          amount: startingBalance
+        })
+        peerId = peer.id
+      }
+    )
+
+    test('Can create liquidity withdrawal from peer', async (): Promise<void> => {
+      const response = await appContainer.apolloClient
+        .mutate({
+          mutation: gql`
+            mutation CreatePeerLiquidityWithdrawal(
+              $input: CreatePeerLiquidityWithdrawalInput!
+            ) {
+              createPeerLiquidityWithdrawal(input: $input) {
+                code
+                success
+                message
+                error
+              }
+            }
+          `,
+          variables: {
+            input: {
+              id: uuid(),
+              peerId,
+              amount: startingBalance.toString()
+            }
+          }
+        })
+        .then(
+          (query): LiquidityMutationResponse => {
+            if (query.data) {
+              return query.data.createPeerLiquidityWithdrawal
+            } else {
+              throw new Error('Data was empty')
+            }
+          }
+        )
+
+      expect(response.success).toBe(true)
+      expect(response.code).toEqual('200')
+      expect(response.error).toBeNull()
+    })
+
+    test('Returns an error for unknown peer', async (): Promise<void> => {
+      const response = await appContainer.apolloClient
+        .mutate({
+          mutation: gql`
+            mutation CreatePeerLiquidityWithdrawal(
+              $input: CreatePeerLiquidityWithdrawalInput!
+            ) {
+              createPeerLiquidityWithdrawal(input: $input) {
+                code
+                success
+                message
+                error
+              }
+            }
+          `,
+          variables: {
+            input: {
+              id: uuid(),
+              peerId: uuid(),
+              amount: '100'
+            }
+          }
+        })
+        .then(
+          (query): LiquidityMutationResponse => {
+            if (query.data) {
+              return query.data.createPeerLiquidityWithdrawal
+            } else {
+              throw new Error('Data was empty')
+            }
+          }
+        )
+
+      expect(response.success).toBe(false)
+      expect(response.code).toEqual('404')
+      expect(response.message).toEqual('Unknown peer')
+      expect(response.error).toEqual(LiquidityError.UnknownPeer)
+    })
+
+    test('Returns an error for invalid id', async (): Promise<void> => {
+      const response = await appContainer.apolloClient
+        .mutate({
+          mutation: gql`
+            mutation CreatePeerLiquidityWithdrawal(
+              $input: CreatePeerLiquidityWithdrawalInput!
+            ) {
+              createPeerLiquidityWithdrawal(input: $input) {
+                code
+                success
+                message
+                error
+              }
+            }
+          `,
+          variables: {
+            input: {
+              id: 'not a uuid',
+              peerId,
+              amount: startingBalance.toString()
+            }
+          }
+        })
+        .then(
+          (query): LiquidityMutationResponse => {
+            if (query.data) {
+              return query.data.createPeerLiquidityWithdrawal
+            } else {
+              throw new Error('Data was empty')
+            }
+          }
+        )
+
+      expect(response.success).toBe(false)
+      expect(response.code).toEqual('400')
+      expect(response.message).toEqual('Invalid id')
+      expect(response.error).toEqual(LiquidityError.InvalidId)
+    })
+
+    test('Returns an error for existing transfer', async (): Promise<void> => {
+      const account = await accountFactory.build()
+      const id = uuid()
+      await addLiquidity({
+        id,
+        account,
+        amount: BigInt(10)
+      })
+      const response = await appContainer.apolloClient
+        .mutate({
+          mutation: gql`
+            mutation CreatePeerLiquidityWithdrawal(
+              $input: CreatePeerLiquidityWithdrawalInput!
+            ) {
+              createPeerLiquidityWithdrawal(input: $input) {
+                code
+                success
+                message
+                error
+              }
+            }
+          `,
+          variables: {
+            input: {
+              id,
+              peerId,
+              amount: startingBalance.toString()
+            }
+          }
+        })
+        .then(
+          (query): LiquidityMutationResponse => {
+            if (query.data) {
+              return query.data.createPeerLiquidityWithdrawal
+            } else {
+              throw new Error('Data was empty')
+            }
+          }
+        )
+      expect(response.success).toBe(false)
+      expect(response.code).toEqual('409')
+      expect(response.message).toEqual('Transfer exists')
+      expect(response.error).toEqual(LiquidityError.TransferExists)
+    })
+
+    test('Returns error for insufficient balance', async (): Promise<void> => {
+      const response = await appContainer.apolloClient
+        .mutate({
+          mutation: gql`
+            mutation CreatePeerLiquidityWithdrawal(
+              $input: CreatePeerLiquidityWithdrawalInput!
+            ) {
+              createPeerLiquidityWithdrawal(input: $input) {
+                code
+                success
+                message
+                error
+              }
+            }
+          `,
+          variables: {
+            input: {
+              id: uuid(),
+              peerId,
+              amount: (startingBalance + BigInt(1)).toString()
+            }
+          }
+        })
+        .then(
+          (query): LiquidityMutationResponse => {
+            if (query.data) {
+              return query.data.createPeerLiquidityWithdrawal
+            } else {
+              throw new Error('Data was empty')
+            }
+          }
+        )
+
+      expect(response.success).toBe(false)
+      expect(response.code).toEqual('403')
+      expect(response.message).toEqual('Insufficient balance')
+      expect(response.error).toEqual(LiquidityError.InsufficientBalance)
+    })
+  })
+
+  describe.each(['account', 'asset', 'peer'])(
     'Finalize %s liquidity withdrawal',
     (type): void => {
       let withdrawalId: string
@@ -860,7 +1242,7 @@ describe('Withdrawal Resolvers', (): void => {
           let account: AccountOptions
           if (type === 'account') {
             account = await accountFactory.build()
-          } else {
+          } else if (type === 'asset') {
             account = {
               asset: {
                 unit: randomUnit(),
@@ -868,6 +1250,8 @@ describe('Withdrawal Resolvers', (): void => {
               }
             }
             await accountingService.createAssetAccounts(account.asset.unit)
+          } else {
+            account = await peerFactory.build()
           }
           await addLiquidity({
             account,
@@ -1054,7 +1438,7 @@ describe('Withdrawal Resolvers', (): void => {
     }
   )
 
-  describe.each(['account', 'asset'])(
+  describe.each(['account', 'asset', 'peer'])(
     'Roll back %s liquidity withdrawal',
     (type): void => {
       let withdrawalId: string
@@ -1064,7 +1448,7 @@ describe('Withdrawal Resolvers', (): void => {
           let account: AccountOptions
           if (type === 'account') {
             account = await accountFactory.build()
-          } else {
+          } else if (type === 'asset') {
             account = {
               asset: {
                 unit: randomUnit(),
@@ -1072,6 +1456,8 @@ describe('Withdrawal Resolvers', (): void => {
               }
             }
             await accountingService.createAssetAccounts(account.asset.unit)
+          } else {
+            account = await peerFactory.build()
           }
           await addLiquidity({
             account,
