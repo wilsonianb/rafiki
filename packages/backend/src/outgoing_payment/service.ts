@@ -3,7 +3,6 @@ import * as Pay from '@interledger/pay'
 import { BaseService } from '../shared/baseService'
 import { OutgoingPayment, PaymentIntent, PaymentState } from './model'
 import { AccountService } from '../account/service'
-import { BalanceService } from '../balance/service'
 import { PaymentPointerService } from '../payment_pointer/service'
 import { RatesService } from '../rates/service'
 import { IlpPlugin } from './ilp_plugin'
@@ -28,7 +27,6 @@ export interface ServiceDependencies extends BaseService {
   slippage: number
   quoteLifespan: number // milliseconds
   accountService: AccountService
-  balanceService: BalanceService
   paymentPointerService: PaymentPointerService
   ratesService: RatesService
   makeIlpPlugin: (paymentPointerId: string) => IlpPlugin
@@ -60,7 +58,7 @@ async function getOutgoingPayment(
 ): Promise<OutgoingPayment | undefined> {
   return OutgoingPayment.query(deps.knex)
     .findById(id)
-    .withGraphJoined('account.asset')
+    .withGraphJoined(OutgoingPayment.graph, { minimize: true })
 }
 
 type CreateOutgoingPaymentOptions = PaymentIntent & {
@@ -127,7 +125,7 @@ async function createOutgoingPayment(
         url: destination.accountUrl
       }
     })
-    .withGraphFetched('account.asset')
+    .withGraphFetched(OutgoingPayment.graph, { minimize: true })
 }
 
 function requotePayment(

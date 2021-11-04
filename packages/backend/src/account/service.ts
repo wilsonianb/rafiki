@@ -19,6 +19,7 @@ export interface CreateOptions {
   disabled?: boolean
   assetId: string
   sentBalance?: boolean
+  debitBalance?: boolean
 }
 
 export interface AccountTransferOptions {
@@ -81,7 +82,9 @@ async function createAccount(
   const acctTrx = trx || (await Account.startTransaction())
   try {
     const sentBalance = account.sentBalance
+    const debitBalance = account.debitBalance
     delete account.sentBalance
+    delete account.debitBalance
     const accountRow = await Account.query(acctTrx)
       .insertAndFetch({
         assetId: account.assetId,
@@ -91,7 +94,8 @@ async function createAccount(
       .withGraphFetched('asset')
 
     const { id: balanceId } = await deps.balanceService.create({
-      unit: accountRow.asset.unit
+      unit: accountRow.asset.unit,
+      debitBalance
     })
 
     let sentBalanceId: string | undefined
@@ -108,7 +112,7 @@ async function createAccount(
         balanceId,
         sentBalanceId
       })
-      .withGraphFetched('asset')
+      .withGraphFetched(Account.graph)
 
     if (!trx) {
       await acctTrx.commit()
@@ -134,7 +138,7 @@ async function getAccount(
 ): Promise<Account | undefined> {
   const account = await Account.query(deps.knex)
     .findById(accountId)
-    .withGraphJoined('asset')
+    .withGraphJoined(Account.graph)
 
   return account || undefined
 }
@@ -224,7 +228,7 @@ async function transferFunds(
         transfers.push({
           id: uuid(),
           sourceBalanceId: sourceAccount.balanceId,
-          destinationBalanceId: sourceAccount.asset.balanceId,
+          destinationBalanceId: sourceAccount.asset.liquidityAccount.balanceId,
           amount: sourceAmount - destinationAmount,
           timeout
         })
@@ -232,7 +236,7 @@ async function transferFunds(
       } else {
         transfers.push({
           id: uuid(),
-          sourceBalanceId: destinationAccount.asset.balanceId,
+          sourceBalanceId: destinationAccount.asset.liquidityAccount.balanceId,
           destinationBalanceId: destinationAccount.balanceId,
           amount: destinationAmount - sourceAmount,
           timeout
@@ -251,13 +255,13 @@ async function transferFunds(
       {
         id: uuid(),
         sourceBalanceId: sourceAccount.balanceId,
-        destinationBalanceId: sourceAccount.asset.balanceId,
+        destinationBalanceId: sourceAccount.asset.liquidityAccount.balanceId,
         amount: sourceAmount,
         timeout
       },
       {
         id: uuid(),
-        sourceBalanceId: destinationAccount.asset.balanceId,
+        sourceBalanceId: destinationAccount.asset.liquidityAccount.balanceId,
         destinationBalanceId: destinationAccount.balanceId,
         amount: destinationAmount,
         timeout
@@ -267,7 +271,7 @@ async function transferFunds(
   if (sourceAccount.sentBalanceId) {
     transfers.push({
       id: uuid(),
-      sourceBalanceId: sourceAccount.asset.outgoingPaymentsBalanceId,
+      sourceBalanceId: sourceAccount.asset.sentAccount.balanceId,
       destinationBalanceId: sourceAccount.sentBalanceId,
       amount: sourceAmount,
       timeout

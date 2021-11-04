@@ -43,7 +43,7 @@ async function createPaymentPointer(
     .insertAndFetch({
       assetId
     })
-    .withGraphFetched('asset')
+    .withGraphFetched(PaymentPointer.graph)
 }
 
 async function getPaymentPointer(
@@ -52,5 +52,5 @@ async function getPaymentPointer(
 ): Promise<PaymentPointer | undefined> {
   return await PaymentPointer.query(deps.knex)
     .findById(id)
-    .withGraphJoined('asset')
+    .withGraphFetched(PaymentPointer.graph)
 }

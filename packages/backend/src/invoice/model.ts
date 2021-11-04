@@ -6,6 +6,9 @@ export class Invoice extends BaseModel {
   public static get tableName(): string {
     return 'invoices'
   }
+  public static get graph(): string {
+    return `account.${Account.graph}`
+  }
 
   static relationMappings = {
     account: {

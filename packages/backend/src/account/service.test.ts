@@ -140,6 +140,21 @@ describe('Account Service', (): void => {
         debitBalance: false
       })
     })
+
+    test('Can create an account with a debit balance', async (): Promise<void> => {
+      const { id: assetId } = await assetService.getOrCreate(randomAsset())
+      const options: CreateOptions = {
+        assetId,
+        debitBalance: true
+      }
+      const account = await accountService.create(options)
+      await expect(balanceService.get(account.balanceId)).resolves.toEqual({
+        id: account.balanceId,
+        balance: BigInt(0),
+        unit: account.asset.unit,
+        debitBalance: true
+      })
+    })
   })
 
   describe('Get Account', (): void => {
@@ -206,7 +221,7 @@ describe('Account Service', (): void => {
 
         const startingLiquidity = BigInt(100)
         await liquidityService.add({
-          account: sourceAccount.asset,
+          account: sourceAccount.asset.liquidityAccount,
           amount: startingLiquidity
         })
 
@@ -230,12 +245,13 @@ describe('Account Service', (): void => {
         ).resolves.toEqual(startingSourceBalance - sourceAmount)
 
         await expect(
-          assetService.getLiquidityBalance(sourceAccount.asset)
-        ).resolves.toEqual(
-          sourceAmount < destinationAmount
-            ? startingLiquidity - amountDiff
-            : startingLiquidity
-        )
+          balanceService.get(sourceAccount.asset.liquidityAccount.balanceId)
+        ).resolves.toMatchObject({
+          balance:
+            sourceAmount < destinationAmount
+              ? startingLiquidity - amountDiff
+              : startingLiquidity
+        })
 
         await expect(
           accountService.getBalance(destinationAccount.id)
@@ -254,10 +270,10 @@ describe('Account Service', (): void => {
         )
 
         await expect(
-          assetService.getLiquidityBalance(sourceAccount.asset)
-        ).resolves.toEqual(
-          accept ? startingLiquidity - amountDiff : startingLiquidity
-        )
+          balanceService.get(sourceAccount.asset.liquidityAccount.balanceId)
+        ).resolves.toMatchObject({
+          balance: accept ? startingLiquidity - amountDiff : startingLiquidity
+        })
 
         await expect(
           accountService.getBalance(destinationAccount.id)
@@ -302,7 +318,7 @@ describe('Account Service', (): void => {
 
         const startingDestinationLiquidity = BigInt(100)
         await liquidityService.add({
-          account: destinationAccount.asset,
+          account: destinationAccount.asset.liquidityAccount,
           amount: startingDestinationLiquidity
         })
 
@@ -325,12 +341,18 @@ describe('Account Service', (): void => {
         ).resolves.toEqual(startingSourceBalance - sourceAmount)
 
         await expect(
-          assetService.getLiquidityBalance(sourceAccount.asset)
-        ).resolves.toEqual(BigInt(0))
+          balanceService.get(sourceAccount.asset.liquidityAccount.balanceId)
+        ).resolves.toMatchObject({
+          balance: BigInt(0)
+        })
 
         await expect(
-          assetService.getLiquidityBalance(destinationAccount.asset)
-        ).resolves.toEqual(startingDestinationLiquidity - destinationAmount)
+          balanceService.get(
+            destinationAccount.asset.liquidityAccount.balanceId
+          )
+        ).resolves.toMatchObject({
+          balance: startingDestinationLiquidity - destinationAmount
+        })
 
         await expect(
           accountService.getBalance(destinationAccount.id)
@@ -349,16 +371,20 @@ describe('Account Service', (): void => {
         )
 
         await expect(
-          assetService.getLiquidityBalance(sourceAccount.asset)
-        ).resolves.toEqual(accept ? sourceAmount : BigInt(0))
+          balanceService.get(sourceAccount.asset.liquidityAccount.balanceId)
+        ).resolves.toMatchObject({
+          balance: accept ? sourceAmount : BigInt(0)
+        })
 
         await expect(
-          assetService.getLiquidityBalance(destinationAccount.asset)
-        ).resolves.toEqual(
-          accept
+          balanceService.get(
+            destinationAccount.asset.liquidityAccount.balanceId
+          )
+        ).resolves.toMatchObject({
+          balance: accept
             ? startingDestinationLiquidity - destinationAmount
             : startingDestinationLiquidity
-        )
+        })
 
         await expect(
           accountService.getBalance(destinationAccount.id)
@@ -432,12 +458,18 @@ describe('Account Service', (): void => {
         ).resolves.toEqual(startingSourceBalance)
 
         await expect(
-          assetService.getLiquidityBalance(sourceAccount.asset)
-        ).resolves.toEqual(BigInt(0))
+          balanceService.get(sourceAccount.asset.liquidityAccount.balanceId)
+        ).resolves.toMatchObject({
+          balance: BigInt(0)
+        })
 
         await expect(
-          assetService.getLiquidityBalance(destinationAccount.asset)
-        ).resolves.toEqual(BigInt(0))
+          balanceService.get(
+            destinationAccount.asset.liquidityAccount.balanceId
+          )
+        ).resolves.toMatchObject({
+          balance: BigInt(0)
+        })
 
         await expect(
           accountService.getBalance(destinationAccount.id)

@@ -1,13 +1,17 @@
 import { BaseModel } from '../shared/baseModel'
 import { Asset } from '../asset/model'
-import { Model } from 'objection'
+import { Model, RelationMappings } from 'objection'
 
 export class Account extends BaseModel {
   public static get tableName(): string {
     return 'accounts'
   }
 
-  static relationMappings = {
+  public static get graph(): string {
+    return `asset.${Asset.graph}`
+  }
+
+  static relationMappings = (): RelationMappings => ({
     asset: {
       relation: Model.HasOneRelation,
       modelClass: Asset,
@@ -16,7 +20,7 @@ export class Account extends BaseModel {
         to: 'assets.id'
       }
     }
-  }
+  })
 
   public readonly disabled!: boolean
 

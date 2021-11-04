@@ -53,7 +53,9 @@ async function getInvoice(
   deps: ServiceDependencies,
   id: string
 ): Promise<Invoice | undefined> {
-  return Invoice.query(deps.knex).findById(id).withGraphJoined('account.asset')
+  return Invoice.query(deps.knex)
+    .findById(id)
+    .withGraphJoined(Invoice.graph, { minimize: true })
 }
 
 async function createInvoice(
@@ -85,7 +87,7 @@ async function createInvoice(
         expiresAt: expiresAt,
         active: true
       })
-      .withGraphFetched('account.asset')
+      .withGraphFetched(Invoice.graph, { minimize: true })
     if (!trx) {
       await invTrx.commit()
     }

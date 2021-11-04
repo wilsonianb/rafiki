@@ -78,7 +78,7 @@ export async function getPendingPayment(
             .orWhere('quoteActivationDeadline', '<', now)
         })
     })
-    .withGraphFetched('account.asset')
+    .withGraphFetched(OutgoingPayment.graph)
   return payments[0]
 }
 
