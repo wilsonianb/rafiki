@@ -8,7 +8,7 @@ export class Asset extends BaseModel {
   }
 
   public static get graph(): string {
-    return '[liquidityAccount.asset.settlementAccount, settlementAccount, sentAccount]'
+    return '[liquidityAccount.asset.settlementAccount, settlementAccount, sentAccount.asset.liquidityAccount]'
   }
 
   static relationMappings = (): RelationMappings => ({

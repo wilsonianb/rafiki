@@ -2,6 +2,7 @@ import { TransactionOrKnex } from 'objection'
 import * as Pay from '@interledger/pay'
 import { BaseService } from '../shared/baseService'
 import { OutgoingPayment, PaymentIntent, PaymentState } from './model'
+import { Account } from '../account/model'
 import { AccountService } from '../account/service'
 import { PaymentPointerService } from '../payment_pointer/service'
 import { RatesService } from '../rates/service'
@@ -29,7 +30,7 @@ export interface ServiceDependencies extends BaseService {
   accountService: AccountService
   paymentPointerService: PaymentPointerService
   ratesService: RatesService
-  makeIlpPlugin: (paymentPointerId: string) => IlpPlugin
+  makeIlpPlugin: (sourceAccount: Account) => IlpPlugin
 }
 
 export async function createOutgoingPaymentService(
@@ -85,7 +86,14 @@ async function createOutgoingPayment(
     )
   }
 
-  const plugin = deps.makeIlpPlugin(options.paymentPointerId)
+  const paymentPointer = await deps.paymentPointerService.get(
+    options.paymentPointerId
+  )
+  if (!paymentPointer) {
+    throw new Error('outgoing payment payment pointer does not exist')
+  }
+
+  const plugin = deps.makeIlpPlugin(paymentPointer.asset.sentAccount)
   await plugin.connect()
   const destination = await Pay.setupPayment({
     plugin,
@@ -97,12 +105,6 @@ async function createOutgoingPayment(
     })
   })
 
-  const paymentPointer = await deps.paymentPointerService.get(
-    options.paymentPointerId
-  )
-  if (!paymentPointer) {
-    throw new Error('outgoing payment payment pointer does not exist')
-  }
   const account = await deps.accountService.create({
     assetId: paymentPointer.assetId,
     sentBalance: true
