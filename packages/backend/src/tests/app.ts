@@ -1,5 +1,7 @@
+import Axios from 'axios'
 import createLogger from 'pino'
 import Knex from 'knex'
+import nock, { Scope } from 'nock'
 import fetch from 'cross-fetch'
 import { IocContract } from '@adonisjs/fold'
 import {
@@ -21,6 +23,7 @@ export interface TestContainer {
   knex: Knex
   apolloClient: ApolloClient<NormalizedCacheObject>
   connectionUrl: string
+  scope: Scope
   shutdown: () => Promise<void>
 }
 
@@ -43,6 +46,18 @@ export const createTestApp = async (
 
   const app = new App(container)
   await start(container, app)
+
+  // Since payment pointers MUST use HTTPS, manually mock an HTTPS proxy to the SPSP server
+  const scope = nock(`https://${config.ilpAddress}`)
+    .get(/^\/pay\//)
+    .matchHeader('Accept', /application\/spsp4\+json*./)
+    .reply(200, function (path) {
+      return Axios.get(`http://localhost:${app.getPort()}${path}`, {
+        headers: this.req.headers
+      }).then((res) => res.data)
+    })
+    .persist()
+
   const knex = await container.use('knex')
 
   const httpLink = createHttpLink({
@@ -95,7 +110,9 @@ export const createTestApp = async (
     knex,
     apolloClient: client,
     connectionUrl: config.databaseUrl,
+    scope,
     shutdown: async () => {
+      nock.cleanAll()
       await gracefulShutdown(container, app)
     }
   }

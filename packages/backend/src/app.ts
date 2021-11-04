@@ -197,9 +197,12 @@ export class App {
     })
 
     const SPSPService = await this.container.use('SPSPService')
-    this.publicRouter.get('/pay/:id', (ctx: AppContext): void => {
-      SPSPService.GETPayEndpoint(ctx)
-    })
+    this.publicRouter.get(
+      '/pay/:id',
+      async (ctx: AppContext): Promise<void> => {
+        await SPSPService.GETPayEndpoint(ctx)
+      }
+    )
 
     this.koa.use(this.publicRouter.middleware())
   }
