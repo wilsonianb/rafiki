@@ -33,7 +33,7 @@ export class AccountFactory {
       await this.transfers.create([
         {
           id: uuid(),
-          sourceBalanceId: account.asset.settlementBalanceId,
+          sourceBalanceId: account.asset.settlementAccount.balanceId,
           destinationBalanceId: account.balanceId,
           amount: options.balance
         }

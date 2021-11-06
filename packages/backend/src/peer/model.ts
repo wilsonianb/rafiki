@@ -8,6 +8,10 @@ export class Peer extends BaseModel {
     return 'peers'
   }
 
+  public static get graph(): string {
+    return `account.${Account.graph}`
+  }
+
   static relationMappings = {
     account: {
       relation: Model.HasOneRelation,
@@ -30,7 +34,6 @@ export class Peer extends BaseModel {
   public accountId!: string
   public account!: Account
 
-  public incomingTokens?: HttpToken[]
   public http!: {
     outgoing: {
       authToken: string

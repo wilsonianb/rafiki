@@ -1,3 +1,5 @@
+import { Model } from 'objection'
+import { Peer } from '../peer/model'
 import { BaseModel } from '../shared/baseModel'
 
 export class HttpToken extends BaseModel {
@@ -5,6 +7,22 @@ export class HttpToken extends BaseModel {
     return 'httpTokens'
   }
 
+  public static get graph(): string {
+    return `peer.${Peer.graph}`
+  }
+
+  static relationMappings = {
+    peer: {
+      relation: Model.HasOneRelation,
+      modelClass: Peer,
+      join: {
+        from: 'httpTokens.peerId',
+        to: 'peers.id'
+      }
+    }
+  }
+
   public readonly token!: string
-  public readonly accountId!: string
+  public readonly peerId!: string
+  public peer!: Peer
 }

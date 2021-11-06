@@ -7,6 +7,9 @@ export class PaymentPointer extends BaseModel {
   public static get tableName(): string {
     return 'paymentPointers'
   }
+  public static get graph(): string {
+    return `asset.${Asset.graph}`
+  }
 
   static relationMappings = {
     asset: {

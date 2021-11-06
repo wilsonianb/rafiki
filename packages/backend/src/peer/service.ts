@@ -82,7 +82,9 @@ async function getPeer(
   deps: ServiceDependencies,
   id: string
 ): Promise<Peer | undefined> {
-  return Peer.query(deps.knex).findById(id).withGraphJoined('account.asset')
+  return Peer.query(deps.knex)
+    .findById(id)
+    .withGraphFetched(Peer.graph, { minimize: true })
 }
 
 async function createPeer(
@@ -113,7 +115,7 @@ async function createPeer(
         maxPacketAmount: options.maxPacketAmount,
         staticIlpAddress: options.staticIlpAddress
       })
-      .withGraphFetched('account.asset')
+      .withGraphFetched(Peer.graph, { minimize: true })
 
     if (options.http?.incoming) {
       const err = await addIncomingHttpTokens({
@@ -170,7 +172,7 @@ async function updatePeer(
       }
       return await Peer.query(trx)
         .patchAndFetchById(options.id, options)
-        .withGraphFetched('account.asset')
+        .withGraphFetched(Peer.graph, { minimize: true })
         .throwIfNotFound()
     })
   } catch (err) {
@@ -220,7 +222,7 @@ async function getPeerByDestinationAddress(
   // for `staticIlpAddress`s in the accounts table:
   // new RegExp('^' + staticIlpAddress + '($|\\.)')).test(destinationAddress)
   const peer = await Peer.query(deps.knex)
-    .withGraphJoined('account.asset')
+    .withGraphJoined(Peer.graph, { minimize: true })
     .where(
       raw('?', [destinationAddress]),
       'like',
@@ -252,13 +254,9 @@ async function getPeerByIncomingToken(
   deps: ServiceDependencies,
   token: string
 ): Promise<Peer | undefined> {
-  const peer = await Peer.query(deps.knex)
-    .withGraphJoined('[account.asset, incomingTokens]')
-    .where('incomingTokens.token', token)
-    .first()
-  if (peer) {
-    delete peer.incomingTokens
-    return peer
+  const httpToken = await deps.httpTokenService.get(token)
+  if (httpToken) {
+    return httpToken.peer
   }
 }
 
@@ -294,7 +292,7 @@ async function getPeersPage(
    */
   if (typeof pagination?.after === 'string') {
     const peers = await Peer.query(deps.knex)
-      .withGraphFetched('account.asset')
+      .withGraphFetched(Peer.graph, { minimize: true })
       .whereRaw(
         '("createdAt", "id") > (select "createdAt" :: TIMESTAMP, "id" from "peers" where "id" = ?)',
         [pagination.after]
@@ -312,7 +310,7 @@ async function getPeersPage(
    */
   if (typeof pagination?.before === 'string') {
     const peers = await Peer.query(deps.knex)
-      .withGraphFetched('account.asset')
+      .withGraphFetched(Peer.graph, { minimize: true })
       .whereRaw(
         '("createdAt", "id") < (select "createdAt" :: TIMESTAMP, "id" from "peers" where "id" = ?)',
         [pagination.before]
@@ -329,7 +327,7 @@ async function getPeersPage(
   }
 
   const peers = await Peer.query(deps.knex)
-    .withGraphFetched('account.asset')
+    .withGraphFetched(Peer.graph, { minimize: true })
     .orderBy([
       { column: 'createdAt', order: 'asc' },
       { column: 'id', order: 'asc' }

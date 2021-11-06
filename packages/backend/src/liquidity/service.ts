@@ -1,8 +1,7 @@
 import { v4 as uuid } from 'uuid'
 
 import { LiquidityError } from './errors'
-import { Account as IlpAccount } from '../account/model'
-import { Asset } from '../asset/model'
+import { Account } from '../account/model'
 import { TransferService } from '../transfer/service'
 import { TransferError, TransfersError } from '../transfer/errors'
 import { BaseService } from '../shared/baseService'
@@ -12,12 +11,6 @@ import {
   UnknownSettlementAccountError
 } from '../shared/errors'
 import { validateId } from '../shared/utils'
-
-export type Account = IlpAccount | Asset
-
-function isAsset(account: Account): account is Asset {
-  return (account as Asset).settlementBalanceId !== undefined
-}
 
 interface Options {
   id?: string
@@ -65,11 +58,10 @@ async function addLiquidity(
   if (id && !validateId(id)) {
     return LiquidityError.InvalidId
   }
-  const asset = isAsset(account) ? account : account.asset
   const error = await deps.transferService.create([
     {
       id: id || uuid(),
-      sourceBalanceId: asset.settlementBalanceId,
+      sourceBalanceId: account.asset.settlementAccount.balanceId,
       destinationBalanceId: account.balanceId,
       amount
     }
@@ -80,7 +72,7 @@ async function addLiquidity(
       case TransferError.TransferExists:
         return LiquidityError.TransferExists
       case TransferError.UnknownSourceBalance:
-        throw new UnknownSettlementAccountError(asset)
+        throw new UnknownSettlementAccountError(account.asset)
       case TransferError.UnknownDestinationBalance:
         throw new UnknownBalanceError(account.balanceId)
       default:
@@ -96,12 +88,11 @@ async function createLiquidityWithdrawal(
   if (!validateId(id)) {
     return LiquidityError.InvalidId
   }
-  const asset = isAsset(account) ? account : account.asset
   const error = await deps.transferService.create([
     {
       id,
       sourceBalanceId: account.balanceId,
-      destinationBalanceId: asset.settlementBalanceId,
+      destinationBalanceId: account.asset.settlementAccount.balanceId,
       amount,
       timeout: BigInt(60e9) // 1 minute
     }
@@ -114,7 +105,7 @@ async function createLiquidityWithdrawal(
       case TransferError.UnknownSourceBalance:
         throw new UnknownBalanceError(account.balanceId)
       case TransferError.UnknownDestinationBalance:
-        throw new UnknownSettlementAccountError(asset)
+        throw new UnknownSettlementAccountError(account.asset)
       case TransferError.InsufficientBalance:
         return LiquidityError.InsufficientBalance
       default:

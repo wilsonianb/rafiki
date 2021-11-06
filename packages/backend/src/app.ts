@@ -23,6 +23,7 @@ import { HttpTokenService } from './httpToken/service'
 import { BalanceService } from './balance/service'
 import { TransferService } from './transfer/service'
 import { AssetService } from './asset/service'
+import { Account } from './account/model'
 import { AccountService } from './account/service'
 import { PeerService } from './peer/service'
 import { PaymentPointerService } from './payment_pointer/service'
@@ -70,7 +71,7 @@ export interface AppServices {
   streamServer: Promise<StreamServer>
   wmService: Promise<WebMonetizationService>
   outgoingPaymentService: Promise<OutgoingPaymentService>
-  makeIlpPlugin: Promise<(sourceAccount: string) => IlpPlugin>
+  makeIlpPlugin: Promise<(sourceAccount: Account) => IlpPlugin>
   ratesService: Promise<RatesService>
 }
 
@@ -196,9 +197,12 @@ export class App {
     })
 
     const SPSPService = await this.container.use('SPSPService')
-    this.publicRouter.get('/pay/:id', (ctx: AppContext): void => {
-      SPSPService.GETPayEndpoint(ctx)
-    })
+    this.publicRouter.get(
+      '/pay/:id',
+      async (ctx: AppContext): Promise<void> => {
+        await SPSPService.GETPayEndpoint(ctx)
+      }
+    )
 
     this.koa.use(this.publicRouter.middleware())
   }

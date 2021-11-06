@@ -20,6 +20,7 @@ export type PaymentIntent = {
 
 export class OutgoingPayment extends BaseModel {
   public static readonly tableName = 'outgoingPayments'
+  public static readonly graph = `account.${Account.graph}`
 
   public state!: PaymentState
   // The "| null" is necessary so that `$beforeUpdate` can modify a patch to remove the error. If `$beforeUpdate` set `error = undefined`, the patch would ignore the modification.

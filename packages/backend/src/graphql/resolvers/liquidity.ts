@@ -71,7 +71,7 @@ export const addAssetLiquidity: MutationResolvers<ApolloContext>['addAssetLiquid
     const liquidityService = await ctx.container.use('liquidityService')
     const error = await liquidityService.add({
       id: args.input.id,
-      account: asset,
+      account: asset.liquidityAccount,
       amount: args.input.amount
     })
     if (error) {
@@ -163,7 +163,7 @@ export const createAssetLiquidityWithdrawal: MutationResolvers<ApolloContext>['c
     const liquidityService = await ctx.container.use('liquidityService')
     const error = await liquidityService.createWithdrawal({
       id: args.input.id,
-      account: asset,
+      account: asset.liquidityAccount,
       amount: args.input.amount
     })
     if (error) {

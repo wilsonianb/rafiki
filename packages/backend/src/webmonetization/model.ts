@@ -6,6 +6,9 @@ export class WebMonetization extends BaseModel {
   public static get tableName(): string {
     return 'webMonetization'
   }
+  public static get graph(): string {
+    return `invoice.${Invoice.graph}`
+  }
 
   static relationMappings = {
     invoice: {
