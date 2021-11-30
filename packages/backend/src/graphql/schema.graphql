@@ -22,6 +22,8 @@ type Mutation {
   createOutgoingPayment(
     input: CreateOutgoingPaymentInput!
   ): OutgoingPaymentResponse!
+  "Fund a Funding payment's quoted amount."
+  fundOutgoingPayment(paymentId: String!): OutgoingPaymentResponse!
   "Requote a Cancelled payment."
   requoteOutgoingPayment(paymentId: String!): OutgoingPaymentResponse!
   "Cancel a Funding payment."

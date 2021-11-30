@@ -978,6 +978,57 @@ describe('OutgoingPaymentService', (): void => {
     })
   })
 
+  describe('fund', (): void => {
+    let payment: OutgoingPayment
+    beforeEach(async (): Promise<void> => {
+      payment = await outgoingPaymentService.create({
+        accountId,
+        paymentPointer,
+        amountToSend: BigInt(123),
+        autoApprove: false
+      })
+      await processNext(payment.id, PaymentState.Funding)
+    }, 10_000)
+
+    it('fails when no payment exists', async (): Promise<void> => {
+      await expect(outgoingPaymentService.fund(uuid())).rejects.toThrow(
+        'payment does not exist'
+      )
+    })
+
+    it('funds a Funding payment', async (): Promise<void> => {
+      await expect(accountingService.getBalance(payment.id)).resolves.toEqual(
+        BigInt(0)
+      )
+      await expect(
+        outgoingPaymentService.fund(payment.id)
+      ).resolves.toMatchObject({
+        id: payment.id,
+        state: PaymentState.Sending
+      })
+
+      const after = await outgoingPaymentService.get(payment.id)
+      assert.ok(after?.quote)
+      expect(after.state).toBe(PaymentState.Sending)
+      await expect(accountingService.getBalance(payment.id)).resolves.toEqual(
+        after.quote.maxSourceAmount
+      )
+    })
+
+    Object.values(PaymentState).forEach((startState) => {
+      if (startState === PaymentState.Funding) return
+      it(`does not fund a ${startState} payment`, async (): Promise<void> => {
+        await payment.$query().patch({ state: startState })
+        await expect(outgoingPaymentService.fund(payment.id)).rejects.toThrow(
+          `Cannot fund; payment is in state=${startState}`
+        )
+
+        const after = await outgoingPaymentService.get(payment.id)
+        expect(after?.state).toBe(startState)
+      })
+    })
+  })
+
   describe('cancel', (): void => {
     let payment: OutgoingPayment
     beforeEach(
