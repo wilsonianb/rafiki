@@ -17,6 +17,7 @@ import * as worker from './worker'
 export interface OutgoingPaymentService {
   get(id: string): Promise<OutgoingPayment | undefined>
   create(options: CreateOutgoingPaymentOptions): Promise<OutgoingPayment>
+  fund(id: string): Promise<OutgoingPayment>
   cancel(id: string): Promise<OutgoingPayment>
   requote(id: string): Promise<OutgoingPayment>
   processNext(): Promise<string | undefined>
@@ -52,6 +53,7 @@ export async function createOutgoingPaymentService(
     get: (id) => getOutgoingPayment(deps, id),
     create: (options: CreateOutgoingPaymentOptions) =>
       createOutgoingPayment(deps, options),
+    fund: (id) => fundPayment(deps, id),
     cancel: (id) => cancelPayment(deps, id),
     requote: (id) => requotePayment(deps, id),
     processNext: () => worker.processPendingPayment(deps),
@@ -162,6 +164,41 @@ function requotePayment(
       throw new Error(`Cannot quote; payment is in state=${payment.state}`)
     }
     await payment.$query(trx).patch({ state: PaymentState.Quoting })
+    return payment
+  })
+}
+
+async function fundPayment(
+  deps: ServiceDependencies,
+  id: string
+): Promise<OutgoingPayment> {
+  return deps.knex.transaction(async (trx) => {
+    const payment = await OutgoingPayment.query(trx)
+      .findById(id)
+      .forUpdate()
+      .withGraphFetched('account.asset')
+    if (!payment) throw new Error('payment does not exist')
+    if (!payment.quote) throw new Error('missing quote')
+    if (payment.state !== PaymentState.Funding) {
+      throw new Error(`Cannot fund; payment is in state=${payment.state}`)
+    }
+    const error = await deps.accountingService.createTransfer({
+      sourceAccount: {
+        asset: {
+          unit: payment.account.asset.unit,
+          account: AssetAccount.Settlement
+        }
+      },
+      destinationAccount: {
+        id: payment.id,
+        asset: payment.account.asset
+      },
+      amount: payment.quote.maxSourceAmount
+    })
+    if (error) {
+      throw new Error(`Cannot fund; error=${error}`)
+    }
+    await payment.$query(trx).patch({ state: PaymentState.Sending })
     return payment
   })
 }
