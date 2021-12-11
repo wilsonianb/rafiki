@@ -29,6 +29,8 @@ import { SPSPRoutes } from './spsp/routes'
 import { InvoiceRoutes } from './open_payments/invoice/routes'
 import { AccountRoutes } from './open_payments/account/routes'
 import { InvoiceService } from './open_payments/invoice/service'
+import { MandateRoutes } from './open_payments/mandate/routes'
+import { MandateService } from './open_payments/mandate/service'
 import { StreamServer } from '@interledger/stream-receiver'
 import { WebhookService } from './webhook/service'
 import { OutgoingPaymentService } from './outgoing_payment/service'
@@ -71,6 +73,8 @@ export interface AppServices {
   invoiceRoutes: Promise<InvoiceRoutes>
   accountRoutes: Promise<AccountRoutes>
   invoiceService: Promise<InvoiceService>
+  mandateRoutes: Promise<MandateRoutes>
+  mandateService: Promise<MandateService>
   streamServer: Promise<StreamServer>
   webhookService: Promise<WebhookService>
   outgoingPaymentService: Promise<OutgoingPaymentService>
@@ -142,6 +146,9 @@ export class App {
       }
       for (let i = 0; i < this.config.deactivateInvoiceWorkers; i++) {
         process.nextTick(() => this.deactivateInvoice())
+      }
+      for (let i = 0; i < this.config.mandateWorkers; i++) {
+        process.nextTick(() => this.processMandate())
       }
     }
   }
@@ -232,6 +239,7 @@ export class App {
     const spspRoutes = await this.container.use('spspRoutes')
     const accountRoutes = await this.container.use('accountRoutes')
     const invoiceRoutes = await this.container.use('invoiceRoutes')
+    const mandateRoutes = await this.container.use('mandateRoutes')
     this.publicRouter.get(
       '/pay/:accountId',
       async (ctx: AppContext): Promise<void> => {
@@ -246,6 +254,9 @@ export class App {
 
     this.publicRouter.get('/invoices/:invoiceId', invoiceRoutes.get)
     this.publicRouter.post('/pay/:accountId/invoices', invoiceRoutes.create)
+
+    this.publicRouter.get('/mandates/:mandateId', mandateRoutes.get)
+    this.publicRouter.post('/:accountId/mandates', mandateRoutes.create)
 
     this.koa.use(this.publicRouter.middleware())
   }
@@ -285,6 +296,24 @@ export class App {
           setTimeout(
             () => this.deactivateInvoice(),
             this.config.deactivateInvoiceWorkerIdle
+          ).unref()
+      })
+  }
+
+  private async processMandate(): Promise<void> {
+    const mandateService = await this.container.use('mandateService')
+    return mandateService
+      .processNext()
+      .catch((err) => {
+        this.logger.warn({ error: err.message }, 'processMandate error')
+        return true
+      })
+      .then((hasMoreWork) => {
+        if (hasMoreWork) process.nextTick(() => this.processMandate())
+        else
+          setTimeout(
+            () => this.processMandate(),
+            this.config.mandateWorkerIdle
           ).unref()
       })
   }
