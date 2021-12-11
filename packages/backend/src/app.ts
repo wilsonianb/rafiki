@@ -28,6 +28,7 @@ import { RatesService } from './rates/service'
 import { SPSPRoutes } from './spsp/routes'
 import { InvoiceRoutes } from './open_payments/invoice/routes'
 import { AccountRoutes } from './open_payments/account/routes'
+import { GrantService } from './open_payments/grant/service'
 import { InvoiceService } from './open_payments/invoice/service'
 import { StreamServer } from '@interledger/stream-receiver'
 import { WebhookService } from './webhook/service'
@@ -70,6 +71,7 @@ export interface AppServices {
   spspRoutes: Promise<SPSPRoutes>
   invoiceRoutes: Promise<InvoiceRoutes>
   accountRoutes: Promise<AccountRoutes>
+  grantService: Promise<GrantService>
   invoiceService: Promise<InvoiceService>
   streamServer: Promise<StreamServer>
   webhookService: Promise<WebhookService>
@@ -142,6 +144,9 @@ export class App {
       }
       for (let i = 0; i < this.config.invoiceWorkers; i++) {
         process.nextTick(() => this.processInvoice())
+      }
+      for (let i = 0; i < this.config.grantWorkers; i++) {
+        process.nextTick(() => this.processGrant())
       }
     }
   }
@@ -285,6 +290,24 @@ export class App {
           setTimeout(
             () => this.processInvoice(),
             this.config.invoiceWorkerIdle
+          ).unref()
+      })
+  }
+
+  private async processGrant(): Promise<void> {
+    const grantService = await this.container.use('grantService')
+    return grantService
+      .processNext()
+      .catch((err) => {
+        this.logger.warn({ error: err.message }, 'processGrant error')
+        return true
+      })
+      .then((hasMoreWork) => {
+        if (hasMoreWork) process.nextTick(() => this.processGrant())
+        else
+          setTimeout(
+            () => this.processGrant(),
+            this.config.grantWorkerIdle
           ).unref()
       })
   }
