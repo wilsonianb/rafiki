@@ -27,6 +27,8 @@ import { createSPSPRoutes } from './spsp/routes'
 import { createAccountRoutes } from './open_payments/account/routes'
 import { createInvoiceRoutes } from './open_payments/invoice/routes'
 import { createInvoiceService } from './open_payments/invoice/service'
+import { createMandateRoutes } from './open_payments/mandate/routes'
+import { createMandateService } from './open_payments/mandate/service'
 import { StreamServer } from '@interledger/stream-receiver'
 import { createWebhookService } from './webhook/service'
 import { createConnectorService } from './connector'
@@ -201,6 +203,19 @@ export function initIocContainer(
     return createAccountRoutes({
       config: await deps.use('config'),
       accountService: await deps.use('accountService')
+    })
+  })
+  container.singleton('mandateService', async (deps) => {
+    return await createMandateService({
+      logger: await deps.use('logger'),
+      knex: await deps.use('knex')
+    })
+  })
+  container.singleton('mandateRoutes', async (deps) => {
+    return createMandateRoutes({
+      config: await deps.use('config'),
+      logger: await deps.use('logger'),
+      mandateService: await deps.use('mandateService')
     })
   })
 
