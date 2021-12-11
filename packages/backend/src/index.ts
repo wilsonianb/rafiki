@@ -25,6 +25,7 @@ import { createPeerService } from './peer/service'
 import { createAccountService } from './open_payments/account/service'
 import { createSPSPRoutes } from './spsp/routes'
 import { createAccountRoutes } from './open_payments/account/routes'
+import { createGrantService } from './open_payments/grant/service'
 import { createInvoiceRoutes } from './open_payments/invoice/routes'
 import { createInvoiceService } from './open_payments/invoice/service'
 import { StreamServer } from '@interledger/stream-receiver'
@@ -201,6 +202,13 @@ export function initIocContainer(
     return createAccountRoutes({
       config: await deps.use('config'),
       accountService: await deps.use('accountService')
+    })
+  })
+  container.singleton('grantService', async (deps) => {
+    return await createGrantService({
+      logger: await deps.use('logger'),
+      knex: await deps.use('knex'),
+      ratesService: await deps.use('ratesService')
     })
   })
 
