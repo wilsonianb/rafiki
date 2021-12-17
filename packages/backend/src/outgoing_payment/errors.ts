@@ -13,10 +13,13 @@ export type PaymentError = LifecycleError | Pay.PaymentError
 
 export enum LifecycleError {
   QuoteExpired = 'QuoteExpired',
+  InsufficientMandate = 'InsufficientMandate',
   // Rate fetch failed.
   PricesUnavailable = 'PricesUnavailable',
   // Payment aborted via "cancel payment" API call.
   CancelledByAPI = 'CancelledByAPI',
+  // Payment aborted via "cancel mandate" API call.
+  CancelledByMandate = 'CancelledByMandate',
   // Edge error due to retries, partial payment, and database write errors.
   BadState = 'BadState',
 

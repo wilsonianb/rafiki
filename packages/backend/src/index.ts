@@ -25,6 +25,7 @@ import { createPeerService } from './peer/service'
 import { createAccountService } from './open_payments/account/service'
 import { createSPSPRoutes } from './spsp/routes'
 import { createAccountRoutes } from './open_payments/account/routes'
+import { createChargeRoutes } from './open_payments/charge/routes'
 import { createInvoiceRoutes } from './open_payments/invoice/routes'
 import { createInvoiceService } from './open_payments/invoice/service'
 import { createMandateRoutes } from './open_payments/mandate/routes'
@@ -208,7 +209,8 @@ export function initIocContainer(
   container.singleton('mandateService', async (deps) => {
     return await createMandateService({
       logger: await deps.use('logger'),
-      knex: await deps.use('knex')
+      knex: await deps.use('knex'),
+      outgoingPaymentService: await deps.use('outgoingPaymentService')
     })
   })
   container.singleton('mandateRoutes', async (deps) => {
@@ -252,8 +254,17 @@ export function initIocContainer(
       accountingService: await deps.use('accountingService'),
       makeIlpPlugin: await deps.use('makeIlpPlugin'),
       accountService: await deps.use('accountService'),
+      mandateService: await deps.use('mandateService'),
       ratesService: await deps.use('ratesService'),
       webhookService: await deps.use('webhookService')
+    })
+  })
+
+  container.singleton('chargeRoutes', async (deps) => {
+    return createChargeRoutes({
+      config: await deps.use('config'),
+      logger: await deps.use('logger'),
+      outgoingPaymentService: await deps.use('outgoingPaymentService')
     })
   })
 

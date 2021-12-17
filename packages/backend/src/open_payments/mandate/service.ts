@@ -1,8 +1,9 @@
 import { parse, end } from 'iso8601-duration'
-import { ForeignKeyViolationError, TransactionOrKnex } from 'objection'
+import { ForeignKeyViolationError, TransactionOrKnex, raw } from 'objection'
 
 import { CreateError, RevokeError } from './errors'
 import { Mandate } from './model'
+import { OutgoingPaymentService } from '../../outgoing_payment/service'
 import { BaseService } from '../../shared/baseService'
 import { Pagination } from '../../shared/pagination'
 
@@ -25,10 +26,12 @@ export interface MandateService {
   ): Promise<Mandate[]>
   processNext(): Promise<string | undefined>
   revoke(id: string): Promise<Mandate | RevokeError>
+  charge(id: string, amount: bigint, trx?: TransactionOrKnex): Promise<Mandate>
 }
 
 interface ServiceDependencies extends BaseService {
   knex: TransactionOrKnex
+  outgoingPaymentService: OutgoingPaymentService
 }
 
 export async function createMandateService(
@@ -47,7 +50,8 @@ export async function createMandateService(
     getAccountMandatesPage: (accountId, pagination) =>
       getAccountMandatesPage(deps, accountId, pagination),
     processNext: () => processNextMandate(deps),
-    revoke: (id) => revokeMandate(deps, id)
+    revoke: (id) => revokeMandate(deps, id),
+    charge: (id, amount, trx) => chargeMandate(deps, id, amount, trx)
   }
 }
 
@@ -133,6 +137,7 @@ async function processNextMandate(
         processAt: null,
         balance: BigInt(0)
       })
+      await deps.outgoingPaymentService.cancelMandatePayments(mandate.id, trx)
     } else {
       deps.logger.trace({ mandate: mandate.id }, 'starting mandate interval')
       await mandate.$query(trx).patch({
@@ -165,6 +170,25 @@ async function revokeMandate(
     })
     return mandate
   })
+}
+
+async function chargeMandate(
+  deps: ServiceDependencies,
+  id: string,
+  amount: bigint,
+  trx?: TransactionOrKnex
+): Promise<Mandate> {
+  try {
+    return await Mandate.query(trx || deps.knex)
+      .where('id', id)
+      .andWhere('balance', '>=', amount.toString())
+      .patch({ balance: raw(`balance - ${amount.toString()}`) })
+      .returning('*')
+      .first()
+  } catch (err) {
+    console.log(err)
+    throw err
+  }
 }
 
 function getIntervalEnd(mandate: Mandate): Date | undefined {

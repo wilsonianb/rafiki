@@ -19,6 +19,9 @@ import { isTransferError } from '../accounting/errors'
 import { AccountingService, TransferOptions } from '../accounting/service'
 import { AssetOptions } from '../asset/service'
 import { Invoice } from '../open_payments/invoice/model'
+import { isCreateError } from '../open_payments/mandate/errors'
+import { Mandate } from '../open_payments/mandate/model'
+import { MandateService } from '../open_payments/mandate/service'
 import { RatesService } from '../rates/service'
 import { EventType } from '../webhook/service'
 
@@ -28,6 +31,7 @@ describe('OutgoingPaymentService', (): void => {
   let outgoingPaymentService: OutgoingPaymentService
   let ratesService: RatesService
   let accountingService: AccountingService
+  let mandateService: MandateService
   let knex: Knex
   let accountId: string
   let asset: AssetOptions
@@ -189,6 +193,7 @@ describe('OutgoingPaymentService', (): void => {
       deps = await initIocContainer(Config)
       appContainer = await createTestApp(deps)
       accountingService = await deps.use('accountingService')
+      mandateService = await deps.use('mandateService')
       ratesService = await deps.use('ratesService')
 
       asset = {
@@ -256,6 +261,20 @@ describe('OutgoingPaymentService', (): void => {
   })
 
   describe('create', (): void => {
+    let mandate: Mandate
+
+    beforeEach(
+      async (): Promise<void> => {
+        mandate = (await mandateService.create({
+          accountId,
+          amount: BigInt(100),
+          assetCode: asset.code,
+          assetScale: asset.scale
+        })) as Mandate
+        assert.ok(!isCreateError(mandate))
+      }
+    )
+
     it('creates an OutgoingPayment (FixedSend)', async () => {
       const payment = await outgoingPaymentService.create({
         accountId,
@@ -306,6 +325,24 @@ describe('OutgoingPaymentService', (): void => {
       expect(payment2.id).toEqual(payment.id)
     })
 
+    it('creates an OutgoingPayment (Mandate Charge)', async () => {
+      const payment = await outgoingPaymentService.create({
+        mandateId: mandate.id,
+        invoiceUrl
+      })
+      expect(payment.state).toEqual(PaymentState.Quoting)
+      expect(payment.intent).toEqual({
+        invoiceUrl
+      })
+      expect(payment.accountId).toBe(accountId)
+      expect(payment.mandateId).toBe(mandate.id)
+      await expectOutcome(payment, { accountBalance: BigInt(0) })
+
+      await expect(outgoingPaymentService.get(payment.id)).resolves.toEqual(
+        payment
+      )
+    })
+
     it('fails to create with nonexistent account', async () => {
       await expect(
         outgoingPaymentService.create({
@@ -314,6 +351,57 @@ describe('OutgoingPaymentService', (): void => {
           amountToSend: BigInt(123)
         })
       ).rejects.toThrow('outgoing payment account does not exist')
+    })
+
+    it('fails to create with nonexistent mandate', async () => {
+      await expect(
+        outgoingPaymentService.create({
+          mandateId: uuid(),
+          invoiceUrl
+        })
+      ).rejects.toThrow('outgoing payment mandate does not exist')
+    })
+
+    it('fails to create with revoked mandate', async () => {
+      await mandateService.revoke(mandate.id)
+      await expect(
+        outgoingPaymentService.create({
+          mandateId: mandate.id,
+          invoiceUrl
+        })
+      ).rejects.toThrow('outgoing payment mandate is revoked')
+    })
+
+    it('fails to create with expired mandate', async () => {
+      await mandate.$query(knex).patch({ expiresAt: new Date(Date.now() - 1) })
+      await expect(
+        outgoingPaymentService.create({
+          mandateId: mandate.id,
+          invoiceUrl
+        })
+      ).rejects.toThrow('outgoing payment mandate is expired')
+    })
+
+    it('fails to create with inactive mandate', async () => {
+      await mandate
+        .$query(knex)
+        .patch({ startAt: new Date(Date.now() + 30_000) })
+      await expect(
+        outgoingPaymentService.create({
+          mandateId: mandate.id,
+          invoiceUrl
+        })
+      ).rejects.toThrow('outgoing payment mandate is not active')
+    })
+
+    it('fails to create with zero balance mandate', async () => {
+      await mandate.$query(knex).patch({ balance: BigInt(0) })
+      await expect(
+        outgoingPaymentService.create({
+          mandateId: mandate.id,
+          invoiceUrl
+        })
+      ).rejects.toThrow('outgoing payment mandate has zero balance')
     })
   })
 
@@ -376,6 +464,42 @@ describe('OutgoingPaymentService', (): void => {
         expect(payment.quote.highExchangeRateEstimate.valueOf()).toBe(
           0.500000000001
         )
+      })
+
+      it('Funding (Mandate Charge)', async (): Promise<void> => {
+        const mandate = (await mandateService.create({
+          accountId,
+          amount: BigInt(200),
+          assetCode: asset.code,
+          assetScale: asset.scale
+        })) as Mandate
+        assert.ok(!isCreateError(mandate))
+
+        const paymentId = (
+          await outgoingPaymentService.create({
+            mandateId: mandate.id,
+            invoiceUrl
+          })
+        ).id
+        const payment = await processNext(paymentId, PaymentState.Funding)
+        if (!payment.quote) throw 'no quote'
+
+        expect(payment.quote.targetType).toBe(Pay.PaymentType.FixedDelivery)
+        expect(payment.quote.minDeliveryAmount).toBe(BigInt(56))
+        expect(payment.quote.maxSourceAmount).toBe(
+          BigInt(Math.ceil(56 * 2 * (1 + config.slippage)))
+        )
+        expect(payment.quote.minExchangeRate.valueOf()).toBe(
+          0.5 * (1 - config.slippage)
+        )
+        expect(payment.quote.lowExchangeRateEstimate.valueOf()).toBe(0.5)
+        expect(payment.quote.highExchangeRateEstimate.valueOf()).toBe(
+          0.500000000001
+        )
+
+        await expect(mandateService.get(mandate.id)).resolves.toMatchObject({
+          balance: mandate.balance - payment.quote.maxSourceAmount
+        })
       })
 
       it('Quoting (rate service error)', async (): Promise<void> => {
@@ -476,6 +600,30 @@ describe('OutgoingPaymentService', (): void => {
         ).id
         await payInvoice(invoice.amount)
         await processNext(paymentId, PaymentState.Completed)
+      })
+
+      it('Cancelled (insufficient mandate balance)', async (): Promise<void> => {
+        const mandate = (await mandateService.create({
+          accountId,
+          amount: BigInt(1),
+          assetCode: asset.code,
+          assetScale: asset.scale
+        })) as Mandate
+        assert.ok(!isCreateError(mandate))
+
+        const paymentId = (
+          await outgoingPaymentService.create({
+            mandateId: mandate.id,
+            invoiceUrl
+          })
+        ).id
+        await processNext(
+          paymentId,
+          PaymentState.Cancelled,
+          LifecycleError.InsufficientMandate
+        )
+
+        await expect(mandateService.get(mandate.id)).resolves.toEqual(mandate)
       })
 
       it('Cancelled (destination asset changed)', async (): Promise<void> => {
