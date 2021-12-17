@@ -4,9 +4,15 @@ import { v4 as uuid } from 'uuid'
 
 import { BaseService } from '../shared/baseService'
 import { CreateError, LifecycleError, OutgoingPaymentError } from './errors'
-import { OutgoingPayment, PaymentIntent, PaymentState } from './model'
+import {
+  InvoiceIntent,
+  OutgoingPayment,
+  PaymentIntent,
+  PaymentState
+} from './model'
 import { AccountingService } from '../accounting/service'
 import { AccountService } from '../open_payments/account/service'
+import { MandateService } from '../open_payments/mandate/service'
 import { RatesService } from '../rates/service'
 import { WebhookService } from '../webhook/service'
 import { IlpPlugin, IlpPluginOptions } from './ilp_plugin'
@@ -22,6 +28,10 @@ export interface OutgoingPaymentService {
     options: FundOutgoingPaymentOptions
   ): Promise<OutgoingPayment | OutgoingPaymentError>
   cancel(id: string): Promise<OutgoingPayment | OutgoingPaymentError>
+  cancelMandatePayments(
+    mandateId: string,
+    trx: TransactionOrKnex
+  ): Promise<void>
   requote(id: string): Promise<OutgoingPayment | OutgoingPaymentError>
   processNext(): Promise<string | undefined>
   getAccountPage(
@@ -41,6 +51,7 @@ export interface ServiceDependencies extends BaseService {
   quoteLifespan: number // milliseconds
   accountingService: AccountingService
   accountService: AccountService
+  mandateService: MandateService
   ratesService: RatesService
   webhookService: WebhookService
   makeIlpPlugin: (options: IlpPluginOptions) => IlpPlugin
@@ -59,6 +70,8 @@ export async function createOutgoingPaymentService(
       createOutgoingPayment(deps, options),
     fund: (options) => fundPayment(deps, options),
     cancel: (id) => cancelPayment(deps, id),
+    cancelMandatePayments: (mandateId, trx) =>
+      cancelMandatePayments(deps, mandateId, trx),
     requote: (id) => requotePayment(deps, id),
     processNext: () => worker.processPendingPayment(deps),
     getAccountPage: (accountId, pagination) =>
@@ -72,18 +85,41 @@ async function getOutgoingPayment(
 ): Promise<OutgoingPayment | undefined> {
   return OutgoingPayment.query(deps.knex)
     .findById(id)
-    .withGraphJoined('account.asset')
+    .withGraphJoined('[account.asset, mandate]')
 }
 
-export type CreateOutgoingPaymentOptions = PaymentIntent & {
-  accountId: string
-}
+export type CreateOutgoingPaymentOptions =
+  | (InvoiceIntent & {
+      accountId?: never
+      mandateId?: string
+    })
+  | (PaymentIntent & {
+      accountId: string
+      mandateId?: never
+    })
 
 // TODO ensure this is idempotent/safe for fixed send payments
 async function createOutgoingPayment(
   deps: ServiceDependencies,
   options: CreateOutgoingPaymentOptions
 ): Promise<OutgoingPayment | CreateError> {
+  let accountId: string
+  if (options.mandateId) {
+    const mandate = await deps.mandateService.get(options.mandateId)
+    if (!mandate) return CreateError.UnknownMandate
+    const now = new Date()
+    if (
+      mandate.revoked ||
+      (mandate.expiresAt && mandate.expiresAt <= now) ||
+      (mandate.startAt && mandate.startAt > now) ||
+      mandate.balance === BigInt(0)
+    ) {
+      return CreateError.InvalidMandate
+    }
+    accountId = mandate.accountId
+  } else if (options.accountId) {
+    accountId = options.accountId
+  }
   try {
     return await OutgoingPayment.transaction(deps.knex, async (trx) => {
       const payment = await OutgoingPayment.query(trx)
@@ -94,10 +130,11 @@ async function createOutgoingPayment(
             invoiceUrl: options.invoiceUrl,
             amountToSend: options.amountToSend
           },
-          accountId: options.accountId,
+          accountId,
+          mandateId: options.mandateId,
           destinationAccount: PLACEHOLDER_DESTINATION
         })
-        .withGraphFetched('account.asset')
+        .withGraphFetched('[account.asset, mandate]')
 
       const plugin = deps.makeIlpPlugin({
         sourceAccount: {
@@ -214,6 +251,26 @@ async function cancelPayment(
     )
     return payment
   })
+}
+
+async function cancelMandatePayments(
+  deps: ServiceDependencies,
+  mandateId: string,
+  trx: TransactionOrKnex
+): Promise<void> {
+  const payments = await OutgoingPayment.query(trx)
+    .where({ mandateId })
+    .forUpdate()
+  for (const payment of payments) {
+    await lifecycle.handleCancelled(
+      {
+        ...deps,
+        knex: trx
+      },
+      payment,
+      LifecycleError.CancelledByMandate
+    )
+  }
 }
 
 interface Pagination {

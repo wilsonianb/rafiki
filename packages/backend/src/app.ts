@@ -29,6 +29,7 @@ import { SPSPRoutes } from './spsp/routes'
 import { InvoiceRoutes } from './open_payments/invoice/routes'
 import { AccountRoutes } from './open_payments/account/routes'
 import { InvoiceService } from './open_payments/invoice/service'
+import { ChargeRoutes } from './open_payments/charge/routes'
 import { MandateRoutes } from './open_payments/mandate/routes'
 import { MandateService } from './open_payments/mandate/service'
 import { StreamServer } from '@interledger/stream-receiver'
@@ -73,6 +74,7 @@ export interface AppServices {
   invoiceRoutes: Promise<InvoiceRoutes>
   accountRoutes: Promise<AccountRoutes>
   invoiceService: Promise<InvoiceService>
+  chargeRoutes: Promise<ChargeRoutes>
   mandateRoutes: Promise<MandateRoutes>
   mandateService: Promise<MandateService>
   streamServer: Promise<StreamServer>

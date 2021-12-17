@@ -103,6 +103,17 @@ export async function handleQuoting(
     throw LifecycleError.MissingBalance
   }
 
+  if (payment.mandateId) {
+    const mandate = await deps.mandateService.charge(
+      payment.mandateId,
+      quote.maxSourceAmount,
+      deps.knex
+    )
+    if (!mandate) {
+      throw LifecycleError.InsufficientMandate
+    }
+  }
+
   const state =
     balance < quote.maxSourceAmount
       ? PaymentState.Funding
