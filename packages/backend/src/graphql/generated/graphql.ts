@@ -135,12 +135,15 @@ export type CreateAssetLiquidityWithdrawalInput = {
   id: Scalars['String'];
 };
 
+export type CreateOutgoingInvoicePaymentInput = {
+  accountId: Scalars['String'];
+  invoiceUrl: Scalars['String'];
+};
+
 export type CreateOutgoingPaymentInput = {
   accountId: Scalars['String'];
-  paymentPointer?: Maybe<Scalars['String']>;
-  amountToSend?: Maybe<Scalars['UInt64']>;
-  invoiceUrl?: Maybe<Scalars['String']>;
-  autoApprove: Scalars['Boolean'];
+  paymentPointer: Scalars['String'];
+  amountToSend: Scalars['UInt64'];
 };
 
 export type CreatePeerInput = {
@@ -259,6 +262,7 @@ export type LiquidityMutationResponse = MutationResponse & {
 export type Mutation = {
   __typename?: 'Mutation';
   createOutgoingPayment: OutgoingPaymentResponse;
+  createOutgoingInvoicePayment: OutgoingPaymentResponse;
   createAccount: CreateAccountMutationResponse;
   /** Create peer */
   createPeer: CreatePeerMutationResponse;
@@ -297,6 +301,11 @@ export type Mutation = {
 
 export type MutationCreateOutgoingPaymentArgs = {
   input: CreateOutgoingPaymentInput;
+};
+
+
+export type MutationCreateOutgoingInvoicePaymentArgs = {
+  input: CreateOutgoingInvoicePaymentInput;
 };
 
 
@@ -458,7 +467,6 @@ export type PaymentIntent = {
   paymentPointer?: Maybe<Scalars['String']>;
   amountToSend?: Maybe<Scalars['UInt64']>;
   invoiceUrl?: Maybe<Scalars['String']>;
-  autoApprove: Scalars['Boolean'];
 };
 
 export type PaymentQuote = {
@@ -710,6 +718,7 @@ export type ResolversTypes = {
   CreateApiKeyInput: ResolverTypeWrapper<Partial<CreateApiKeyInput>>;
   CreateApiKeyMutationResponse: ResolverTypeWrapper<Partial<CreateApiKeyMutationResponse>>;
   CreateAssetLiquidityWithdrawalInput: ResolverTypeWrapper<Partial<CreateAssetLiquidityWithdrawalInput>>;
+  CreateOutgoingInvoicePaymentInput: ResolverTypeWrapper<Partial<CreateOutgoingInvoicePaymentInput>>;
   CreateOutgoingPaymentInput: ResolverTypeWrapper<Partial<CreateOutgoingPaymentInput>>;
   CreatePeerInput: ResolverTypeWrapper<Partial<CreatePeerInput>>;
   CreatePeerLiquidityWithdrawalInput: ResolverTypeWrapper<Partial<CreatePeerLiquidityWithdrawalInput>>;
@@ -778,6 +787,7 @@ export type ResolversParentTypes = {
   CreateApiKeyInput: Partial<CreateApiKeyInput>;
   CreateApiKeyMutationResponse: Partial<CreateApiKeyMutationResponse>;
   CreateAssetLiquidityWithdrawalInput: Partial<CreateAssetLiquidityWithdrawalInput>;
+  CreateOutgoingInvoicePaymentInput: Partial<CreateOutgoingInvoicePaymentInput>;
   CreateOutgoingPaymentInput: Partial<CreateOutgoingPaymentInput>;
   CreatePeerInput: Partial<CreatePeerInput>;
   CreatePeerLiquidityWithdrawalInput: Partial<CreatePeerLiquidityWithdrawalInput>;
@@ -951,6 +961,7 @@ export type LiquidityMutationResponseResolvers<ContextType = any, ParentType ext
 
 export type MutationResolvers<ContextType = any, ParentType extends ResolversParentTypes['Mutation'] = ResolversParentTypes['Mutation']> = {
   createOutgoingPayment?: Resolver<ResolversTypes['OutgoingPaymentResponse'], ParentType, ContextType, RequireFields<MutationCreateOutgoingPaymentArgs, 'input'>>;
+  createOutgoingInvoicePayment?: Resolver<ResolversTypes['OutgoingPaymentResponse'], ParentType, ContextType, RequireFields<MutationCreateOutgoingInvoicePaymentArgs, 'input'>>;
   createAccount?: Resolver<ResolversTypes['CreateAccountMutationResponse'], ParentType, ContextType, RequireFields<MutationCreateAccountArgs, 'input'>>;
   createPeer?: Resolver<ResolversTypes['CreatePeerMutationResponse'], ParentType, ContextType, RequireFields<MutationCreatePeerArgs, 'input'>>;
   updatePeer?: Resolver<ResolversTypes['UpdatePeerMutationResponse'], ParentType, ContextType, RequireFields<MutationUpdatePeerArgs, 'input'>>;
@@ -1035,7 +1046,6 @@ export type PaymentIntentResolvers<ContextType = any, ParentType extends Resolve
   paymentPointer?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   amountToSend?: Resolver<Maybe<ResolversTypes['UInt64']>, ParentType, ContextType>;
   invoiceUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
-  autoApprove?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
