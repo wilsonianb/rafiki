@@ -12,12 +12,19 @@ const ratioFields = [
   'quoteHighExchangeRateEstimate'
 ]
 
-export type PaymentIntent = {
-  paymentPointer?: string
-  invoiceUrl?: string
-  amountToSend?: bigint
-  autoApprove: boolean
+export interface FixedSendIntent {
+  paymentPointer: string
+  invoiceUrl?: never
+  amountToSend: bigint
 }
+
+export interface InvoiceIntent {
+  paymentPointer?: never
+  invoiceUrl: string
+  amountToSend?: never
+}
+
+export type PaymentIntent = FixedSendIntent | InvoiceIntent
 
 export class OutgoingPayment extends BaseModel {
   public static readonly tableName = 'outgoingPayments'
@@ -29,7 +36,11 @@ export class OutgoingPayment extends BaseModel {
   // The "| null" is necessary so that `$beforeUpdate` can modify a patch to remove the webhookId. If `$beforeUpdate` set `webhookId = undefined`, the patch would ignore the modification.
   public webhookId?: string | null
 
-  public intent!: PaymentIntent
+  public intent!: {
+    paymentPointer?: string
+    invoiceUrl?: string
+    amountToSend?: bigint
+  }
 
   public quote?: {
     timestamp: Date

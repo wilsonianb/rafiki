@@ -4,6 +4,7 @@ import { getAccountInvoices, getPageInfo } from './invoice'
 import {
   getOutgoingPayment,
   createOutgoingPayment,
+  createOutgoingInvoicePayment,
   getOutcome,
   getAccountOutgoingPayments,
   getOutgoingPaymentPageInfo
@@ -56,6 +57,7 @@ export const resolvers: Resolvers = {
   Mutation: {
     createAccount,
     createOutgoingPayment,
+    createOutgoingInvoicePayment,
     createApiKey: createApiKey,
     redeemApiKey: redeemApiKey,
     deleteAllApiKeys: deleteAllApiKeys,
