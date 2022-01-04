@@ -1,6 +1,7 @@
 import { Pojo, Model, ModelOptions, QueryContext } from 'objection'
 import * as Pay from '@interledger/pay'
 import { Account } from '../open_payments/account/model'
+import { Mandate } from '../open_payments/mandate/model'
 import { BaseModel } from '../shared/baseModel'
 
 const fieldPrefixes = ['intent', 'quote', 'destinationAccount', 'outcome']
@@ -11,12 +12,19 @@ const ratioFields = [
   'quoteHighExchangeRateEstimate'
 ]
 
-export type PaymentIntent = {
-  paymentPointer?: string
-  invoiceUrl?: string
-  amountToSend?: bigint
-  autoApprove: boolean
+export interface FixedSendIntent {
+  paymentPointer: string
+  invoiceUrl?: never
+  amountToSend: bigint
 }
+
+export interface InvoiceIntent {
+  paymentPointer?: never
+  invoiceUrl: string
+  amountToSend?: never
+}
+
+export type PaymentIntent = FixedSendIntent | InvoiceIntent
 
 export class OutgoingPayment extends BaseModel {
   public static readonly tableName = 'outgoingPayments'
@@ -26,7 +34,11 @@ export class OutgoingPayment extends BaseModel {
   public error?: string | null
   public stateAttempts!: number
 
-  public intent!: PaymentIntent
+  public intent!: {
+    paymentPointer?: string
+    invoiceUrl?: string
+    amountToSend?: bigint
+  }
 
   public quote?: {
     timestamp: Date
@@ -46,6 +58,8 @@ export class OutgoingPayment extends BaseModel {
   // Open payments account id of the sender
   public accountId!: string
   public account!: Account
+  public mandateId?: string
+  public mandate?: Mandate
   public destinationAccount!: {
     scale: number
     code: string
@@ -59,6 +73,14 @@ export class OutgoingPayment extends BaseModel {
       join: {
         from: 'outgoingPayments.accountId',
         to: 'accounts.id'
+      }
+    },
+    mandate: {
+      relation: Model.BelongsToOneRelation,
+      modelClass: Mandate,
+      join: {
+        from: 'outgoingPayments.mandateId',
+        to: 'mandates.id'
       }
     }
   }

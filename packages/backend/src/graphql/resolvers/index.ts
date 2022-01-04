@@ -2,8 +2,14 @@ import { Resolvers } from '../generated/graphql'
 import { getAccount, createAccount } from './account'
 import { getAccountInvoices, getPageInfo } from './invoice'
 import {
+  getAccountMandates,
+  getMandatePageInfo,
+  revokeMandate
+} from './mandate'
+import {
   getOutgoingPayment,
   createOutgoingPayment,
+  createOutgoingInvoicePayment,
   requoteOutgoingPayment,
   fundOutgoingPayment,
   cancelOutgoingPayment,
@@ -25,6 +31,9 @@ import {
   addPeerLiquidity,
   createAssetLiquidityWithdrawal,
   createPeerLiquidityWithdrawal,
+  createAccountWithdrawal,
+  createInvoiceWithdrawal,
+  createOutgoingPaymentWithdrawal,
   finalizeLiquidityWithdrawal,
   rollbackLiquidityWithdrawal
 } from './liquidity'
@@ -41,10 +50,14 @@ export const resolvers: Resolvers = {
   },
   Account: {
     invoices: getAccountInvoices,
+    mandates: getAccountMandates,
     outgoingPayments: getAccountOutgoingPayments
   },
   InvoiceConnection: {
     pageInfo: getPageInfo
+  },
+  MandateConnection: {
+    pageInfo: getMandatePageInfo
   },
   OutgoingPaymentConnection: {
     pageInfo: getOutgoingPaymentPageInfo
@@ -58,6 +71,7 @@ export const resolvers: Resolvers = {
   Mutation: {
     createAccount,
     createOutgoingPayment,
+    createOutgoingInvoicePayment,
     requoteOutgoingPayment,
     fundOutgoingPayment,
     cancelOutgoingPayment,
@@ -73,7 +87,11 @@ export const resolvers: Resolvers = {
     addPeerLiquidity: addPeerLiquidity,
     createAssetLiquidityWithdrawal: createAssetLiquidityWithdrawal,
     createPeerLiquidityWithdrawal: createPeerLiquidityWithdrawal,
+    createAccountWithdrawal,
+    createInvoiceWithdrawal,
+    createOutgoingPaymentWithdrawal,
     finalizeLiquidityWithdrawal: finalizeLiquidityWithdrawal,
-    rollbackLiquidityWithdrawal: rollbackLiquidityWithdrawal
+    rollbackLiquidityWithdrawal: rollbackLiquidityWithdrawal,
+    revokeMandate: revokeMandate
   }
 }
