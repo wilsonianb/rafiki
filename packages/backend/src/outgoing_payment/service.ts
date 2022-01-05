@@ -28,10 +28,6 @@ export interface OutgoingPaymentService {
     options: FundOutgoingPaymentOptions
   ): Promise<OutgoingPayment | OutgoingPaymentError>
   cancel(id: string): Promise<OutgoingPayment | OutgoingPaymentError>
-  cancelMandatePayments(
-    mandateId: string,
-    trx: TransactionOrKnex
-  ): Promise<void>
   requote(id: string): Promise<OutgoingPayment | OutgoingPaymentError>
   processNext(): Promise<string | undefined>
   getAccountPage(
@@ -70,8 +66,6 @@ export async function createOutgoingPaymentService(
       createOutgoingPayment(deps, options),
     fund: (options) => fundPayment(deps, options),
     cancel: (id) => cancelPayment(deps, id),
-    cancelMandatePayments: (mandateId, trx) =>
-      cancelMandatePayments(deps, mandateId, trx),
     requote: (id) => requotePayment(deps, id),
     processNext: () => worker.processPendingPayment(deps),
     getAccountPage: (accountId, pagination) =>
@@ -107,13 +101,7 @@ async function createOutgoingPayment(
   if (options.mandateId) {
     const mandate = await deps.mandateService.get(options.mandateId)
     if (!mandate) return CreateError.UnknownMandate
-    const now = new Date()
-    if (
-      mandate.revoked ||
-      (mandate.expiresAt && mandate.expiresAt <= now) ||
-      (mandate.startAt && mandate.startAt > now) ||
-      mandate.balance === BigInt(0)
-    ) {
+    if (!mandate.isActive()) {
       return CreateError.InvalidMandate
     }
     accountId = mandate.accountId
@@ -251,26 +239,6 @@ async function cancelPayment(
     )
     return payment
   })
-}
-
-async function cancelMandatePayments(
-  deps: ServiceDependencies,
-  mandateId: string,
-  trx: TransactionOrKnex
-): Promise<void> {
-  const payments = await OutgoingPayment.query(trx)
-    .where({ mandateId })
-    .forUpdate()
-  for (const payment of payments) {
-    await lifecycle.handleCancelled(
-      {
-        ...deps,
-        knex: trx
-      },
-      payment,
-      LifecycleError.CancelledByMandate
-    )
-  }
 }
 
 interface Pagination {

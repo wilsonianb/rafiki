@@ -1,4 +1,5 @@
 import * as Pay from '@interledger/pay'
+import { raw } from 'objection'
 
 import { LifecycleError } from './errors'
 import { OutgoingPayment, PaymentState } from './model'
@@ -104,14 +105,21 @@ export async function handleQuoting(
   }
 
   if (payment.mandateId) {
-    const mandate = await deps.mandateService.charge(
-      payment.mandateId,
-      quote.maxSourceAmount,
-      deps.knex
-    )
-    if (!mandate) {
+    const mandate = await payment
+      .$relatedQuery('mandate', deps.knex)
+      .forUpdate()
+    const chargeAmount =
+      payment.quote &&
+      mandate.processAt?.getTime() !== payment.quote.mandateInterval?.getTime()
+        ? quote.maxSourceAmount
+        : quote.maxSourceAmount - balance
+    if (mandate.balance < chargeAmount) {
       throw LifecycleError.InsufficientMandate
     }
+    await mandate.$query(deps.knex).patch({
+      balance: raw(`balance - ${chargeAmount.toString()}`)
+    })
+    payment.mandate = mandate
   }
 
   const state =
@@ -133,7 +141,8 @@ export async function handleQuoting(
       minExchangeRate: quote.minExchangeRate,
       lowExchangeRateEstimate: quote.lowEstimatedExchangeRate,
       highExchangeRateEstimate: quote.highEstimatedExchangeRate,
-      amountSent
+      amountSent,
+      mandateInterval: payment.mandate?.processAt
     }
   })
 

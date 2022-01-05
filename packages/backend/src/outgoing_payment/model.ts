@@ -54,6 +54,7 @@ export class OutgoingPayment extends BaseModel {
     highExchangeRateEstimate: Pay.Ratio
     // Amount already sent at the time of the quote
     amountSent: bigint
+    mandateInterval?: Date | null
   }
   // Open payments account id of the sender
   public accountId!: string

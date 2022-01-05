@@ -404,16 +404,6 @@ describe('OutgoingPaymentService', (): void => {
         })
       ).resolves.toEqual(CreateError.InvalidMandate)
     })
-
-    it('fails to create with zero balance mandate', async () => {
-      await mandate.$query(knex).patch({ balance: BigInt(0) })
-      await expect(
-        outgoingPaymentService.create({
-          mandateId: mandate.id,
-          invoiceUrl
-        })
-      ).resolves.toEqual(CreateError.InvalidMandate)
-    })
   })
 
   describe('processNext', (): void => {
@@ -477,40 +467,98 @@ describe('OutgoingPaymentService', (): void => {
         )
       })
 
-      it('Funding (Mandate Charge)', async (): Promise<void> => {
-        const mandate = (await mandateService.create({
-          accountId,
-          amount: BigInt(200),
-          assetCode: asset.code,
-          assetScale: asset.scale
-        })) as Mandate
-        assert.ok(!isCreateMandateError(mandate))
+      describe.each`
+        state                     | description
+        ${PaymentState.Funding}   | ${'mandate charge'}
+        ${PaymentState.Cancelled} | ${'insufficient mandate balance'}
+      `('$state ($description)', ({ state }): void => {
+        it.each`
+          requote  | newInterval | description
+          ${false} | ${false}    | ${'quote'}
+          ${true}  | ${false}    | ${'requote'}
+          ${true}  | ${true}     | ${'requote in next interval'}
+        `(
+          '$description',
+          async ({ requote, newInterval }): Promise<void> => {
+            const mandate = await mandateService.create({
+              accountId,
+              amount:
+                state === PaymentState.Funding ? BigInt(200) : BigInt(100),
+              assetCode: asset.code,
+              assetScale: asset.scale,
+              interval: 'P1M'
+            })
+            assert.ok(!isCreateMandateError(mandate))
 
-        const paymentId = (
-          await paymentFactory.build({
-            mandateId: mandate.id,
-            invoiceUrl
-          })
-        ).id
-        const payment = await processNext(paymentId, PaymentState.Funding)
-        if (!payment.quote) throw 'no quote'
+            const payment = await paymentFactory.build({
+              mandateId: mandate.id,
+              invoiceUrl
+            })
+            const paymentId = payment.id
 
-        expect(payment.quote.targetType).toBe(Pay.PaymentType.FixedDelivery)
-        expect(payment.quote.minDeliveryAmount).toBe(BigInt(56))
-        expect(payment.quote.maxSourceAmount).toBe(
-          BigInt(Math.ceil(56 * 2 * (1 + config.slippage)))
-        )
-        expect(payment.quote.minExchangeRate.valueOf()).toBe(
-          0.5 * (1 - config.slippage)
-        )
-        expect(payment.quote.lowExchangeRateEstimate.valueOf()).toBe(0.5)
-        expect(payment.quote.highExchangeRateEstimate.valueOf()).toBe(
-          0.500000000001
-        )
+            const paymentBalance = requote ? BigInt(50) : BigInt(0)
+            if (requote) {
+              jest
+                .spyOn(Pay, 'startQuote')
+                .mockImplementationOnce(async (options: Pay.QuoteOptions) => {
+                  const quote = await Pay.startQuote(options)
+                  return {
+                    ...quote,
+                    maxSourceAmount: paymentBalance
+                  }
+                })
+              const payment = await processNext(paymentId, PaymentState.Funding)
+              assert.ok(payment.quote?.mandateInterval)
+              expect(payment.quote.mandateInterval).toEqual(mandate.processAt)
+              expect(payment.mandate).toMatchObject({
+                balance: mandate.balance - paymentBalance
+              })
+              await expect(
+                outgoingPaymentService.fund({
+                  id: paymentId,
+                  amount: paymentBalance,
+                  transferId: uuid()
+                })
+              ).resolves.toMatchObject({
+                state: PaymentState.Sending
+              })
+              await payment.$query(knex).patch({
+                state: PaymentState.Quoting
+              })
+              if (newInterval) {
+                await mandate.$query(knex).patch({
+                  balance: mandate.amount,
+                  processAt: new Date(
+                    payment.quote.mandateInterval.getTime() + 60_000
+                  )
+                })
+              }
+            }
 
-        await expect(mandateService.get(mandate.id)).resolves.toMatchObject({
-          balance: mandate.balance - payment.quote.maxSourceAmount
-        })
+            if (state === PaymentState.Funding) {
+              const payment = await processNext(paymentId, state)
+              if (!payment.quote) throw 'no quote'
+              await expect(
+                mandateService.get(mandate.id)
+              ).resolves.toMatchObject({
+                balance: mandate.balance - payment.quote.maxSourceAmount
+              })
+            } else {
+              await processNext(
+                paymentId,
+                state,
+                LifecycleError.InsufficientMandate
+              )
+              await expect(
+                mandateService.get(mandate.id)
+              ).resolves.toMatchObject({
+                balance: newInterval
+                  ? mandate.balance
+                  : mandate.balance - paymentBalance
+              })
+            }
+          }
+        )
       })
 
       it('Quoting (rate service error)', async (): Promise<void> => {
@@ -611,30 +659,6 @@ describe('OutgoingPaymentService', (): void => {
         ).id
         await payInvoice(invoice.amount)
         await processNext(paymentId, PaymentState.Completed)
-      })
-
-      it('Cancelled (insufficient mandate balance)', async (): Promise<void> => {
-        const mandate = (await mandateService.create({
-          accountId,
-          amount: BigInt(1),
-          assetCode: asset.code,
-          assetScale: asset.scale
-        })) as Mandate
-        assert.ok(!isCreateMandateError(mandate))
-
-        const paymentId = (
-          await paymentFactory.build({
-            mandateId: mandate.id,
-            invoiceUrl
-          })
-        ).id
-        await processNext(
-          paymentId,
-          PaymentState.Cancelled,
-          LifecycleError.InsufficientMandate
-        )
-
-        await expect(mandateService.get(mandate.id)).resolves.toEqual(mandate)
       })
 
       it('Cancelled (destination asset changed)', async (): Promise<void> => {

@@ -1,5 +1,5 @@
 import { parse, end } from 'iso8601-duration'
-import { ForeignKeyViolationError, TransactionOrKnex, raw } from 'objection'
+import { ForeignKeyViolationError, TransactionOrKnex } from 'objection'
 
 import { CreateError, RevokeError } from './errors'
 import { Mandate } from './model'
@@ -25,7 +25,6 @@ export interface MandateService {
   ): Promise<Mandate[]>
   processNext(): Promise<string | undefined>
   revoke(id: string): Promise<Mandate | RevokeError>
-  charge(id: string, amount: bigint, trx?: TransactionOrKnex): Promise<Mandate>
 }
 
 interface ServiceDependencies extends BaseService {
@@ -48,8 +47,7 @@ export async function createMandateService(
     getAccountMandatesPage: (accountId, pagination) =>
       getAccountMandatesPage(deps, accountId, pagination),
     processNext: () => processNextMandate(deps),
-    revoke: (id) => revokeMandate(deps, id),
-    charge: (id, amount, trx) => chargeMandate(deps, id, amount, trx)
+    revoke: (id) => revokeMandate(deps, id)
   }
 }
 
@@ -135,7 +133,6 @@ async function processNextMandate(
         processAt: null,
         balance: BigInt(0)
       })
-      // await deps.outgoingPaymentService.cancelMandatePayments(mandate.id, trx)
     } else {
       deps.logger.trace({ mandate: mandate.id }, 'starting mandate interval')
       await mandate.$query(trx).patch({
@@ -168,25 +165,6 @@ async function revokeMandate(
     })
     return mandate
   })
-}
-
-async function chargeMandate(
-  deps: ServiceDependencies,
-  id: string,
-  amount: bigint,
-  trx?: TransactionOrKnex
-): Promise<Mandate> {
-  try {
-    return await Mandate.query(trx || deps.knex)
-      .where('id', id)
-      .andWhere('balance', '>=', amount.toString())
-      .patch({ balance: raw(`balance - ${amount.toString()}`) })
-      .returning('*')
-      .first()
-  } catch (err) {
-    console.log(err)
-    throw err
-  }
 }
 
 function getIntervalEnd(mandate: Mandate): Date | undefined {

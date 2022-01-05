@@ -23,6 +23,7 @@ exports.up = function (knex) {
     table.bigInteger('quoteLowExchangeRateEstimateDenominator').nullable()
     table.bigInteger('quoteHighExchangeRateEstimateNumerator').nullable()
     table.bigInteger('quoteHighExchangeRateEstimateDenominator').nullable()
+    table.timestamp('quoteMandateInterval').nullable()
 
     // Amount already sent at the time of the quote
     table.bigInteger('quoteAmountSent').nullable()
@@ -34,6 +35,7 @@ exports.up = function (knex) {
     // Open payments mandate for which this payment is a charge
     table.uuid('mandateId').nullable()
     table.foreign('mandateId').references('mandates.id')
+    // mandate rate?
 
     table.integer('destinationAccountScale').notNullable()
     table.string('destinationAccountCode').notNullable()
