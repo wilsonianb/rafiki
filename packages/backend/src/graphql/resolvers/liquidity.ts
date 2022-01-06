@@ -1,3 +1,5 @@
+import { raw } from 'objection'
+
 import { paymentToGraphql } from './outgoing_payment'
 import {
   ResolversTypes,
@@ -313,6 +315,12 @@ export const createInvoiceWithdrawal: MutationResolvers<ApolloContext>['createIn
   }
 }
 
+const chargeWithdrawalKey = (withdrawalId: string): string =>
+  `charge_withdrawal:${withdrawalId}`
+
+const ID_KEY = 'id'
+const AMOUNT_KEY = 'amount'
+
 export const createOutgoingPaymentWithdrawal: MutationResolvers<ApolloContext>['createOutgoingPaymentWithdrawal'] = async (
   parent,
   args,
@@ -338,15 +346,29 @@ export const createOutgoingPaymentWithdrawal: MutationResolvers<ApolloContext>['
         LiquidityError.AmountZero
       ] as OutgoingPaymentWithdrawalMutationResponse
     }
+    const timeout = BigInt(60e9) // 1 minute
     const error = await accountingService.createWithdrawal({
       id,
       accountId: payment.id,
       amount,
-      timeout: BigInt(60e9) // 1 minute
+      timeout
     })
 
     if (error) {
       return errorToResponse(error) as OutgoingPaymentWithdrawalMutationResponse
+    }
+    // Cache charge payment to refund mandate on withdrawal commit
+    // The tigerbeetle transfer could instead be looked up on commit,
+    // but the payment (debit account) id would need to be converted from bigint.
+    if (payment.mandateId) {
+      const redis = await ctx.container.use('redis')
+      const key = chargeWithdrawalKey(id)
+      await redis
+        .multi()
+        .hset(key, ID_KEY, payment.id)
+        .hset(key, AMOUNT_KEY, amount)
+        .pexpire(key, timeout)
+        .exec()
     }
     return {
       code: '200',
@@ -379,15 +401,47 @@ export const finalizeLiquidityWithdrawal: MutationResolvers<ApolloContext>['fina
   args,
   ctx
 ): ResolversTypes['LiquidityMutationResponse'] => {
-  const accountingService = await ctx.container.use('accountingService')
-  const error = await accountingService.commitWithdrawal(args.withdrawalId)
-  if (error) {
-    return errorToResponse(error)
-  }
-  return {
-    code: '200',
-    success: true,
-    message: 'Finalized Withdrawal'
+  const knex = await ctx.container.use('knex')
+  const trx = await knex.transaction()
+  try {
+    const redis = await ctx.container.use('redis')
+    const key = chargeWithdrawalKey(args.withdrawalId)
+    const [paymentId, amount] = await redis.hmget(key, ID_KEY, AMOUNT_KEY)
+    if (paymentId) {
+      if (!amount) throw new Error('missing charge withdrawal amount')
+      // Refund mandate for withdrawn charge payment amount
+      const outgoingPaymentService = await ctx.container.use(
+        'outgoingPaymentService'
+      )
+      const payment = await outgoingPaymentService.get(paymentId)
+      if (!payment) throw new Error('missing payment')
+      if (!payment.mandateId) throw new Error('missing mandate id')
+      const mandate = await payment.$relatedQuery('mandate', trx).forUpdate()
+      // Don't refund mandate if it has started a new interval
+      if (
+        payment.quote?.mandateInterval?.getTime() ===
+        mandate.processAt?.getTime()
+      ) {
+        await mandate.$query(trx).patch({
+          balance: raw(`balance + ${amount.toString()}`)
+        })
+      }
+    }
+    const accountingService = await ctx.container.use('accountingService')
+    const error = await accountingService.commitWithdrawal(args.withdrawalId)
+    if (error) {
+      await trx.rollback()
+      return errorToResponse(error)
+    }
+    await trx.commit()
+    return {
+      code: '200',
+      success: true,
+      message: 'Finalized Withdrawal'
+    }
+  } catch (err) {
+    await trx.rollback()
+    throw err
   }
 }
 

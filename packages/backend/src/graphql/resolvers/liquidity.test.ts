@@ -2,6 +2,7 @@ import assert from 'assert'
 import { gql } from 'apollo-server-koa'
 import Knex from 'knex'
 import { v4 as uuid } from 'uuid'
+import * as Pay from '@interledger/pay'
 
 import { createTestApp, TestContainer } from '../../tests/app'
 import { IocContract } from '@adonisjs/fold'
@@ -12,6 +13,8 @@ import { AccountingService, Deposit } from '../../accounting/service'
 import { AssetService } from '../../asset/service'
 import { AccountService } from '../../open_payments/account/service'
 import { InvoiceService } from '../../open_payments/invoice/service'
+import { isCreateError } from '../../open_payments/mandate/errors'
+import { OutgoingPayment } from '../../outgoing_payment//model'
 import { randomAsset, randomUnit } from '../../tests/asset'
 import { PaymentFactory } from '../../tests/paymentFactory'
 import { PeerFactory } from '../../tests/peerFactory'
@@ -1979,6 +1982,188 @@ describe('Withdrawal Resolvers', (): void => {
           expect(response.message).toEqual('Withdrawal already rolled back')
           expect(response.error).toEqual(LiquidityError.AlreadyRolledBack)
         })
+
+        if (type === AccountType.Payment) {
+          describe('Charge', (): void => {
+            let withdrawalId: string
+            let payment: OutgoingPayment
+            const amount = BigInt(100)
+
+            beforeEach(
+              async (): Promise<void> => {
+                const account = await accountService.create({
+                  asset: randomAsset()
+                })
+                const mandateService = await deps.use('mandateService')
+                const { code: assetCode, scale: assetScale } = randomAsset()
+                const mandate = await mandateService.create({
+                  accountId: account.id,
+                  amount,
+                  assetCode,
+                  assetScale,
+                  interval: 'P1M'
+                })
+                assert.ok(!isCreateError(mandate))
+                payment = await paymentFactory.build({
+                  mandateId: mandate.id
+                })
+                await payment.$query(knex).patch({
+                  quote: {
+                    timestamp: new Date(),
+                    activationDeadline: new Date(Date.now() + 1000),
+                    targetType: Pay.PaymentType.FixedSend,
+                    minDeliveryAmount: BigInt(123),
+                    maxSourceAmount: BigInt(456),
+                    maxPacketAmount: BigInt(789),
+                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                    minExchangeRate: Pay.Ratio.from(1.23)!,
+                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                    lowExchangeRateEstimate: Pay.Ratio.from(1.2)!,
+                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                    highExchangeRateEstimate: Pay.Ratio.from(2.3)!,
+                    amountSent: BigInt(0),
+                    mandateInterval: mandate.processAt
+                  }
+                })
+                await expect(
+                  accountingService.createDeposit({
+                    id: uuid(),
+                    accountId: payment.id,
+                    amount
+                  })
+                ).resolves.toBeUndefined()
+                withdrawalId = uuid()
+                // Create the withdrawal with the resolver in order to
+                // cache the charge in redis
+                const response = await appContainer.apolloClient
+                  .mutate({
+                    mutation: gql`
+                      mutation CreateOutgoingPaymentWithdrawal(
+                        $input: CreateOutgoingPaymentWithdrawalInput!
+                      ) {
+                        createOutgoingPaymentWithdrawal(input: $input) {
+                          code
+                          success
+                          message
+                          error
+                          withdrawal {
+                            id
+                            amount
+                            payment {
+                              id
+                            }
+                          }
+                        }
+                      }
+                    `,
+                    variables: {
+                      input: {
+                        id: withdrawalId,
+                        paymentId: payment.id
+                      }
+                    }
+                  })
+                  .then(
+                    (query): OutgoingPaymentWithdrawalMutationResponse => {
+                      if (query.data) {
+                        return query.data.createOutgoingPaymentWithdrawal
+                      } else {
+                        throw new Error('Data was empty')
+                      }
+                    }
+                  )
+                expect(response.success).toBe(true)
+              }
+            )
+
+            test('Finalizing withdrawal refunds mandate', async (): Promise<void> => {
+              const response = await appContainer.apolloClient
+                .mutate({
+                  mutation: gql`
+                    mutation FinalizeLiquidityWithdrawal(
+                      $withdrawalId: String!
+                    ) {
+                      finalizeLiquidityWithdrawal(withdrawalId: $withdrawalId) {
+                        code
+                        success
+                        message
+                        error
+                      }
+                    }
+                  `,
+                  variables: {
+                    withdrawalId
+                  }
+                })
+                .then(
+                  (query): LiquidityMutationResponse => {
+                    if (query.data) {
+                      return query.data.finalizeLiquidityWithdrawal
+                    } else {
+                      throw new Error('Data was empty')
+                    }
+                  }
+                )
+
+              expect(response.success).toBe(true)
+              expect(response.code).toEqual('200')
+              expect(response.error).toBeNull()
+
+              assert.ok(payment.mandate)
+              await expect(
+                payment.$relatedQuery('mandate', knex)
+              ).resolves.toMatchObject({
+                balance: payment.mandate.balance + amount
+              })
+            })
+
+            test("Finalizing doesn't refund mandate that has started new interval", async (): Promise<void> => {
+              assert.ok(payment.mandate)
+              assert.ok(payment.quote?.mandateInterval)
+              await payment.mandate.$query(knex).patch({
+                processAt: new Date(
+                  payment.quote.mandateInterval.getTime() + 60_000
+                )
+              })
+              const response = await appContainer.apolloClient
+                .mutate({
+                  mutation: gql`
+                    mutation FinalizeLiquidityWithdrawal(
+                      $withdrawalId: String!
+                    ) {
+                      finalizeLiquidityWithdrawal(withdrawalId: $withdrawalId) {
+                        code
+                        success
+                        message
+                        error
+                      }
+                    }
+                  `,
+                  variables: {
+                    withdrawalId
+                  }
+                })
+                .then(
+                  (query): LiquidityMutationResponse => {
+                    if (query.data) {
+                      return query.data.finalizeLiquidityWithdrawal
+                    } else {
+                      throw new Error('Data was empty')
+                    }
+                  }
+                )
+
+              expect(response.success).toBe(true)
+              expect(response.code).toEqual('200')
+              expect(response.error).toBeNull()
+
+              assert.ok(payment.mandate)
+              await expect(
+                payment.$relatedQuery('mandate', knex)
+              ).resolves.toEqual(payment.mandate)
+            })
+          })
+        }
       }
     )
 
