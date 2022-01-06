@@ -10,6 +10,8 @@ import { initIocContainer } from '../..'
 import { Config } from '../../config/app'
 import { AccountingService, Deposit } from '../../accounting/service'
 import { AssetService } from '../../asset/service'
+import { AccountService } from '../../open_payments/account/service'
+import { InvoiceService } from '../../open_payments/invoice/service'
 import { randomAsset, randomUnit } from '../../tests/asset'
 import { PaymentFactory } from '../../tests/paymentFactory'
 import { PeerFactory } from '../../tests/peerFactory'
@@ -25,8 +27,11 @@ import {
 describe('Withdrawal Resolvers', (): void => {
   let deps: IocContract<AppServices>
   let appContainer: TestContainer
+  let accountService: AccountService
   let accountingService: AccountingService
   let assetService: AssetService
+  let invoiceService: InvoiceService
+  let paymentFactory: PaymentFactory
   let peerFactory: PeerFactory
   let knex: Knex
   const timeout = BigInt(10e9) // 10 seconds
@@ -36,8 +41,11 @@ describe('Withdrawal Resolvers', (): void => {
       deps = await initIocContainer(Config)
       appContainer = await createTestApp(deps)
       knex = await deps.use('knex')
+      accountService = await deps.use('accountService')
       accountingService = await deps.use('accountingService')
       assetService = await deps.use('assetService')
+      invoiceService = await deps.use('invoiceService')
+      paymentFactory = new PaymentFactory(deps)
       const peerService = await deps.use('peerService')
       peerFactory = new PeerFactory(peerService)
     }
@@ -1184,12 +1192,9 @@ describe('Withdrawal Resolvers', (): void => {
 
     beforeEach(
       async (): Promise<void> => {
-        const accountService = await deps.use('accountService')
         const { id: accountId } = await accountService.create({
           asset: randomAsset()
         })
-
-        const invoiceService = await deps.use('invoiceService')
         invoiceId = (
           await invoiceService.create({
             accountId,
@@ -1449,7 +1454,6 @@ describe('Withdrawal Resolvers', (): void => {
 
     beforeEach(
       async (): Promise<void> => {
-        const paymentFactory = new PaymentFactory(deps)
         paymentId = (await paymentFactory.build()).id
 
         await expect(
@@ -1701,427 +1705,413 @@ describe('Withdrawal Resolvers', (): void => {
     })
   })
 
-  describe.each(['peer', 'asset'])(
-    'Finalize %s liquidity withdrawal',
-    (type): void => {
-      let withdrawalId: string
+  enum AccountType {
+    Asset = 'Asset',
+    Invoice = 'Invoice',
+    Payment = 'Payment',
+    Peer = 'Peer'
+  }
 
-      beforeEach(
-        async (): Promise<void> => {
-          let deposit: Deposit
-          if (type === 'peer') {
-            const peer = await peerFactory.build()
-            deposit = {
-              id: uuid(),
-              accountId: peer.id,
-              amount: BigInt(100)
+  describe('Finalize/Rollback liquidity withdrawal', (): void => {
+    describe.each(Object.values(AccountType).map((type) => [type]))(
+      '%s',
+      (type): void => {
+        let withdrawalId: string
+
+        beforeEach(
+          async (): Promise<void> => {
+            let deposit: Deposit
+            const amount = BigInt(100)
+            if (type === AccountType.Asset) {
+              const unit = randomUnit()
+              await accountingService.createAssetAccounts(unit)
+              deposit = {
+                id: uuid(),
+                asset: { unit },
+                amount
+              }
+            } else {
+              let accountId: string
+              if (type === AccountType.Invoice) {
+                const account = await accountService.create({
+                  asset: randomAsset()
+                })
+                const invoice = await invoiceService.create({
+                  accountId: account.id,
+                  amount,
+                  expiresAt: new Date(Date.now() + 30_000)
+                })
+                accountId = invoice.id
+              } else if (type === AccountType.Payment) {
+                const payment = await paymentFactory.build()
+                accountId = payment.id
+              } else {
+                assert.equal(type, AccountType.Peer)
+                const peer = await peerFactory.build()
+                accountId = peer.id
+              }
+              deposit = {
+                id: uuid(),
+                accountId,
+                amount
+              }
             }
-          } else {
-            assert.equal(type, 'asset')
-            const unit = randomUnit()
-            await accountingService.createAssetAccounts(unit)
-            deposit = {
-              id: uuid(),
-              asset: { unit },
-              amount: BigInt(100)
+
+            await expect(
+              accountingService.createDeposit(deposit)
+            ).resolves.toBeUndefined()
+            withdrawalId = uuid()
+            await expect(
+              accountingService.createWithdrawal({
+                ...deposit,
+                id: withdrawalId,
+                amount: BigInt(10),
+                timeout
+              })
+            ).resolves.toBeUndefined()
+          }
+        )
+
+        test(`Can finalize a liquidity withdrawal`, async (): Promise<void> => {
+          const response = await appContainer.apolloClient
+            .mutate({
+              mutation: gql`
+                mutation FinalizeLiquidityWithdrawal($withdrawalId: String!) {
+                  finalizeLiquidityWithdrawal(withdrawalId: $withdrawalId) {
+                    code
+                    success
+                    message
+                    error
+                  }
+                }
+              `,
+              variables: {
+                withdrawalId
+              }
+            })
+            .then(
+              (query): LiquidityMutationResponse => {
+                if (query.data) {
+                  return query.data.finalizeLiquidityWithdrawal
+                } else {
+                  throw new Error('Data was empty')
+                }
+              }
+            )
+
+          expect(response.success).toBe(true)
+          expect(response.code).toEqual('200')
+          expect(response.error).toBeNull()
+        })
+
+        test("Can't finalize finalized withdrawal", async (): Promise<void> => {
+          await expect(
+            accountingService.commitWithdrawal(withdrawalId)
+          ).resolves.toBeUndefined()
+          const response = await appContainer.apolloClient
+            .mutate({
+              mutation: gql`
+                mutation FinalizeLiquidityWithdrawal($withdrawalId: String!) {
+                  finalizeLiquidityWithdrawal(withdrawalId: $withdrawalId) {
+                    code
+                    success
+                    message
+                    error
+                  }
+                }
+              `,
+              variables: {
+                withdrawalId
+              }
+            })
+            .then(
+              (query): LiquidityMutationResponse => {
+                if (query.data) {
+                  return query.data.finalizeLiquidityWithdrawal
+                } else {
+                  throw new Error('Data was empty')
+                }
+              }
+            )
+
+          expect(response.success).toBe(false)
+          expect(response.code).toEqual('409')
+          expect(response.message).toEqual('Withdrawal already finalized')
+          expect(response.error).toEqual(LiquidityError.AlreadyCommitted)
+        })
+
+        test("Can't finalize rolled back withdrawal", async (): Promise<void> => {
+          await expect(
+            accountingService.rollbackWithdrawal(withdrawalId)
+          ).resolves.toBeUndefined()
+          const response = await appContainer.apolloClient
+            .mutate({
+              mutation: gql`
+                mutation FinalizeLiquidityWithdrawal($withdrawalId: String!) {
+                  finalizeLiquidityWithdrawal(withdrawalId: $withdrawalId) {
+                    code
+                    success
+                    message
+                    error
+                  }
+                }
+              `,
+              variables: {
+                withdrawalId
+              }
+            })
+            .then(
+              (query): LiquidityMutationResponse => {
+                if (query.data) {
+                  return query.data.finalizeLiquidityWithdrawal
+                } else {
+                  throw new Error('Data was empty')
+                }
+              }
+            )
+
+          expect(response.success).toBe(false)
+          expect(response.code).toEqual('409')
+          expect(response.message).toEqual('Withdrawal already rolled back')
+          expect(response.error).toEqual(LiquidityError.AlreadyRolledBack)
+        })
+
+        test(`Can rollback a liquidity withdrawal`, async (): Promise<void> => {
+          const response = await appContainer.apolloClient
+            .mutate({
+              mutation: gql`
+                mutation RollbackLiquidityWithdrawal($withdrawalId: String!) {
+                  rollbackLiquidityWithdrawal(withdrawalId: $withdrawalId) {
+                    code
+                    success
+                    message
+                    error
+                  }
+                }
+              `,
+              variables: {
+                withdrawalId
+              }
+            })
+            .then(
+              (query): LiquidityMutationResponse => {
+                if (query.data) {
+                  return query.data.rollbackLiquidityWithdrawal
+                } else {
+                  throw new Error('Data was empty')
+                }
+              }
+            )
+
+          expect(response.success).toBe(true)
+          expect(response.code).toEqual('200')
+          expect(response.error).toBeNull()
+        })
+
+        test("Can't rollback finalized withdrawal", async (): Promise<void> => {
+          await expect(
+            accountingService.commitWithdrawal(withdrawalId)
+          ).resolves.toBeUndefined()
+          const response = await appContainer.apolloClient
+            .mutate({
+              mutation: gql`
+                mutation RollbackLiquidityWithdrawal($withdrawalId: String!) {
+                  rollbackLiquidityWithdrawal(withdrawalId: $withdrawalId) {
+                    code
+                    success
+                    message
+                    error
+                  }
+                }
+              `,
+              variables: {
+                withdrawalId
+              }
+            })
+            .then(
+              (query): LiquidityMutationResponse => {
+                if (query.data) {
+                  return query.data.rollbackLiquidityWithdrawal
+                } else {
+                  throw new Error('Data was empty')
+                }
+              }
+            )
+
+          expect(response.success).toBe(false)
+          expect(response.code).toEqual('409')
+          expect(response.message).toEqual('Withdrawal already finalized')
+          expect(response.error).toEqual(LiquidityError.AlreadyCommitted)
+        })
+
+        test("Can't rollback rolled back withdrawal", async (): Promise<void> => {
+          await expect(
+            accountingService.rollbackWithdrawal(withdrawalId)
+          ).resolves.toBeUndefined()
+          const response = await appContainer.apolloClient
+            .mutate({
+              mutation: gql`
+                mutation RollbackLiquidityWithdrawal($withdrawalId: String!) {
+                  rollbackLiquidityWithdrawal(withdrawalId: $withdrawalId) {
+                    code
+                    success
+                    message
+                    error
+                  }
+                }
+              `,
+              variables: {
+                withdrawalId
+              }
+            })
+            .then(
+              (query): LiquidityMutationResponse => {
+                if (query.data) {
+                  return query.data.rollbackLiquidityWithdrawal
+                } else {
+                  throw new Error('Data was empty')
+                }
+              }
+            )
+
+          expect(response.success).toBe(false)
+          expect(response.code).toEqual('409')
+          expect(response.message).toEqual('Withdrawal already rolled back')
+          expect(response.error).toEqual(LiquidityError.AlreadyRolledBack)
+        })
+      }
+    )
+
+    test("Can't finalize non-existent withdrawal", async (): Promise<void> => {
+      const response = await appContainer.apolloClient
+        .mutate({
+          mutation: gql`
+            mutation FinalizeLiquidityWithdrawal($withdrawalId: String!) {
+              finalizeLiquidityWithdrawal(withdrawalId: $withdrawalId) {
+                code
+                success
+                message
+                error
+              }
+            }
+          `,
+          variables: {
+            withdrawalId: uuid()
+          }
+        })
+        .then(
+          (query): LiquidityMutationResponse => {
+            if (query.data) {
+              return query.data.finalizeLiquidityWithdrawal
+            } else {
+              throw new Error('Data was empty')
             }
           }
-          await expect(
-            accountingService.createDeposit(deposit)
-          ).resolves.toBeUndefined()
-          withdrawalId = uuid()
-          await expect(
-            accountingService.createWithdrawal({
-              ...deposit,
-              id: withdrawalId,
-              amount: BigInt(10),
-              timeout
-            })
-          ).resolves.toBeUndefined()
-        }
-      )
+        )
 
-      test(`Can finalize a(n) ${type} liquidity withdrawal`, async (): Promise<void> => {
-        const response = await appContainer.apolloClient
-          .mutate({
-            mutation: gql`
-              mutation FinalizeLiquidityWithdrawal($withdrawalId: String!) {
-                finalizeLiquidityWithdrawal(withdrawalId: $withdrawalId) {
-                  code
-                  success
-                  message
-                  error
-                }
-              }
-            `,
-            variables: {
-              withdrawalId
-            }
-          })
-          .then(
-            (query): LiquidityMutationResponse => {
-              if (query.data) {
-                return query.data.finalizeLiquidityWithdrawal
-              } else {
-                throw new Error('Data was empty')
+      expect(response.success).toBe(false)
+      expect(response.code).toEqual('404')
+      expect(response.message).toEqual('Unknown withdrawal')
+      expect(response.error).toEqual(LiquidityError.UnknownTransfer)
+    })
+
+    test("Can't finalize invalid withdrawal id", async (): Promise<void> => {
+      const response = await appContainer.apolloClient
+        .mutate({
+          mutation: gql`
+            mutation FinalizeLiquidityWithdrawal($withdrawalId: String!) {
+              finalizeLiquidityWithdrawal(withdrawalId: $withdrawalId) {
+                code
+                success
+                message
+                error
               }
             }
-          )
-
-        expect(response.success).toBe(true)
-        expect(response.code).toEqual('200')
-        expect(response.error).toBeNull()
-      })
-
-      test("Can't finalize non-existent withdrawal", async (): Promise<void> => {
-        const response = await appContainer.apolloClient
-          .mutate({
-            mutation: gql`
-              mutation FinalizeLiquidityWithdrawal($withdrawalId: String!) {
-                finalizeLiquidityWithdrawal(withdrawalId: $withdrawalId) {
-                  code
-                  success
-                  message
-                  error
-                }
-              }
-            `,
-            variables: {
-              withdrawalId: uuid()
-            }
-          })
-          .then(
-            (query): LiquidityMutationResponse => {
-              if (query.data) {
-                return query.data.finalizeLiquidityWithdrawal
-              } else {
-                throw new Error('Data was empty')
-              }
-            }
-          )
-
-        expect(response.success).toBe(false)
-        expect(response.code).toEqual('404')
-        expect(response.message).toEqual('Unknown withdrawal')
-        expect(response.error).toEqual(LiquidityError.UnknownTransfer)
-      })
-
-      test("Can't finalize invalid withdrawal id", async (): Promise<void> => {
-        const response = await appContainer.apolloClient
-          .mutate({
-            mutation: gql`
-              mutation FinalizeLiquidityWithdrawal($withdrawalId: String!) {
-                finalizeLiquidityWithdrawal(withdrawalId: $withdrawalId) {
-                  code
-                  success
-                  message
-                  error
-                }
-              }
-            `,
-            variables: {
-              withdrawalId: 'not a uuid'
-            }
-          })
-          .then(
-            (query): LiquidityMutationResponse => {
-              if (query.data) {
-                return query.data.finalizeLiquidityWithdrawal
-              } else {
-                throw new Error('Data was empty')
-              }
-            }
-          )
-
-        expect(response.success).toBe(false)
-        expect(response.code).toEqual('400')
-        expect(response.message).toEqual('Invalid id')
-        expect(response.error).toEqual(LiquidityError.InvalidId)
-      })
-
-      test("Can't finalize finalized withdrawal", async (): Promise<void> => {
-        await expect(
-          accountingService.commitWithdrawal(withdrawalId)
-        ).resolves.toBeUndefined()
-        const response = await appContainer.apolloClient
-          .mutate({
-            mutation: gql`
-              mutation FinalizeLiquidityWithdrawal($withdrawalId: String!) {
-                finalizeLiquidityWithdrawal(withdrawalId: $withdrawalId) {
-                  code
-                  success
-                  message
-                  error
-                }
-              }
-            `,
-            variables: {
-              withdrawalId
-            }
-          })
-          .then(
-            (query): LiquidityMutationResponse => {
-              if (query.data) {
-                return query.data.finalizeLiquidityWithdrawal
-              } else {
-                throw new Error('Data was empty')
-              }
-            }
-          )
-
-        expect(response.success).toBe(false)
-        expect(response.code).toEqual('409')
-        expect(response.message).toEqual('Withdrawal already finalized')
-        expect(response.error).toEqual(LiquidityError.AlreadyCommitted)
-      })
-
-      test("Can't finalize rolled back withdrawal", async (): Promise<void> => {
-        await expect(
-          accountingService.rollbackWithdrawal(withdrawalId)
-        ).resolves.toBeUndefined()
-        const response = await appContainer.apolloClient
-          .mutate({
-            mutation: gql`
-              mutation FinalizeLiquidityWithdrawal($withdrawalId: String!) {
-                finalizeLiquidityWithdrawal(withdrawalId: $withdrawalId) {
-                  code
-                  success
-                  message
-                  error
-                }
-              }
-            `,
-            variables: {
-              withdrawalId
-            }
-          })
-          .then(
-            (query): LiquidityMutationResponse => {
-              if (query.data) {
-                return query.data.finalizeLiquidityWithdrawal
-              } else {
-                throw new Error('Data was empty')
-              }
-            }
-          )
-
-        expect(response.success).toBe(false)
-        expect(response.code).toEqual('409')
-        expect(response.message).toEqual('Withdrawal already rolled back')
-        expect(response.error).toEqual(LiquidityError.AlreadyRolledBack)
-      })
-    }
-  )
-
-  describe.each(['peer', 'asset'])(
-    'Roll back %s liquidity withdrawal',
-    (type): void => {
-      let withdrawalId: string
-
-      beforeEach(
-        async (): Promise<void> => {
-          let deposit: Deposit
-          if (type === 'peer') {
-            const peer = await peerFactory.build()
-            deposit = {
-              id: uuid(),
-              accountId: peer.id,
-              amount: BigInt(100)
-            }
-          } else {
-            assert.equal(type, 'asset')
-            const unit = randomUnit()
-            await accountingService.createAssetAccounts(unit)
-            deposit = {
-              id: uuid(),
-              asset: { unit },
-              amount: BigInt(100)
+          `,
+          variables: {
+            withdrawalId: 'not a uuid'
+          }
+        })
+        .then(
+          (query): LiquidityMutationResponse => {
+            if (query.data) {
+              return query.data.finalizeLiquidityWithdrawal
+            } else {
+              throw new Error('Data was empty')
             }
           }
-          await expect(
-            accountingService.createDeposit(deposit)
-          ).resolves.toBeUndefined()
-          withdrawalId = uuid()
-          await expect(
-            accountingService.createWithdrawal({
-              ...deposit,
-              id: withdrawalId,
-              amount: BigInt(10),
-              timeout
-            })
-          ).resolves.toBeUndefined()
-        }
-      )
+        )
 
-      test(`Can rollback a(n) ${type} liquidity withdrawal`, async (): Promise<void> => {
-        const response = await appContainer.apolloClient
-          .mutate({
-            mutation: gql`
-              mutation RollbackLiquidityWithdrawal($withdrawalId: String!) {
-                rollbackLiquidityWithdrawal(withdrawalId: $withdrawalId) {
-                  code
-                  success
-                  message
-                  error
-                }
-              }
-            `,
-            variables: {
-              withdrawalId
-            }
-          })
-          .then(
-            (query): LiquidityMutationResponse => {
-              if (query.data) {
-                return query.data.rollbackLiquidityWithdrawal
-              } else {
-                throw new Error('Data was empty')
+      expect(response.success).toBe(false)
+      expect(response.code).toEqual('400')
+      expect(response.message).toEqual('Invalid id')
+      expect(response.error).toEqual(LiquidityError.InvalidId)
+    })
+
+    test("Can't rollback non-existent withdrawal", async (): Promise<void> => {
+      const response = await appContainer.apolloClient
+        .mutate({
+          mutation: gql`
+            mutation RollbackLiquidityWithdrawal($withdrawalId: String!) {
+              rollbackLiquidityWithdrawal(withdrawalId: $withdrawalId) {
+                code
+                success
+                message
+                error
               }
             }
-          )
-
-        expect(response.success).toBe(true)
-        expect(response.code).toEqual('200')
-        expect(response.error).toBeNull()
-      })
-
-      test("Can't rollback non-existent withdrawal", async (): Promise<void> => {
-        const response = await appContainer.apolloClient
-          .mutate({
-            mutation: gql`
-              mutation RollbackLiquidityWithdrawal($withdrawalId: String!) {
-                rollbackLiquidityWithdrawal(withdrawalId: $withdrawalId) {
-                  code
-                  success
-                  message
-                  error
-                }
-              }
-            `,
-            variables: {
-              withdrawalId: uuid()
+          `,
+          variables: {
+            withdrawalId: uuid()
+          }
+        })
+        .then(
+          (query): LiquidityMutationResponse => {
+            if (query.data) {
+              return query.data.rollbackLiquidityWithdrawal
+            } else {
+              throw new Error('Data was empty')
             }
-          })
-          .then(
-            (query): LiquidityMutationResponse => {
-              if (query.data) {
-                return query.data.rollbackLiquidityWithdrawal
-              } else {
-                throw new Error('Data was empty')
-              }
-            }
-          )
+          }
+        )
 
-        expect(response.success).toBe(false)
-        expect(response.code).toEqual('404')
-        expect(response.message).toEqual('Unknown withdrawal')
-        expect(response.error).toEqual(LiquidityError.UnknownTransfer)
-      })
+      expect(response.success).toBe(false)
+      expect(response.code).toEqual('404')
+      expect(response.message).toEqual('Unknown withdrawal')
+      expect(response.error).toEqual(LiquidityError.UnknownTransfer)
+    })
 
-      test("Can't rollback invalid withdrawal id", async (): Promise<void> => {
-        const response = await appContainer.apolloClient
-          .mutate({
-            mutation: gql`
-              mutation RollbackLiquidityWithdrawal($withdrawalId: String!) {
-                rollbackLiquidityWithdrawal(withdrawalId: $withdrawalId) {
-                  code
-                  success
-                  message
-                  error
-                }
-              }
-            `,
-            variables: {
-              withdrawalId: 'not a uuid'
-            }
-          })
-          .then(
-            (query): LiquidityMutationResponse => {
-              if (query.data) {
-                return query.data.rollbackLiquidityWithdrawal
-              } else {
-                throw new Error('Data was empty')
+    test("Can't rollback invalid withdrawal id", async (): Promise<void> => {
+      const response = await appContainer.apolloClient
+        .mutate({
+          mutation: gql`
+            mutation RollbackLiquidityWithdrawal($withdrawalId: String!) {
+              rollbackLiquidityWithdrawal(withdrawalId: $withdrawalId) {
+                code
+                success
+                message
+                error
               }
             }
-          )
-
-        expect(response.success).toBe(false)
-        expect(response.code).toEqual('400')
-        expect(response.message).toEqual('Invalid id')
-        expect(response.error).toEqual(LiquidityError.InvalidId)
-      })
-
-      test("Can't rollback finalized withdrawal", async (): Promise<void> => {
-        await expect(
-          accountingService.commitWithdrawal(withdrawalId)
-        ).resolves.toBeUndefined()
-        const response = await appContainer.apolloClient
-          .mutate({
-            mutation: gql`
-              mutation RollbackLiquidityWithdrawal($withdrawalId: String!) {
-                rollbackLiquidityWithdrawal(withdrawalId: $withdrawalId) {
-                  code
-                  success
-                  message
-                  error
-                }
-              }
-            `,
-            variables: {
-              withdrawalId
+          `,
+          variables: {
+            withdrawalId: 'not a uuid'
+          }
+        })
+        .then(
+          (query): LiquidityMutationResponse => {
+            if (query.data) {
+              return query.data.rollbackLiquidityWithdrawal
+            } else {
+              throw new Error('Data was empty')
             }
-          })
-          .then(
-            (query): LiquidityMutationResponse => {
-              if (query.data) {
-                return query.data.rollbackLiquidityWithdrawal
-              } else {
-                throw new Error('Data was empty')
-              }
-            }
-          )
+          }
+        )
 
-        expect(response.success).toBe(false)
-        expect(response.code).toEqual('409')
-        expect(response.message).toEqual('Withdrawal already finalized')
-        expect(response.error).toEqual(LiquidityError.AlreadyCommitted)
-      })
-
-      test("Can't rollback rolled back withdrawal", async (): Promise<void> => {
-        await expect(
-          accountingService.rollbackWithdrawal(withdrawalId)
-        ).resolves.toBeUndefined()
-        const response = await appContainer.apolloClient
-          .mutate({
-            mutation: gql`
-              mutation RollbackLiquidityWithdrawal($withdrawalId: String!) {
-                rollbackLiquidityWithdrawal(withdrawalId: $withdrawalId) {
-                  code
-                  success
-                  message
-                  error
-                }
-              }
-            `,
-            variables: {
-              withdrawalId
-            }
-          })
-          .then(
-            (query): LiquidityMutationResponse => {
-              if (query.data) {
-                return query.data.rollbackLiquidityWithdrawal
-              } else {
-                throw new Error('Data was empty')
-              }
-            }
-          )
-
-        expect(response.success).toBe(false)
-        expect(response.code).toEqual('409')
-        expect(response.message).toEqual('Withdrawal already rolled back')
-        expect(response.error).toEqual(LiquidityError.AlreadyRolledBack)
-      })
-    }
-  )
+      expect(response.success).toBe(false)
+      expect(response.code).toEqual('400')
+      expect(response.message).toEqual('Invalid id')
+      expect(response.error).toEqual(LiquidityError.InvalidId)
+    })
+  })
 })
