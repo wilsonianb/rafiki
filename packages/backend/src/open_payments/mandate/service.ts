@@ -3,6 +3,7 @@ import { ForeignKeyViolationError, TransactionOrKnex } from 'objection'
 
 import { CreateError, RevokeError } from './errors'
 import { Mandate } from './model'
+import { RatesService } from '../../rates/service'
 import { BaseService } from '../../shared/baseService'
 import { Pagination } from '../../shared/pagination'
 
@@ -29,6 +30,7 @@ export interface MandateService {
 
 interface ServiceDependencies extends BaseService {
   knex: TransactionOrKnex
+  ratesService: RatesService
 }
 
 export async function createMandateService(
@@ -65,6 +67,10 @@ async function createMandate(
   const now = new Date()
   if (options.expiresAt && options.expiresAt < now) {
     return CreateError.InvalidExpiresAt
+  }
+  const prices = await deps.ratesService.prices()
+  if (!prices[options.assetCode]) {
+    return CreateError.UnknownAsset
   }
   const prestart = options.startAt && now < options.startAt
   try {

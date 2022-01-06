@@ -209,7 +209,8 @@ export function initIocContainer(
   container.singleton('mandateService', async (deps) => {
     return await createMandateService({
       logger: await deps.use('logger'),
-      knex: await deps.use('knex')
+      knex: await deps.use('knex'),
+      ratesService: await deps.use('ratesService')
     })
   })
   container.singleton('mandateRoutes', async (deps) => {

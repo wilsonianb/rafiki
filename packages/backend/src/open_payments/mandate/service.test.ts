@@ -1,5 +1,6 @@
 import assert from 'assert'
 import Knex from 'knex'
+import nock from 'nock'
 import { WorkerUtils, makeWorkerUtils } from 'graphile-worker'
 import { parse, end } from 'iso8601-duration'
 import { v4 as uuid } from 'uuid'
@@ -39,10 +40,18 @@ describe('Mandate Service', (): void => {
     send: jest.fn()
   }
   const { code: assetCode, scale: assetScale } = randomAsset()
+  const prices = {
+    [assetCode]: 1.0
+  }
   const amount = BigInt(100)
 
   beforeAll(
     async (): Promise<void> => {
+      Config.pricesUrl = 'https://test.prices'
+      nock(Config.pricesUrl)
+        .get('/')
+        .reply(200, () => prices)
+        .persist()
       deps = await initIocContainer(Config)
       deps.bind('messageProducer', async () => mockMessageProducer)
       appContainer = await createTestApp(deps)
@@ -59,7 +68,9 @@ describe('Mandate Service', (): void => {
 
   beforeEach(
     async (): Promise<void> => {
-      accountId = (await accountService.create({ asset: randomAsset() })).id
+      const asset = randomAsset()
+      accountId = (await accountService.create({ asset })).id
+      prices[asset.code] = 2.0
     }
   )
 
@@ -139,6 +150,18 @@ describe('Mandate Service', (): void => {
               assetScale
             })
           ).resolves.toEqual(CreateError.UnknownAccount)
+        })
+
+        test('Cannot create mandate for unknown asset', async (): Promise<void> => {
+          const { code: assetCode } = randomAsset()
+          await expect(
+            mandateService.create({
+              accountId: uuid(),
+              amount,
+              assetCode,
+              assetScale
+            })
+          ).resolves.toEqual(CreateError.UnknownAsset)
         })
 
         if (expiring) {

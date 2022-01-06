@@ -119,7 +119,8 @@ const errorToMessage: {
 } = {
   [CreateError.InvalidExpiresAt]: 'invalid expiresAt',
   [CreateError.InvalidInterval]: 'invalid interval',
-  [CreateError.UnknownAccount]: 'invalid account'
+  [CreateError.UnknownAccount]: 'invalid account',
+  [CreateError.UnknownAsset]: 'invalid asset'
 }
 
 function tryParseAmount(amount: unknown): bigint | null {

@@ -1,6 +1,7 @@
 import assert from 'assert'
 import * as httpMocks from 'node-mocks-http'
 import Knex from 'knex'
+import nock from 'nock'
 import { WorkerUtils, makeWorkerUtils } from 'graphile-worker'
 import { v4 as uuid } from 'uuid'
 
@@ -35,11 +36,20 @@ describe('Mandate Routes', (): void => {
   const mockMessageProducer = {
     send: jest.fn()
   }
+  const { code: assetCode, scale: assetScale } = randomAsset()
+  const prices = {
+    [assetCode]: 1.0
+  }
 
   beforeAll(
     async (): Promise<void> => {
       config = Config
       config.publicHost = 'https://wallet.example'
+      config.pricesUrl = 'https://test.prices'
+      nock(config.pricesUrl)
+        .get('/')
+        .reply(200, () => prices)
+        .persist()
       deps = await initIocContainer(config)
       deps.bind('messageProducer', async () => mockMessageProducer)
       appContainer = await createTestApp(deps)
@@ -52,7 +62,6 @@ describe('Mandate Routes', (): void => {
     }
   )
 
-  const { code: assetCode, scale: assetScale } = randomAsset()
   let account: Account
 
   beforeEach(
@@ -63,6 +72,7 @@ describe('Mandate Routes', (): void => {
       mandateRoutes = await deps.use('mandateRoutes')
 
       account = await accountService.create({ asset: randomAsset() })
+      prices[account.asset.code] = 2.0
     }
   )
 
@@ -274,6 +284,16 @@ describe('Mandate Routes', (): void => {
       await expect(mandateRoutes.create(ctx)).rejects.toHaveProperty(
         'message',
         'invalid account'
+      )
+    })
+
+    test('returns error on unknown asset', async (): Promise<void> => {
+      const ctx = setup({})
+      const { code: assetCode } = randomAsset()
+      ctx.request.body['assetCode'] = assetCode
+      await expect(mandateRoutes.create(ctx)).rejects.toHaveProperty(
+        'message',
+        'invalid asset'
       )
     })
 
