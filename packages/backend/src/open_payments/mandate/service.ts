@@ -17,6 +17,11 @@ export interface CreateOptions {
   interval?: string
 }
 
+export interface Charge {
+  amount: bigint
+  mandate: Mandate
+}
+
 export interface MandateService {
   create(options: CreateOptions): Promise<Mandate | CreateError>
   get(id: string): Promise<Mandate | undefined>
@@ -26,6 +31,11 @@ export interface MandateService {
   ): Promise<Mandate[]>
   processNext(): Promise<string | undefined>
   revoke(id: string): Promise<Mandate | RevokeError>
+  charge(
+    id: string,
+    sourceAmount: bigint,
+    trx?: TransactionOrKnex
+  ): Promise<Charge | undefined>
 }
 
 interface ServiceDependencies extends BaseService {
@@ -49,7 +59,9 @@ export async function createMandateService(
     getAccountMandatesPage: (accountId, pagination) =>
       getAccountMandatesPage(deps, accountId, pagination),
     processNext: () => processNextMandate(deps),
-    revoke: (id) => revokeMandate(deps, id)
+    revoke: (id) => revokeMandate(deps, id),
+    charge: (id, sourceAmount, trx) =>
+      chargeMandate(deps, id, sourceAmount, trx)
   }
 }
 
@@ -170,6 +182,44 @@ async function revokeMandate(
       balance: BigInt(0)
     })
     return mandate
+  })
+}
+
+async function chargeMandate(
+  deps: ServiceDependencies,
+  id: string,
+  sourceAmount: bigint,
+  trx?: TransactionOrKnex
+): Promise<Charge | undefined> {
+  const knex = trx || deps.knex
+  return await knex.transaction(async (trx) => {
+    const mandate = await Mandate.query(trx)
+      .findById(id)
+      .forUpdate()
+      .withGraphFetched('account.asset')
+    if (mandate) {
+      const amountOrError = await deps.ratesService.convert({
+        sourceAmount,
+        sourceAsset: mandate.account.asset,
+        destinationAsset: {
+          code: mandate.assetCode,
+          scale: mandate.assetScale
+        }
+      })
+      if (typeof amountOrError !== 'bigint') {
+        // ConvertError
+        throw new Error(`Exchange rate error: ${amountOrError}`)
+      }
+      if (amountOrError <= mandate.balance) {
+        await mandate.$query(trx).patch({
+          balance: mandate.balance - amountOrError
+        })
+        return {
+          amount: amountOrError,
+          mandate
+        }
+      }
+    }
   })
 }
 
