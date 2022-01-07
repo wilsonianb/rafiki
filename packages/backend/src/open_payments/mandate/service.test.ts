@@ -451,6 +451,50 @@ describe('Mandate Service', (): void => {
     })
   })
 
+  describe('refund', (): void => {
+    let mandate: Mandate
+
+    beforeEach(
+      async (): Promise<void> => {
+        mandate = (await mandateService.create({
+          accountId,
+          amount,
+          assetCode,
+          assetScale
+        })) as Mandate
+        assert.ok(!isCreateError(mandate))
+        await mandate.$query(knex).patch({
+          balance: BigInt(0)
+        })
+      }
+    )
+
+    test('Refunds amount to mandate balance', async (): Promise<void> => {
+      await expect(
+        mandateService.refund(mandate.id, mandate.amount)
+      ).resolves.toMatchObject({
+        balance: mandate.amount
+      })
+      await expect(mandateService.get(mandate.id)).resolves.toMatchObject({
+        balance: mandate.amount
+      })
+    })
+
+    test('Limits refund by mandate amount', async (): Promise<void> => {
+      await expect(
+        mandateService.refund(mandate.id, mandate.amount + 1n)
+      ).resolves.toMatchObject({
+        balance: mandate.amount
+      })
+    })
+
+    test('Returns undefined for unknown mandate', async (): Promise<void> => {
+      await expect(
+        mandateService.refund(uuid(), mandate.amount)
+      ).resolves.toBeUndefined()
+    })
+  })
+
   describe('Mandate pagination', (): void => {
     let mandatesCreated: Mandate[]
 

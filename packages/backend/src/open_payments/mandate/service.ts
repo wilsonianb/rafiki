@@ -36,6 +36,11 @@ export interface MandateService {
     sourceAmount: bigint,
     trx?: TransactionOrKnex
   ): Promise<Charge | undefined>
+  refund(
+    id: string,
+    amount: bigint,
+    trx?: TransactionOrKnex
+  ): Promise<Mandate | undefined>
 }
 
 interface ServiceDependencies extends BaseService {
@@ -61,7 +66,8 @@ export async function createMandateService(
     processNext: () => processNextMandate(deps),
     revoke: (id) => revokeMandate(deps, id),
     charge: (id, sourceAmount, trx) =>
-      chargeMandate(deps, id, sourceAmount, trx)
+      chargeMandate(deps, id, sourceAmount, trx),
+    refund: (id, amount, trx) => refundMandate(deps, id, amount, trx)
   }
 }
 
@@ -219,6 +225,35 @@ async function chargeMandate(
           mandate
         }
       }
+    }
+  })
+}
+
+async function refundMandate(
+  deps: ServiceDependencies,
+  id: string,
+  amount: bigint,
+  trx?: TransactionOrKnex
+): Promise<Mandate | undefined> {
+  const knex = trx || deps.knex
+  return await knex.transaction(async (trx) => {
+    const mandate = await Mandate.query(trx)
+      .findById(id)
+      .forUpdate()
+      .withGraphFetched('account.asset')
+    if (mandate) {
+      let newBalance = mandate.balance + amount
+      if (newBalance > mandate.amount) {
+        deps.logger.warn(
+          { mandate: mandate.id },
+          'refund exceeds mandate balance limit'
+        )
+        newBalance = mandate.amount
+      }
+      await mandate.$query(trx).patch({
+        balance: newBalance
+      })
+      return mandate
     }
   })
 }
