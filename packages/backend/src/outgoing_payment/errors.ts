@@ -1,5 +1,15 @@
 import * as Pay from '@interledger/pay'
 
+export enum CreateError {
+  InvalidMandate = 'InvalidMandate',
+  UnknownAccount = 'UnknownAccount',
+  UnknownMandate = 'UnknownMandate'
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types
+export const isCreateError = (o: any): o is CreateError =>
+  Object.values(CreateError).includes(o)
+
 export enum OutgoingPaymentError {
   UnknownPayment = 'UnknownPayment',
   WrongState = 'WrongState'
@@ -13,6 +23,7 @@ export type PaymentError = LifecycleError | Pay.PaymentError
 
 export enum LifecycleError {
   QuoteExpired = 'QuoteExpired',
+  InsufficientMandate = 'InsufficientMandate',
   // Rate fetch failed.
   PricesUnavailable = 'PricesUnavailable',
   // Payment aborted via "cancel payment" API call.
@@ -22,6 +33,7 @@ export enum LifecycleError {
 
   // These errors shouldn't ever trigger (impossible states), but they exist to satisfy types:
   MissingBalance = 'MissingBalance',
+  MissingMandate = 'MissingMandate',
   MissingQuote = 'MissingQuote',
   MissingInvoice = 'MissingInvoice',
   InvalidRatio = 'InvalidRatio'

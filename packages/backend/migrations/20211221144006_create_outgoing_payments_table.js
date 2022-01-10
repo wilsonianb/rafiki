@@ -9,7 +9,6 @@ exports.up = function (knex) {
     table.string('intentPaymentPointer').nullable()
     table.string('intentInvoiceUrl').nullable()
     table.bigInteger('intentAmountToSend').nullable()
-    table.boolean('intentAutoApprove').notNullable()
 
     table.timestamp('quoteTimestamp').nullable()
     table.timestamp('quoteActivationDeadline').nullable()
@@ -32,6 +31,12 @@ exports.up = function (knex) {
     // from which to request funds for payment
     table.uuid('accountId').notNullable()
     table.foreign('accountId').references('accounts.id')
+    // Open payments mandate for which this payment is a charge
+    table.uuid('mandateId').nullable()
+    table.foreign('mandateId').references('mandates.id')
+    table.float('mandateExchangeRate').nullable()
+    table.timestamp('mandateRefundDeadline').nullable()
+
     table.integer('destinationAccountScale').notNullable()
     table.string('destinationAccountCode').notNullable()
     table.string('destinationAccountUrl').nullable()
@@ -40,6 +45,8 @@ exports.up = function (knex) {
     table.timestamp('updatedAt').defaultTo(knex.fn.now())
 
     table.index(['accountId', 'createdAt', 'id'])
+
+    table.index(['mandateId', 'createdAt', 'id'])
   })
 }
 

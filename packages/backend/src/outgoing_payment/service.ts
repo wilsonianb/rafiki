@@ -3,10 +3,16 @@ import * as Pay from '@interledger/pay'
 import { v4 as uuid } from 'uuid'
 
 import { BaseService } from '../shared/baseService'
-import { LifecycleError, OutgoingPaymentError } from './errors'
-import { OutgoingPayment, PaymentIntent, PaymentState } from './model'
+import { CreateError, LifecycleError, OutgoingPaymentError } from './errors'
+import {
+  InvoiceIntent,
+  OutgoingPayment,
+  PaymentIntent,
+  PaymentState
+} from './model'
 import { AccountingService } from '../accounting/service'
 import { AccountService } from '../open_payments/account/service'
+import { MandateService } from '../open_payments/mandate/service'
 import { RatesService } from '../rates/service'
 import { WebhookService } from '../webhook/service'
 import { IlpPlugin, IlpPluginOptions } from './ilp_plugin'
@@ -15,7 +21,9 @@ import * as worker from './worker'
 
 export interface OutgoingPaymentService {
   get(id: string): Promise<OutgoingPayment | undefined>
-  create(options: CreateOutgoingPaymentOptions): Promise<OutgoingPayment>
+  create(
+    options: CreateOutgoingPaymentOptions
+  ): Promise<OutgoingPayment | CreateError>
   fund(
     options: FundOutgoingPaymentOptions
   ): Promise<OutgoingPayment | OutgoingPaymentError>
@@ -39,6 +47,7 @@ export interface ServiceDependencies extends BaseService {
   quoteLifespan: number // milliseconds
   accountingService: AccountingService
   accountService: AccountService
+  mandateService: MandateService
   ratesService: RatesService
   webhookService: WebhookService
   makeIlpPlugin: (options: IlpPluginOptions) => IlpPlugin
@@ -70,33 +79,35 @@ async function getOutgoingPayment(
 ): Promise<OutgoingPayment | undefined> {
   return OutgoingPayment.query(deps.knex)
     .findById(id)
-    .withGraphJoined('account.asset')
+    .withGraphJoined('[account.asset, mandate]')
 }
 
-type CreateOutgoingPaymentOptions = PaymentIntent & {
-  accountId: string
-}
+export type CreateOutgoingPaymentOptions =
+  | (InvoiceIntent & {
+      accountId?: never
+      mandateId?: string
+    })
+  | (PaymentIntent & {
+      accountId: string
+      mandateId?: never
+    })
 
-// TODO ensure this is idempotent/safe for autoApprove:true payments
+// TODO ensure this is idempotent/safe for fixed send payments
 async function createOutgoingPayment(
   deps: ServiceDependencies,
   options: CreateOutgoingPaymentOptions
-): Promise<OutgoingPayment> {
-  if (
-    options.invoiceUrl &&
-    (options.paymentPointer || options.amountToSend !== undefined)
-  ) {
-    deps.logger.warn(
-      {
-        options
-      },
-      'createOutgoingPayment invalid parameters'
-    )
-    throw new Error(
-      'invoiceUrl and (paymentPointer,amountToSend) are mutually exclusive'
-    )
+): Promise<OutgoingPayment | CreateError> {
+  let accountId: string
+  if (options.mandateId) {
+    const mandate = await deps.mandateService.get(options.mandateId)
+    if (!mandate) return CreateError.UnknownMandate
+    if (!mandate.isActive()) {
+      return CreateError.InvalidMandate
+    }
+    accountId = mandate.accountId
+  } else if (options.accountId) {
+    accountId = options.accountId
   }
-
   try {
     return await OutgoingPayment.transaction(deps.knex, async (trx) => {
       const payment = await OutgoingPayment.query(trx)
@@ -105,13 +116,13 @@ async function createOutgoingPayment(
           intent: {
             paymentPointer: options.paymentPointer,
             invoiceUrl: options.invoiceUrl,
-            amountToSend: options.amountToSend,
-            autoApprove: options.autoApprove
+            amountToSend: options.amountToSend
           },
-          accountId: options.accountId,
+          accountId,
+          mandateId: options.mandateId,
           destinationAccount: PLACEHOLDER_DESTINATION
         })
-        .withGraphFetched('account.asset')
+        .withGraphFetched('[account.asset, mandate]')
 
       const plugin = deps.makeIlpPlugin({
         sourceAccount: {
@@ -148,7 +159,7 @@ async function createOutgoingPayment(
     })
   } catch (err) {
     if (err instanceof ForeignKeyViolationError) {
-      throw new Error('outgoing payment account does not exist')
+      return CreateError.UnknownAccount
     }
     throw err
   }
@@ -183,7 +194,7 @@ async function fundPayment(
     const payment = await OutgoingPayment.query(trx)
       .findById(id)
       .forUpdate()
-      .withGraphFetched('account.asset')
+      .withGraphFetched('[account.asset, mandate]')
     if (!payment) return OutgoingPaymentError.UnknownPayment
     if (payment.state !== PaymentState.Funding) {
       return OutgoingPaymentError.WrongState
@@ -213,7 +224,10 @@ async function cancelPayment(
   id: string
 ): Promise<OutgoingPayment | OutgoingPaymentError> {
   return deps.knex.transaction(async (trx) => {
-    const payment = await OutgoingPayment.query(trx).findById(id).forUpdate()
+    const payment = await OutgoingPayment.query(trx)
+      .findById(id)
+      .forUpdate()
+      .withGraphFetched('[account.asset, mandate]')
     if (!payment) return OutgoingPaymentError.UnknownPayment
     if (payment.state !== PaymentState.Funding) {
       return OutgoingPaymentError.WrongState

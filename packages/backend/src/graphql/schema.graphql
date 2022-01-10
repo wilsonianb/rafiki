@@ -22,6 +22,9 @@ type Mutation {
   createOutgoingPayment(
     input: CreateOutgoingPaymentInput!
   ): OutgoingPaymentResponse!
+  createOutgoingInvoicePayment(
+    input: CreateOutgoingInvoicePaymentInput!
+  ): OutgoingPaymentResponse!
   "Requote a Cancelled payment."
   requoteOutgoingPayment(paymentId: String!): OutgoingPaymentResponse!
   "Add liquidity to a Funding payment."
@@ -111,6 +114,9 @@ type Mutation {
 
   "Revoke Session"
   revokeSession(input: RevokeSessionInput!): RevokeSessionMutationResponse
+
+  "Revoke mandate"
+  revokeMandate(mandateId: String!): RevokeMandateMutationResponse
 }
 
 type PageInfo {
@@ -310,6 +316,16 @@ type Account {
     "Paginating backwards: The last **n** elements from the page."
     last: Int
   ): InvoiceConnection
+  mandates(
+    "Paginating forwards: the cursor before the the requested page."
+    after: String
+    "Paginating backwards: the cursor after the the requested page."
+    before: String
+    "Paginating forwards: The first **n** elements from the page."
+    first: Int
+    "Paginating backwards: The last **n** elements from the page."
+    last: Int
+  ): MandateConnection
   outgoingPayments(
     "Paginating forwards: the cursor before the the requested page."
     after: String
@@ -341,6 +357,29 @@ type Invoice {
   amount: UInt64!
 }
 
+type MandateConnection {
+  pageInfo: PageInfo!
+  edges: [MandateEdge!]!
+}
+
+type MandateEdge {
+  node: Mandate!
+  cursor: String!
+}
+
+type Mandate {
+  id: ID!
+  createdAt: String!
+  amount: UInt64!
+  balance: UInt64!
+  assetCode: String!
+  assetScale: Int!
+  startAt: String
+  expiresAt: String
+  interval: String
+  revoked: Boolean!
+}
+
 type OutgoingPaymentConnection {
   pageInfo: PageInfo!
   edges: [OutgoingPaymentEdge!]!
@@ -368,7 +407,6 @@ type PaymentIntent {
   paymentPointer: String
   amountToSend: UInt64
   invoiceUrl: String
-  autoApprove: Boolean!
 }
 
 enum PaymentState {
@@ -413,10 +451,13 @@ type OutgoingPaymentOutcome {
 
 input CreateOutgoingPaymentInput {
   accountId: String!
-  paymentPointer: String
-  amountToSend: UInt64
-  invoiceUrl: String
-  autoApprove: Boolean!
+  paymentPointer: String!
+  amountToSend: UInt64!
+}
+
+input CreateOutgoingInvoicePaymentInput {
+  accountId: String!
+  invoiceUrl: String!
 }
 
 type OutgoingPaymentResponse {
@@ -556,6 +597,13 @@ type RevokeSessionMutationResponse implements MutationResponse {
   code: String!
   success: Boolean!
   message: String!
+}
+
+type RevokeMandateMutationResponse implements MutationResponse {
+  code: String!
+  success: Boolean!
+  message: String!
+  mandate: Mandate
 }
 
 interface MutationResponse {
