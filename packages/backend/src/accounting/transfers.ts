@@ -3,7 +3,7 @@ import {
   CommitFlags,
   CommitTransferError as CommitTransferErrorCode,
   CreateTransferError as CreateTransferErrorCode,
-  Transfer as TbTransfer,
+  Transfer,
   TransferFlags
 } from 'tigerbeetle-node'
 import { v4 as uuid } from 'uuid'
@@ -18,6 +18,12 @@ import { AccountIdOptions, getAccountId, uuidToBigInt } from './utils'
 
 const TRANSFER_RESERVED = Buffer.alloc(32)
 
+export enum TransferCode {
+  Transfer = 1,
+  Deposit,
+  Withdrawal
+}
+
 type TransfersError = {
   index: number
   error: TransferError
@@ -28,6 +34,7 @@ export interface CreateTransferOptions {
   sourceAccount: AccountIdOptions
   destinationAccount: AccountIdOptions
   amount: bigint
+  code: TransferCode
   timeout?: bigint // nano-seconds
 }
 
@@ -35,7 +42,7 @@ export async function createTransfers(
   deps: ServiceDependencies,
   transfers: CreateTransferOptions[]
 ): Promise<void | TransfersError> {
-  const tbTransfers: TbTransfer[] = []
+  const tbTransfers: Transfer[] = []
   for (let i = 0; i < transfers.length; i++) {
     const transfer = transfers[i]
     if (transfer.amount <= BigInt(0)) {
@@ -55,7 +62,7 @@ export async function createTransfers(
       amount: transfer.amount,
       user_data: BigInt(0),
       reserved: TRANSFER_RESERVED,
-      code: 0,
+      code: transfer.code,
       flags,
       timeout: transfer.timeout || BigInt(0),
       timestamp: BigInt(0)
