@@ -3,7 +3,9 @@ import tmp from 'tmp'
 
 import { Config } from '../config/app'
 
-const TIGERBEETLE_DIR = '/var/lib/tigerbeetle'
+export const TIGERBEETLE_DIR = '/var/lib/tigerbeetle'
+export const TIGERBEETLE_IMAGE =
+  'ghcr.io/coilhq/tigerbeetle@sha256:4dcf54b7b4b9a01f71dc3ed4dabf5a7284eb7b8fd1477e30ca7f0471d0ea8a2b'
 export const TIGERBEETLE_PORT = 3004
 
 export async function startTigerbeetleContainer(
@@ -11,9 +13,7 @@ export async function startTigerbeetleContainer(
 ): Promise<StartedTestContainer> {
   const { name: tigerbeetleDir } = tmp.dirSync({ unsafeCleanup: true })
 
-  await new GenericContainer(
-    'ghcr.io/coilhq/tigerbeetle@sha256:0d8cd6b7a0a7f7ef678c6fc877f294071ead642698db2a438a6599a3ade8fb6f'
-  )
+  await new GenericContainer(TIGERBEETLE_IMAGE)
     .withExposedPorts(TIGERBEETLE_PORT)
     .withBindMount(tigerbeetleDir, TIGERBEETLE_DIR)
     .withCmd([
@@ -25,9 +25,7 @@ export async function startTigerbeetleContainer(
     .withWaitStrategy(Wait.forLogMessage(/initialized data file/))
     .start()
 
-  return await new GenericContainer(
-    'ghcr.io/coilhq/tigerbeetle@sha256:0d8cd6b7a0a7f7ef678c6fc877f294071ead642698db2a438a6599a3ade8fb6f'
-  )
+  return await new GenericContainer(TIGERBEETLE_IMAGE)
     .withExposedPorts(TIGERBEETLE_PORT)
     .withBindMount(tigerbeetleDir, TIGERBEETLE_DIR)
     .withCmd([
