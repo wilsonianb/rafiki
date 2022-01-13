@@ -20,10 +20,12 @@ import {
 import {
   CreateTransferOptions,
   createTransfers,
+  getTransfers,
   commitTransfers,
-  rollbackTransfers
+  rollbackTransfers,
+  TransferCode
 } from './transfers'
-import { AccountIdOptions, AssetAccount } from './utils'
+import { AccountIdOptions, AssetAccount, bigIntToUuid } from './utils'
 import { BaseService } from '../shared/baseService'
 import { validateId } from '../shared/utils'
 
@@ -54,8 +56,12 @@ export type Deposit = (AccountOption | AssetOption) & {
   amount: bigint
 }
 
-export type Withdrawal = Deposit & {
+export type WithdrawalOptions = Deposit & {
   timeout: bigint
+}
+
+export type Withdrawal = WithdrawalOptions & {
+  timestamp: Date
 }
 
 export interface TransferOptions {
@@ -82,7 +88,8 @@ export interface AccountingService {
   getAssetSettlementBalance(unit: number): Promise<bigint | undefined>
   createTransfer(options: TransferOptions): Promise<Transaction | TransferError>
   createDeposit(deposit: Deposit): Promise<void | TransferError>
-  createWithdrawal(withdrawal: Withdrawal): Promise<void | TransferError>
+  createWithdrawal(options: WithdrawalOptions): Promise<void | TransferError>
+  getWithdrawal(id: string): Promise<Withdrawal | undefined>
   commitWithdrawal(id: string): Promise<void | TransferError>
   rollbackWithdrawal(id: string): Promise<void | TransferError>
 }
@@ -115,7 +122,8 @@ export function createAccountingService({
     getAssetSettlementBalance: (unit) => getAssetSettlementBalance(deps, unit),
     createTransfer: (options) => createTransfer(deps, options),
     createDeposit: (transfer) => createAccountDeposit(deps, transfer),
-    createWithdrawal: (transfer) => createAccountWithdrawal(deps, transfer),
+    createWithdrawal: (options) => createAccountWithdrawal(deps, options),
+    getWithdrawal: (id) => getAccountWithdrawal(deps, id),
     commitWithdrawal: (options) => commitAccountWithdrawal(deps, options),
     rollbackWithdrawal: (options) => rollbackAccountWithdrawal(deps, options)
   }
@@ -283,24 +291,40 @@ export async function createTransfer(
   }
   const transfers: Required<CreateTransferOptions>[] = []
 
-  // Same asset
-  if (sourceAccount.asset.unit === destinationAccount.asset.unit) {
+  const addTransfer = ({
+    sourceAccount,
+    destinationAccount,
+    amount
+  }: {
+    sourceAccount: AccountIdOptions
+    destinationAccount: AccountIdOptions
+    amount: bigint
+  }) => {
     transfers.push({
       id: uuid(),
+      sourceAccount,
+      destinationAccount,
+      amount,
+      code: TransferCode.Transfer,
+      timeout
+    })
+  }
+
+  // Same asset
+  if (sourceAccount.asset.unit === destinationAccount.asset.unit) {
+    addTransfer({
       sourceAccount,
       destinationAccount,
       amount:
         destinationAmount && destinationAmount < sourceAmount
           ? destinationAmount
-          : sourceAmount,
-      timeout
+          : sourceAmount
     })
     // Same asset, different amounts
     if (destinationAmount && sourceAmount !== destinationAmount) {
       // Send excess source amount to liquidity account
       if (destinationAmount < sourceAmount) {
-        transfers.push({
-          id: uuid(),
+        addTransfer({
           sourceAccount,
           destinationAccount: {
             asset: {
@@ -308,13 +332,11 @@ export async function createTransfer(
               account: AssetAccount.Liquidity
             }
           },
-          amount: sourceAmount - destinationAmount,
-          timeout
+          amount: sourceAmount - destinationAmount
         })
         // Deliver excess destination amount from liquidity account
       } else {
-        transfers.push({
-          id: uuid(),
+        addTransfer({
           sourceAccount: {
             asset: {
               unit: destinationAccount.asset.unit,
@@ -322,8 +344,7 @@ export async function createTransfer(
             }
           },
           destinationAccount,
-          amount: destinationAmount - sourceAmount,
-          timeout
+          amount: destinationAmount - sourceAmount
         })
       }
     }
@@ -335,32 +356,26 @@ export async function createTransfer(
     }
     // Send to source liquidity account
     // Deliver from destination liquidity account
-    transfers.push(
-      {
-        id: uuid(),
-        sourceAccount,
-        destinationAccount: {
-          asset: {
-            unit: sourceAccount.asset.unit,
-            account: AssetAccount.Liquidity
-          }
-        },
-        amount: sourceAmount,
-        timeout
+    addTransfer({
+      sourceAccount,
+      destinationAccount: {
+        asset: {
+          unit: sourceAccount.asset.unit,
+          account: AssetAccount.Liquidity
+        }
       },
-      {
-        id: uuid(),
-        sourceAccount: {
-          asset: {
-            unit: destinationAccount.asset.unit,
-            account: AssetAccount.Liquidity
-          }
-        },
-        destinationAccount,
-        amount: destinationAmount,
-        timeout
-      }
-    )
+      amount: sourceAmount
+    })
+    addTransfer({
+      sourceAccount: {
+        asset: {
+          unit: destinationAccount.asset.unit,
+          account: AssetAccount.Liquidity
+        }
+      },
+      destinationAccount,
+      amount: destinationAmount
+    })
   }
   const error = await createTransfers(deps, transfers)
   if (error) {
@@ -441,7 +456,8 @@ async function createAccountDeposit(
         }
       },
       destinationAccount,
-      amount
+      amount,
+      code: TransferCode.Deposit
     }
   ])
   if (error) {
@@ -451,7 +467,7 @@ async function createAccountDeposit(
 
 async function createAccountWithdrawal(
   deps: ServiceDependencies,
-  { id, accountId, asset, amount, timeout }: Withdrawal
+  { id, accountId, asset, amount, timeout }: WithdrawalOptions
 ): Promise<void | TransferError> {
   if (!validateId(id)) {
     return TransferError.InvalidId
@@ -486,11 +502,30 @@ async function createAccountWithdrawal(
         }
       },
       amount,
+      code: TransferCode.Withdrawal,
       timeout
     }
   ])
   if (error) {
     return error.error
+  }
+}
+
+async function getAccountWithdrawal(
+  deps: ServiceDependencies,
+  withdrawalId: string
+): Promise<Withdrawal | undefined> {
+  const transfers = await getTransfers(deps, [withdrawalId])
+  if (transfers && transfers[0].code === TransferCode.Withdrawal) {
+    const withdrawal = transfers[0]
+    console.log(withdrawal)
+    return {
+      id: withdrawalId,
+      accountId: bigIntToUuid(withdrawal.debit_account_id),
+      amount: withdrawal.amount,
+      timeout: withdrawal.timeout,
+      timestamp: new Date(withdrawal.timestamp.toString())
+    }
   }
 }
 

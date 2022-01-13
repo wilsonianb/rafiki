@@ -4,12 +4,16 @@ const Knex = require('knex')
 const { GenericContainer, Wait } = require('testcontainers')
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const tmp = require('tmp')
+const {
+  TIGERBEETLE_DIR,
+  TIGERBEETLE_IMAGE,
+  TIGERBEETLE_PORT
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+} = require('./src/tests/tigerbeetle')
 
 const POSTGRES_PORT = 5432
 
 const TIGERBEETLE_CLUSTER_ID = 1
-const TIGERBEETLE_PORT = 3004
-const TIGERBEETLE_DIR = '/var/lib/tigerbeetle'
 
 const REDIS_PORT = 6379
 
@@ -67,9 +71,7 @@ module.exports = async (globalConfig) => {
   if (!process.env.TIGERBEETLE_REPLICA_ADDRESSES) {
     const { name: tigerbeetleDir } = tmp.dirSync({ unsafeCleanup: true })
 
-    await new GenericContainer(
-      'ghcr.io/coilhq/tigerbeetle@sha256:0d8cd6b7a0a7f7ef678c6fc877f294071ead642698db2a438a6599a3ade8fb6f'
-    )
+    await new GenericContainer(TIGERBEETLE_IMAGE)
       .withExposedPorts(TIGERBEETLE_PORT)
       .withBindMount(tigerbeetleDir, TIGERBEETLE_DIR)
       .withCmd([
@@ -81,9 +83,7 @@ module.exports = async (globalConfig) => {
       .withWaitStrategy(Wait.forLogMessage(/initialized data file/))
       .start()
 
-    const tigerbeetleContainer = await new GenericContainer(
-      'ghcr.io/coilhq/tigerbeetle@sha256:0d8cd6b7a0a7f7ef678c6fc877f294071ead642698db2a438a6599a3ade8fb6f'
-    )
+    const tigerbeetleContainer = await new GenericContainer(TIGERBEETLE_IMAGE)
       .withExposedPorts(TIGERBEETLE_PORT)
       .withBindMount(tigerbeetleDir, TIGERBEETLE_DIR)
       .withCmd([
