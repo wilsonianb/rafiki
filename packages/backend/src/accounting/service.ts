@@ -20,11 +20,12 @@ import {
 import {
   CreateTransferOptions,
   createTransfers,
+  getTransfers,
   commitTransfers,
   rollbackTransfers,
   TransferCode
 } from './transfers'
-import { AccountIdOptions, AssetAccount } from './utils'
+import { AccountIdOptions, AssetAccount, bigIntToUuid } from './utils'
 import { BaseService } from '../shared/baseService'
 import { validateId } from '../shared/utils'
 
@@ -55,8 +56,12 @@ export type Deposit = (AccountOption | AssetOption) & {
   amount: bigint
 }
 
-export type Withdrawal = Deposit & {
+export type WithdrawalOptions = Deposit & {
   timeout: bigint
+}
+
+export type Withdrawal = WithdrawalOptions & {
+  timestamp: Date
 }
 
 export interface TransferOptions {
@@ -83,7 +88,8 @@ export interface AccountingService {
   getAssetSettlementBalance(unit: number): Promise<bigint | undefined>
   createTransfer(options: TransferOptions): Promise<Transaction | TransferError>
   createDeposit(deposit: Deposit): Promise<void | TransferError>
-  createWithdrawal(withdrawal: Withdrawal): Promise<void | TransferError>
+  createWithdrawal(options: WithdrawalOptions): Promise<void | TransferError>
+  getWithdrawal(id: string): Promise<Withdrawal | undefined>
   commitWithdrawal(id: string): Promise<void | TransferError>
   rollbackWithdrawal(id: string): Promise<void | TransferError>
 }
@@ -116,7 +122,8 @@ export function createAccountingService({
     getAssetSettlementBalance: (unit) => getAssetSettlementBalance(deps, unit),
     createTransfer: (options) => createTransfer(deps, options),
     createDeposit: (transfer) => createAccountDeposit(deps, transfer),
-    createWithdrawal: (transfer) => createAccountWithdrawal(deps, transfer),
+    createWithdrawal: (options) => createAccountWithdrawal(deps, options),
+    getWithdrawal: (id) => getAccountWithdrawal(deps, id),
     commitWithdrawal: (options) => commitAccountWithdrawal(deps, options),
     rollbackWithdrawal: (options) => rollbackAccountWithdrawal(deps, options)
   }
@@ -460,7 +467,7 @@ async function createAccountDeposit(
 
 async function createAccountWithdrawal(
   deps: ServiceDependencies,
-  { id, accountId, asset, amount, timeout }: Withdrawal
+  { id, accountId, asset, amount, timeout }: WithdrawalOptions
 ): Promise<void | TransferError> {
   if (!validateId(id)) {
     return TransferError.InvalidId
@@ -501,6 +508,24 @@ async function createAccountWithdrawal(
   ])
   if (error) {
     return error.error
+  }
+}
+
+async function getAccountWithdrawal(
+  deps: ServiceDependencies,
+  withdrawalId: string
+): Promise<Withdrawal | undefined> {
+  const transfers = await getTransfers(deps, [withdrawalId])
+  if (transfers && transfers[0].code === TransferCode.Withdrawal) {
+    const withdrawal = transfers[0]
+    console.log(withdrawal)
+    return {
+      id: withdrawalId,
+      accountId: bigIntToUuid(withdrawal.debit_account_id),
+      amount: withdrawal.amount,
+      timeout: withdrawal.timeout,
+      timestamp: new Date(withdrawal.timestamp.toString())
+    }
   }
 }
 

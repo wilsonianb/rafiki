@@ -1,3 +1,5 @@
+import * as uuid from 'uuid'
+
 const ASSET_ACCOUNTS_RESERVED = 8
 
 export enum AssetAccount {
@@ -39,4 +41,10 @@ export function getAccountId(options: AccountIdOptions): bigint {
 
 export function uuidToBigInt(id: string): bigint {
   return BigInt(`0x${id.replace(/-/g, '')}`)
+}
+
+export function bigIntToUuid(id: bigint): string {
+  const hexString = id.toString(16).padStart(32, '0')
+  const bytes = Uint8Array.from(Buffer.from(hexString, 'hex'))
+  return uuid.stringify([...bytes])
 }

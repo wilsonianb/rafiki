@@ -9,7 +9,7 @@ import {
   AccountingService,
   AccountOptions,
   Deposit,
-  Withdrawal
+  WithdrawalOptions
 } from './service'
 import { CreateAccountError, TransferError, isTransferError } from './errors'
 import { createTestApp, TestContainer } from '../tests/app'
@@ -592,7 +592,7 @@ describe('Accounting Service', (): void => {
     ${true}  | ${'Asset Liquidity'}
     ${false} | ${'Account'}
   `(`$description Withdrawal`, (asset): void => {
-    let withdrawal: Withdrawal
+    let withdrawal: WithdrawalOptions
     let unit: number
     const startingBalance = BigInt(10)
     beforeEach(
@@ -654,6 +654,9 @@ describe('Accounting Service', (): void => {
         await expect(
           accountingService.getAssetSettlementBalance(unit)
         ).resolves.toEqual(startingBalance)
+        await expect(
+          accountingService.getWithdrawal(withdrawal.id)
+        ).resolves.toBeUndefined()
       })
 
       test('Cannot create withdrawal with invalid id', async (): Promise<void> => {
@@ -713,6 +716,10 @@ describe('Accounting Service', (): void => {
       })
     })
 
+    // describe('Get', (): void => {
+
+    // })
+
     describe('Commit', (): void => {
       beforeEach(
         async (): Promise<void> => {
@@ -738,6 +745,9 @@ describe('Accounting Service', (): void => {
         await expect(
           accountingService.getAssetSettlementBalance(unit)
         ).resolves.toEqual(startingBalance - withdrawal.amount)
+        await expect(
+          accountingService.getWithdrawal(withdrawal.id)
+        ).resolves.toBeUndefined()
       })
 
       test('Cannot commit unknown withdrawal', async (): Promise<void> => {
@@ -811,6 +821,9 @@ describe('Accounting Service', (): void => {
         await expect(
           accountingService.getAssetSettlementBalance(unit)
         ).resolves.toEqual(startingBalance)
+        await expect(
+          accountingService.getWithdrawal(withdrawal.id)
+        ).resolves.toBeUndefined()
       })
 
       test('Cannot rollback unknown withdrawal', async (): Promise<void> => {

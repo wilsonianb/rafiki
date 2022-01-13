@@ -103,6 +103,15 @@ export async function createTransfers(
   }
 }
 
+export async function getTransfers(
+  deps: ServiceDependencies,
+  transferIds: string[]
+): Promise<Transfer[]> {
+  return await deps.tigerbeetle.lookupTransfers(
+    transferIds.map((id) => uuidToBigInt(id))
+  )
+}
+
 export async function commitTransfers(
   deps: ServiceDependencies,
   transferIds: string[]
