@@ -11,9 +11,10 @@ import { IAppConfig, Config } from '../config/app'
 import { IocContract } from '@adonisjs/fold'
 import { initIocContainer } from '../'
 import { AppServices } from '../app'
+import { PaymentFactory } from '../tests/paymentFactory'
 import { truncateTable, truncateTables } from '../tests/tableManager'
 import { OutgoingPayment, PaymentIntent, PaymentState } from './model'
-import { LifecycleError } from './errors'
+import { CreateError, isCreateError, LifecycleError } from './errors'
 import { RETRY_BACKOFF_SECONDS } from './worker'
 import { isTransferError } from '../accounting/errors'
 import { AccountingService, TransferOptions } from '../accounting/service'
@@ -28,6 +29,7 @@ describe('OutgoingPaymentService', (): void => {
   let outgoingPaymentService: OutgoingPaymentService
   let ratesService: RatesService
   let accountingService: AccountingService
+  let paymentFactory: PaymentFactory
   let knex: Knex
   let accountId: string
   let asset: AssetOptions
@@ -186,6 +188,7 @@ describe('OutgoingPaymentService', (): void => {
       appContainer = await createTestApp(deps)
       accountingService = await deps.use('accountingService')
       ratesService = await deps.use('ratesService')
+      paymentFactory = new PaymentFactory(deps)
 
       asset = {
         scale: 9,
@@ -258,6 +261,7 @@ describe('OutgoingPaymentService', (): void => {
         paymentPointer,
         amountToSend: BigInt(123)
       })
+      assert.ok(!isCreateError(payment))
       expect(payment.state).toEqual(PaymentState.Quoting)
       expect(payment.intent).toEqual({
         paymentPointer,
@@ -283,6 +287,7 @@ describe('OutgoingPaymentService', (): void => {
         accountId,
         invoiceUrl
       })
+      assert.ok(!isCreateError(payment))
       expect(payment.state).toEqual(PaymentState.Quoting)
       expect(payment.intent).toEqual({
         invoiceUrl
@@ -309,7 +314,7 @@ describe('OutgoingPaymentService', (): void => {
           paymentPointer,
           amountToSend: BigInt(123)
         })
-      ).rejects.toThrow('outgoing payment account does not exist')
+      ).resolves.toEqual(CreateError.UnknownAccount)
     })
   })
 
@@ -317,7 +322,7 @@ describe('OutgoingPaymentService', (): void => {
     describe('QUOTING→', (): void => {
       it('FUNDING (FixedSend)', async (): Promise<void> => {
         const paymentId = (
-          await outgoingPaymentService.create({
+          await paymentFactory.build({
             accountId,
             paymentPointer,
             amountToSend: BigInt(123)
@@ -352,7 +357,7 @@ describe('OutgoingPaymentService', (): void => {
 
       it('FUNDING (FixedDelivery)', async (): Promise<void> => {
         const paymentId = (
-          await outgoingPaymentService.create({
+          await paymentFactory.build({
             accountId,
             invoiceUrl
           })
@@ -379,7 +384,7 @@ describe('OutgoingPaymentService', (): void => {
           .spyOn(ratesService, 'prices')
           .mockImplementation(() => Promise.reject(new Error('fail')))
         const paymentId = (
-          await outgoingPaymentService.create({
+          await paymentFactory.build({
             accountId,
             paymentPointer,
             amountToSend: BigInt(123)
@@ -403,7 +408,7 @@ describe('OutgoingPaymentService', (): void => {
 
       // This mocks QUOTING→FUNDING, but for it to trigger for real, it would go from SENDING→QUOTING(retry)→FUNDING (when the sending partially failed).
       it('FUNDING (FixedSend, 0<intent.amountToSend<amountSent)', async (): Promise<void> => {
-        const payment = await outgoingPaymentService.create({
+        const payment = await paymentFactory.build({
           accountId,
           paymentPointer,
           amountToSend: BigInt(123)
@@ -420,7 +425,7 @@ describe('OutgoingPaymentService', (): void => {
 
       // This mocks QUOTING→COMPLETED, but for it to trigger for real, it would go from SENDING→QUOTING(retry)→COMPLETED (when the SENDING→COMPLETED transition failed to commit).
       it('COMPLETED (FixedSend, intent.amountToSend===amountSent)', async (): Promise<void> => {
-        const payment = await outgoingPaymentService.create({
+        const payment = await paymentFactory.build({
           accountId,
           paymentPointer,
           amountToSend: BigInt(123)
@@ -437,7 +442,7 @@ describe('OutgoingPaymentService', (): void => {
       // Maybe another person or payment paid the invoice already. Or it could be like the FixedSend case, where the SENDING→COMPLETED transition failed to commit, and this is a retry.
       it('COMPLETED (FixedDelivery, invoice was already full paid)', async (): Promise<void> => {
         const paymentId = (
-          await outgoingPaymentService.create({
+          await paymentFactory.build({
             accountId,
             invoiceUrl
           })
@@ -447,7 +452,7 @@ describe('OutgoingPaymentService', (): void => {
       })
 
       it('CANCELLED (destination asset changed)', async (): Promise<void> => {
-        const originalPayment = await outgoingPaymentService.create({
+        const originalPayment = await paymentFactory.build({
           accountId,
           paymentPointer,
           amountToSend: BigInt(123)
@@ -479,7 +484,7 @@ describe('OutgoingPaymentService', (): void => {
 
       beforeEach(
         async (): Promise<void> => {
-          const { id: paymentId } = await outgoingPaymentService.create({
+          const { id: paymentId } = await paymentFactory.build({
             accountId,
             paymentPointer,
             amountToSend: BigInt(123)
@@ -557,7 +562,7 @@ describe('OutgoingPaymentService', (): void => {
       )
 
       async function setup(opts: PaymentIntent): Promise<string> {
-        const { id: paymentId } = await outgoingPaymentService.create({
+        const { id: paymentId } = await paymentFactory.build({
           accountId,
           ...opts
         })
@@ -794,7 +799,7 @@ describe('OutgoingPaymentService', (): void => {
             .mockImplementation(() => Promise.resolve())
 
           paymentId = (
-            await outgoingPaymentService.create({
+            await paymentFactory.build({
               accountId,
               invoiceUrl
             })
@@ -907,7 +912,7 @@ describe('OutgoingPaymentService', (): void => {
       paymentsCreated = []
       for (let i = 0; i < 40; i++) {
         paymentsCreated.push(
-          await outgoingPaymentService.create({
+          await paymentFactory.build({
             accountId,
             paymentPointer,
             amountToSend: BigInt(123)
