@@ -14,6 +14,7 @@ import {
 } from './service'
 import { createTestApp, TestContainer } from '../tests/app'
 import { randomAsset } from '../tests/asset'
+import { PaymentFactory } from '../tests/paymentFactory'
 import { truncateTables } from '../tests/tableManager'
 import { Config } from '../config/app'
 import { IocContract } from '@adonisjs/fold'
@@ -53,10 +54,10 @@ describe('Webhook Service', (): void => {
         expiresAt: new Date(Date.now() + 60 * 1000),
         description: 'description!'
       })
-      const outgoingPaymentService = await deps.use('outgoingPaymentService')
       const config = await deps.use('config')
       const invoiceUrl = `${config.publicHost}/invoices/${invoice.id}`
-      payment = await outgoingPaymentService.create({
+      const paymentFactory = new PaymentFactory(deps)
+      payment = await paymentFactory.build({
         accountId,
         invoiceUrl
       })

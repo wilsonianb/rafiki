@@ -3,6 +3,7 @@ import * as Pay from '@interledger/pay'
 import { v4 as uuid } from 'uuid'
 
 import { BaseService } from '../shared/baseService'
+import { CreateError } from './errors'
 import { OutgoingPayment, PaymentIntent, PaymentState } from './model'
 import { AccountingService } from '../accounting/service'
 import { AccountService } from '../open_payments/account/service'
@@ -13,7 +14,9 @@ import * as worker from './worker'
 
 export interface OutgoingPaymentService {
   get(id: string): Promise<OutgoingPayment | undefined>
-  create(options: CreateOutgoingPaymentOptions): Promise<OutgoingPayment>
+  create(
+    options: CreateOutgoingPaymentOptions
+  ): Promise<OutgoingPayment | CreateError>
   processNext(): Promise<string | undefined>
   getAccountPage(
     accountId: string,
@@ -63,7 +66,7 @@ async function getOutgoingPayment(
     .withGraphJoined('account.asset')
 }
 
-type CreateOutgoingPaymentOptions = PaymentIntent & {
+export type CreateOutgoingPaymentOptions = PaymentIntent & {
   accountId: string
 }
 
@@ -71,7 +74,7 @@ type CreateOutgoingPaymentOptions = PaymentIntent & {
 async function createOutgoingPayment(
   deps: ServiceDependencies,
   options: CreateOutgoingPaymentOptions
-): Promise<OutgoingPayment> {
+): Promise<OutgoingPayment | CreateError> {
   try {
     return await OutgoingPayment.transaction(deps.knex, async (trx) => {
       const payment = await OutgoingPayment.query(trx)
@@ -122,7 +125,7 @@ async function createOutgoingPayment(
     })
   } catch (err) {
     if (err instanceof ForeignKeyViolationError) {
-      throw new Error('outgoing payment account does not exist')
+      return CreateError.UnknownAccount
     }
     throw err
   }
