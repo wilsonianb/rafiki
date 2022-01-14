@@ -2,13 +2,13 @@ import { Resolvers } from '../generated/graphql'
 import { getAccount, createAccount } from './account'
 import { getAccountInvoices, getPageInfo } from './invoice'
 import {
-  getOutgoingPayment,
-  createOutgoingPayment,
-  createOutgoingInvoicePayment,
+  getPayment,
+  createPayment,
+  createInvoicePayment,
   getOutcome,
-  getAccountOutgoingPayments,
-  getOutgoingPaymentPageInfo
-} from './outgoing_payment'
+  getAccountPayments,
+  getPaymentPageInfo
+} from './payment'
 import { createApiKey, deleteAllApiKeys, redeemApiKey } from './apiKey'
 import {
   getPeer,
@@ -34,21 +34,21 @@ export const resolvers: Resolvers = {
   UInt64: GraphQLBigInt,
   Query: {
     account: getAccount,
-    outgoingPayment: getOutgoingPayment,
+    payment: getPayment,
     peer: getPeer,
     peers: getPeers
   },
   Account: {
     invoices: getAccountInvoices,
-    outgoingPayments: getAccountOutgoingPayments
+    payments: getAccountPayments
   },
   InvoiceConnection: {
     pageInfo: getPageInfo
   },
-  OutgoingPaymentConnection: {
-    pageInfo: getOutgoingPaymentPageInfo
+  PaymentConnection: {
+    pageInfo: getPaymentPageInfo
   },
-  OutgoingPayment: {
+  Payment: {
     outcome: getOutcome
   },
   PeersConnection: {
@@ -56,8 +56,8 @@ export const resolvers: Resolvers = {
   },
   Mutation: {
     createAccount,
-    createOutgoingPayment,
-    createOutgoingInvoicePayment,
+    createPayment,
+    createInvoicePayment,
     createApiKey: createApiKey,
     redeemApiKey: redeemApiKey,
     deleteAllApiKeys: deleteAllApiKeys,

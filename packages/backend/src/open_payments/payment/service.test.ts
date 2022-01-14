@@ -5,27 +5,27 @@ import * as Pay from '@interledger/pay'
 import { URL } from 'url'
 import { v4 as uuid } from 'uuid'
 
-import { OutgoingPaymentService } from './service'
-import { createTestApp, TestContainer } from '../tests/app'
-import { IAppConfig, Config } from '../config/app'
+import { PaymentService } from './service'
+import { createTestApp, TestContainer } from '../../tests/app'
+import { IAppConfig, Config } from '../../config/app'
 import { IocContract } from '@adonisjs/fold'
-import { initIocContainer } from '../'
-import { AppServices } from '../app'
-import { truncateTable, truncateTables } from '../tests/tableManager'
-import { OutgoingPayment, PaymentIntent, PaymentState } from './model'
+import { initIocContainer } from '../../'
+import { AppServices } from '../../app'
+import { truncateTable, truncateTables } from '../../tests/tableManager'
+import { Payment, PaymentIntent, PaymentState } from './model'
 import { LifecycleError } from './errors'
 import { RETRY_BACKOFF_SECONDS } from './worker'
-import { isTransferError } from '../accounting/errors'
-import { AccountingService, TransferOptions } from '../accounting/service'
-import { AssetOptions } from '../asset/service'
-import { Invoice } from '../open_payments/invoice/model'
-import { RatesService } from '../rates/service'
-import { EventType } from '../webhook/service'
+import { isTransferError } from '../../accounting/errors'
+import { AccountingService, TransferOptions } from '../../accounting/service'
+import { AssetOptions } from '../../asset/service'
+import { Invoice } from '../invoice/model'
+import { RatesService } from '../../rates/service'
+import { EventType } from '../../webhook/service'
 
-describe('OutgoingPaymentService', (): void => {
+describe('PaymentService', (): void => {
   let deps: IocContract<AppServices>
   let appContainer: TestContainer
-  let outgoingPaymentService: OutgoingPaymentService
+  let paymentService: PaymentService
   let ratesService: RatesService
   let accountingService: AccountingService
   let knex: Knex
@@ -77,9 +77,9 @@ describe('OutgoingPaymentService', (): void => {
     paymentId: string,
     expectState: PaymentState,
     expectedError?: string
-  ): Promise<OutgoingPayment> {
-    await expect(outgoingPaymentService.processNext()).resolves.toBe(paymentId)
-    const payment = await outgoingPaymentService.get(paymentId)
+  ): Promise<Payment> {
+    await expect(paymentService.processNext()).resolves.toBe(paymentId)
+    const payment = await paymentService.get(paymentId)
     if (!payment) throw 'no payment'
     if (expectState) expect(payment.state).toBe(expectState)
     expect(payment.error).toEqual(expectedError || null)
@@ -139,7 +139,7 @@ describe('OutgoingPaymentService', (): void => {
   }
 
   async function expectOutcome(
-    payment: OutgoingPayment,
+    payment: Payment,
     {
       amountSent,
       amountDelivered,
@@ -199,7 +199,7 @@ describe('OutgoingPaymentService', (): void => {
 
   beforeEach(
     async (): Promise<void> => {
-      outgoingPaymentService = await deps.use('outgoingPaymentService')
+      paymentService = await deps.use('paymentService')
       const accountService = await deps.use('accountService')
       accountId = (await accountService.create({ asset })).id
       const destinationAsset = {
@@ -247,13 +247,13 @@ describe('OutgoingPaymentService', (): void => {
 
   describe('get', (): void => {
     it('returns undefined when no payment exists', async () => {
-      await expect(outgoingPaymentService.get(uuid())).resolves.toBeUndefined()
+      await expect(paymentService.get(uuid())).resolves.toBeUndefined()
     })
   })
 
   describe('create', (): void => {
-    it('creates an OutgoingPayment (FixedSend)', async () => {
-      const payment = await outgoingPaymentService.create({
+    it('creates an Payment (FixedSend)', async () => {
+      const payment = await paymentService.create({
         accountId,
         paymentPointer,
         amountToSend: BigInt(123)
@@ -273,13 +273,13 @@ describe('OutgoingPaymentService', (): void => {
         url: accountUrl
       })
 
-      const payment2 = await outgoingPaymentService.get(payment.id)
+      const payment2 = await paymentService.get(payment.id)
       if (!payment2) throw 'no payment'
       expect(payment2.id).toEqual(payment.id)
     })
 
-    it('creates an OutgoingPayment (FixedDelivery)', async () => {
-      const payment = await outgoingPaymentService.create({
+    it('creates an Payment (FixedDelivery)', async () => {
+      const payment = await paymentService.create({
         accountId,
         invoiceUrl
       })
@@ -297,14 +297,14 @@ describe('OutgoingPaymentService', (): void => {
         url: accountUrl
       })
 
-      const payment2 = await outgoingPaymentService.get(payment.id)
+      const payment2 = await paymentService.get(payment.id)
       if (!payment2) throw 'no payment'
       expect(payment2.id).toEqual(payment.id)
     })
 
     it('fails to create with nonexistent account', async () => {
       await expect(
-        outgoingPaymentService.create({
+        paymentService.create({
           accountId: uuid(),
           paymentPointer,
           amountToSend: BigInt(123)
@@ -317,7 +317,7 @@ describe('OutgoingPaymentService', (): void => {
     describe('Quoting→', (): void => {
       it('Funding (FixedSend)', async (): Promise<void> => {
         const paymentId = (
-          await outgoingPaymentService.create({
+          await paymentService.create({
             accountId,
             paymentPointer,
             amountToSend: BigInt(123)
@@ -352,7 +352,7 @@ describe('OutgoingPaymentService', (): void => {
 
       it('Funding (FixedDelivery)', async (): Promise<void> => {
         const paymentId = (
-          await outgoingPaymentService.create({
+          await paymentService.create({
             accountId,
             invoiceUrl
           })
@@ -379,7 +379,7 @@ describe('OutgoingPaymentService', (): void => {
           .spyOn(ratesService, 'prices')
           .mockImplementation(() => Promise.reject(new Error('fail')))
         const paymentId = (
-          await outgoingPaymentService.create({
+          await paymentService.create({
             accountId,
             paymentPointer,
             amountToSend: BigInt(123)
@@ -403,7 +403,7 @@ describe('OutgoingPaymentService', (): void => {
 
       // This mocks Quoting→Funding, but for it to trigger for real, it would go from Sending→Quoting(retry)→Funding (when the sending partially failed).
       it('Funding (FixedSend, 0<intent.amountToSend<amountSent)', async (): Promise<void> => {
-        const payment = await outgoingPaymentService.create({
+        const payment = await paymentService.create({
           accountId,
           paymentPointer,
           amountToSend: BigInt(123)
@@ -420,7 +420,7 @@ describe('OutgoingPaymentService', (): void => {
 
       // This mocks Quoting→Completed, but for it to trigger for real, it would go from Sending→Quoting(retry)→Completed (when the Sending→Completed transition failed to commit).
       it('Completed (FixedSend, intent.amountToSend===amountSent)', async (): Promise<void> => {
-        const payment = await outgoingPaymentService.create({
+        const payment = await paymentService.create({
           accountId,
           paymentPointer,
           amountToSend: BigInt(123)
@@ -437,7 +437,7 @@ describe('OutgoingPaymentService', (): void => {
       // Maybe another person or payment paid the invoice already. Or it could be like the FixedSend case, where the Sending→Completed transition failed to commit, and this is a retry.
       it('Completed (FixedDelivery, invoice was already full paid)', async (): Promise<void> => {
         const paymentId = (
-          await outgoingPaymentService.create({
+          await paymentService.create({
             accountId,
             invoiceUrl
           })
@@ -447,14 +447,14 @@ describe('OutgoingPaymentService', (): void => {
       })
 
       it('Cancelled (destination asset changed)', async (): Promise<void> => {
-        const originalPayment = await outgoingPaymentService.create({
+        const originalPayment = await paymentService.create({
           accountId,
           paymentPointer,
           amountToSend: BigInt(123)
         })
         const paymentId = originalPayment.id
         // Pretend that the destination asset was initially different.
-        await OutgoingPayment.query(knex)
+        await Payment.query(knex)
           .findById(paymentId)
           .patch({
             destinationAccount: Object.assign(
@@ -475,11 +475,11 @@ describe('OutgoingPaymentService', (): void => {
     })
 
     describe('Funding→', (): void => {
-      let payment: OutgoingPayment
+      let payment: Payment
 
       beforeEach(
         async (): Promise<void> => {
-          const { id: paymentId } = await outgoingPaymentService.create({
+          const { id: paymentId } = await paymentService.create({
             accountId,
             paymentPointer,
             amountToSend: BigInt(123)
@@ -557,7 +557,7 @@ describe('OutgoingPaymentService', (): void => {
       )
 
       async function setup(opts: PaymentIntent): Promise<string> {
-        const { id: paymentId } = await outgoingPaymentService.create({
+        const { id: paymentId } = await paymentService.create({
           accountId,
           ...opts
         })
@@ -725,7 +725,7 @@ describe('OutgoingPaymentService', (): void => {
 
         await processNext(paymentId, PaymentState.Completed)
         // Pretend that the transaction didn't commit.
-        await OutgoingPayment.query(knex)
+        await Payment.query(knex)
           .findById(paymentId)
           .patch({ state: PaymentState.Sending })
         const payment = await processNext(paymentId, PaymentState.Completed)
@@ -759,7 +759,7 @@ describe('OutgoingPaymentService', (): void => {
           invoiceUrl
         })
         // Pretend that the destination asset was initially different.
-        await OutgoingPayment.query(knex)
+        await Payment.query(knex)
           .findById(paymentId)
           .patch({
             destinationAccount: {
@@ -794,7 +794,7 @@ describe('OutgoingPaymentService', (): void => {
             .mockImplementation(() => Promise.resolve())
 
           paymentId = (
-            await outgoingPaymentService.create({
+            await paymentService.create({
               accountId,
               invoiceUrl
             })
@@ -842,9 +842,7 @@ describe('OutgoingPaymentService', (): void => {
           BigInt(0)
         )
         // Payment is done being processed
-        await expect(
-          outgoingPaymentService.processNext()
-        ).resolves.toBeUndefined()
+        await expect(paymentService.processNext()).resolves.toBeUndefined()
       })
 
       it(`${state} (webhook with empty balance)`, async (): Promise<void> => {
@@ -859,9 +857,7 @@ describe('OutgoingPaymentService', (): void => {
         expect(payment.webhookId).toBeNull()
 
         // Payment is done being processed
-        await expect(
-          outgoingPaymentService.processNext()
-        ).resolves.toBeUndefined()
+        await expect(paymentService.processNext()).resolves.toBeUndefined()
       })
 
       it(`${state} (webhook error)`, async (): Promise<void> => {
@@ -901,13 +897,13 @@ describe('OutgoingPaymentService', (): void => {
   })
 
   describe('getAccountPage', () => {
-    let paymentsCreated: OutgoingPayment[]
+    let paymentsCreated: Payment[]
 
     beforeEach(async (): Promise<void> => {
       paymentsCreated = []
       for (let i = 0; i < 40; i++) {
         paymentsCreated.push(
-          await outgoingPaymentService.create({
+          await paymentService.create({
             accountId,
             paymentPointer,
             amountToSend: BigInt(123)
@@ -918,12 +914,12 @@ describe('OutgoingPaymentService', (): void => {
 
     afterEach(
       async (): Promise<void> => {
-        await truncateTable(knex, 'outgoingPayments')
+        await truncateTable(knex, 'payments')
       }
     )
 
     test('Defaults to fetching first 20 items', async (): Promise<void> => {
-      const payments = await outgoingPaymentService.getAccountPage(accountId)
+      const payments = await paymentService.getAccountPage(accountId)
       expect(payments).toHaveLength(20)
       expect(payments[0].id).toEqual(paymentsCreated[0].id)
       expect(payments[19].id).toEqual(paymentsCreated[19].id)
@@ -934,7 +930,7 @@ describe('OutgoingPaymentService', (): void => {
       const pagination = {
         first: 10
       }
-      const payments = await outgoingPaymentService.getAccountPage(
+      const payments = await paymentService.getAccountPage(
         accountId,
         pagination
       )
@@ -948,7 +944,7 @@ describe('OutgoingPaymentService', (): void => {
       const pagination = {
         after: paymentsCreated[19].id
       }
-      const payments = await outgoingPaymentService.getAccountPage(
+      const payments = await paymentService.getAccountPage(
         accountId,
         pagination
       )
@@ -963,7 +959,7 @@ describe('OutgoingPaymentService', (): void => {
         first: 10,
         after: paymentsCreated[9].id
       }
-      const payments = await outgoingPaymentService.getAccountPage(
+      const payments = await paymentService.getAccountPage(
         accountId,
         pagination
       )
@@ -977,10 +973,7 @@ describe('OutgoingPaymentService', (): void => {
       const pagination = {
         last: 10
       }
-      const payments = outgoingPaymentService.getAccountPage(
-        accountId,
-        pagination
-      )
+      const payments = paymentService.getAccountPage(accountId, pagination)
       await expect(payments).rejects.toThrow(
         "Can't paginate backwards from the start."
       )
@@ -990,7 +983,7 @@ describe('OutgoingPaymentService', (): void => {
       const pagination = {
         before: paymentsCreated[20].id
       }
-      const payments = await outgoingPaymentService.getAccountPage(
+      const payments = await paymentService.getAccountPage(
         accountId,
         pagination
       )
@@ -1005,7 +998,7 @@ describe('OutgoingPaymentService', (): void => {
         last: 5,
         before: paymentsCreated[10].id
       }
-      const payments = await outgoingPaymentService.getAccountPage(
+      const payments = await paymentService.getAccountPage(
         accountId,
         pagination
       )
@@ -1019,7 +1012,7 @@ describe('OutgoingPaymentService', (): void => {
       const paginationForwards = {
         first: 10
       }
-      const paymentsForwards = await outgoingPaymentService.getAccountPage(
+      const paymentsForwards = await paymentService.getAccountPage(
         accountId,
         paginationForwards
       )
@@ -1027,7 +1020,7 @@ describe('OutgoingPaymentService', (): void => {
         last: 10,
         before: paymentsCreated[10].id
       }
-      const paymentsBackwards = await outgoingPaymentService.getAccountPage(
+      const paymentsBackwards = await paymentService.getAccountPage(
         accountId,
         paginationBackwards
       )
@@ -1041,7 +1034,7 @@ describe('OutgoingPaymentService', (): void => {
         after: paymentsCreated[19].id,
         before: paymentsCreated[19].id
       }
-      const payments = await outgoingPaymentService.getAccountPage(
+      const payments = await paymentService.getAccountPage(
         accountId,
         pagination
       )
@@ -1055,10 +1048,7 @@ describe('OutgoingPaymentService', (): void => {
       const pagination = {
         first: -1
       }
-      const payments = outgoingPaymentService.getAccountPage(
-        accountId,
-        pagination
-      )
+      const payments = paymentService.getAccountPage(accountId, pagination)
       await expect(payments).rejects.toThrow('Pagination index error')
     })
 
@@ -1066,10 +1056,7 @@ describe('OutgoingPaymentService', (): void => {
       const pagination = {
         first: 101
       }
-      const payments = outgoingPaymentService.getAccountPage(
-        accountId,
-        pagination
-      )
+      const payments = paymentService.getAccountPage(accountId, pagination)
       await expect(payments).rejects.toThrow('Pagination index error')
     })
   })

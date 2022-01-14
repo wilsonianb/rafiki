@@ -1,5 +1,5 @@
 exports.up = function (knex) {
-  return knex.schema.createTable('outgoingPayments', function (table) {
+  return knex.schema.createTable('payments', function (table) {
     table.uuid('id').notNullable().primary()
 
     table.string('state').notNullable().index() // PaymentState
@@ -28,7 +28,7 @@ exports.up = function (knex) {
     // Amount already sent at the time of the quote
     table.bigInteger('quoteAmountSent').nullable()
 
-    // Open payments account corresponding to wallet account
+    // Open Payments account corresponding to wallet account
     // from which to request funds for payment
     table.uuid('accountId').notNullable()
     table.foreign('accountId').references('accounts.id')
@@ -44,5 +44,5 @@ exports.up = function (knex) {
 }
 
 exports.down = function (knex) {
-  return knex.schema.dropTableIfExists('outgoingPayments')
+  return knex.schema.dropTableIfExists('payments')
 }

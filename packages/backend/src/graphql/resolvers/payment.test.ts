@@ -13,27 +13,27 @@ import { initIocContainer } from '../..'
 import { Config } from '../../config/app'
 import { randomAsset } from '../../tests/asset'
 import { truncateTables } from '../../tests/tableManager'
-import { OutgoingPaymentService } from '../../outgoing_payment/service'
+import { PaymentService } from '../../open_payments/payment/service'
 import {
-  OutgoingPayment as OutgoingPaymentModel,
+  Payment as PaymentModel,
   PaymentState
-} from '../../outgoing_payment/model'
+} from '../../open_payments/payment/model'
 import { AccountingService } from '../../accounting/service'
 import { AccountService } from '../../open_payments/account/service'
 import {
-  OutgoingPayment,
-  OutgoingPaymentResponse,
+  Payment,
+  PaymentResponse,
   Account,
   PaymentState as SchemaPaymentState,
   PaymentType as SchemaPaymentType
 } from '../generated/graphql'
 
-describe('OutgoingPayment Resolvers', (): void => {
+describe('Payment Resolvers', (): void => {
   let deps: IocContract<AppServices>
   let appContainer: TestContainer
   let knex: Knex
   let accountingService: AccountingService
-  let outgoingPaymentService: OutgoingPaymentService
+  let paymentService: PaymentService
   let accountService: AccountService
 
   const streamServer = new StreamServer({
@@ -50,7 +50,7 @@ describe('OutgoingPayment Resolvers', (): void => {
       appContainer = await createTestApp(deps)
       knex = await deps.use('knex')
       accountingService = await deps.use('accountingService')
-      outgoingPaymentService = await deps.use('outgoingPaymentService')
+      paymentService = await deps.use('paymentService')
       accountService = await deps.use('accountService')
 
       const credentials = streamServer.generateCredentials({
@@ -76,14 +76,14 @@ describe('OutgoingPayment Resolvers', (): void => {
     }
   )
 
-  let payment: OutgoingPaymentModel
+  let payment: PaymentModel
 
   beforeEach(
     async (): Promise<void> => {
       const { id: accountId } = await accountService.create({
         asset: randomAsset()
       })
-      payment = await OutgoingPaymentModel.query(knex).insertAndFetch({
+      payment = await PaymentModel.query(knex).insertAndFetch({
         state: PaymentState.Quoting,
         intent: {
           paymentPointer: 'http://wallet2.example/paymentpointer/bob',
@@ -118,7 +118,7 @@ describe('OutgoingPayment Resolvers', (): void => {
     jest.restoreAllMocks()
   })
 
-  describe('Query.outgoingPayment', (): void => {
+  describe('Query.payment', (): void => {
     // Query with each payment state with and without an error
     const states: [PaymentState, PaymentError | null][] = Object.values(
       PaymentState
@@ -130,14 +130,12 @@ describe('OutgoingPayment Resolvers', (): void => {
       '200 - %s, error: %s',
       async (state, error): Promise<void> => {
         const amountSent = BigInt(78)
-        jest
-          .spyOn(outgoingPaymentService, 'get')
-          .mockImplementation(async () => {
-            const updatedPayment = payment
-            updatedPayment.state = state
-            updatedPayment.error = error
-            return updatedPayment
-          })
+        jest.spyOn(paymentService, 'get').mockImplementation(async () => {
+          const updatedPayment = payment
+          updatedPayment.state = state
+          updatedPayment.error = error
+          return updatedPayment
+        })
         jest
           .spyOn(accountingService, 'getTotalSent')
           .mockImplementation(async (id: string) => {
@@ -148,8 +146,8 @@ describe('OutgoingPayment Resolvers', (): void => {
         const query = await appContainer.apolloClient
           .query({
             query: gql`
-              query OutgoingPayment($paymentId: String!) {
-                outgoingPayment(id: $paymentId) {
+              query Payment($paymentId: String!) {
+                payment(id: $paymentId) {
                   id
                   accountId
                   state
@@ -187,7 +185,7 @@ describe('OutgoingPayment Resolvers', (): void => {
               paymentId: payment.id
             }
           })
-          .then((query): OutgoingPayment => query.data?.outgoingPayment)
+          .then((query): Payment => query.data?.payment)
 
         expect(query.id).toEqual(payment.id)
         expect(query.accountId).toEqual(payment.accountId)
@@ -218,7 +216,7 @@ describe('OutgoingPayment Resolvers', (): void => {
         })
         expect(query.outcome).toEqual({
           amountSent: amountSent.toString(),
-          __typename: 'OutgoingPaymentOutcome'
+          __typename: 'PaymentOutcome'
         })
         expect(new Date(query.createdAt)).toEqual(payment.createdAt)
       }
@@ -226,14 +224,14 @@ describe('OutgoingPayment Resolvers', (): void => {
 
     test('404', async (): Promise<void> => {
       jest
-        .spyOn(outgoingPaymentService, 'get')
+        .spyOn(paymentService, 'get')
         .mockImplementation(async () => undefined)
 
       await expect(
         appContainer.apolloClient.query({
           query: gql`
-            query OutgoingPayment($paymentId: String!) {
-              outgoingPayment(id: $paymentId) {
+            query Payment($paymentId: String!) {
+              payment(id: $paymentId) {
                 id
               }
             }
@@ -244,7 +242,7 @@ describe('OutgoingPayment Resolvers', (): void => {
     })
   })
 
-  describe('Mutation.createOutgoingPayment', (): void => {
+  describe('Mutation.createPayment', (): void => {
     const input = {
       accountId: uuid(),
       paymentPointer: 'http://wallet2.example/paymentpointer/bob',
@@ -252,23 +250,19 @@ describe('OutgoingPayment Resolvers', (): void => {
     }
 
     test('200', async (): Promise<void> => {
-      jest
-        .spyOn(outgoingPaymentService, 'create')
-        .mockImplementation(async (args) => {
-          expect(args).toEqual({
-            ...input,
-            amountToSend: BigInt(input.amountToSend)
-          })
-          return payment
+      jest.spyOn(paymentService, 'create').mockImplementation(async (args) => {
+        expect(args).toEqual({
+          ...input,
+          amountToSend: BigInt(input.amountToSend)
         })
+        return payment
+      })
 
       const query = await appContainer.apolloClient
         .query({
           query: gql`
-            mutation CreateOutgoingPayment(
-              $input: CreateOutgoingPaymentInput!
-            ) {
-              createOutgoingPayment(input: $input) {
+            mutation CreatePayment($input: CreatePaymentInput!) {
+              createPayment(input: $input) {
                 code
                 success
                 payment {
@@ -280,9 +274,7 @@ describe('OutgoingPayment Resolvers', (): void => {
           `,
           variables: { input }
         })
-        .then(
-          (query): OutgoingPaymentResponse => query.data?.createOutgoingPayment
-        )
+        .then((query): PaymentResponse => query.data?.createPayment)
 
       expect(query.code).toBe('200')
       expect(query.success).toBe(true)
@@ -291,19 +283,15 @@ describe('OutgoingPayment Resolvers', (): void => {
     })
 
     test('400', async (): Promise<void> => {
-      jest
-        .spyOn(outgoingPaymentService, 'create')
-        .mockImplementation(async (_args) => {
-          throw PaymentError.InvalidPaymentPointer
-        })
+      jest.spyOn(paymentService, 'create').mockImplementation(async (_args) => {
+        throw PaymentError.InvalidPaymentPointer
+      })
 
       const query = await appContainer.apolloClient
         .query({
           query: gql`
-            mutation CreateOutgoingPayment(
-              $input: CreateOutgoingPaymentInput!
-            ) {
-              createOutgoingPayment(input: $input) {
+            mutation CreatePayment($input: CreatePaymentInput!) {
+              createPayment(input: $input) {
                 code
                 success
                 message
@@ -316,9 +304,7 @@ describe('OutgoingPayment Resolvers', (): void => {
           `,
           variables: { input }
         })
-        .then(
-          (query): OutgoingPaymentResponse => query.data?.createOutgoingPayment
-        )
+        .then((query): PaymentResponse => query.data?.createPayment)
       expect(query.code).toBe('400')
       expect(query.success).toBe(false)
       expect(query.message).toBe(PaymentError.InvalidPaymentPointer)
@@ -326,19 +312,15 @@ describe('OutgoingPayment Resolvers', (): void => {
     })
 
     test('500', async (): Promise<void> => {
-      jest
-        .spyOn(outgoingPaymentService, 'create')
-        .mockImplementation(async (_args) => {
-          throw PaymentError.ReceiverProtocolViolation
-        })
+      jest.spyOn(paymentService, 'create').mockImplementation(async (_args) => {
+        throw PaymentError.ReceiverProtocolViolation
+      })
 
       const query = await appContainer.apolloClient
         .query({
           query: gql`
-            mutation CreateOutgoingPayment(
-              $input: CreateOutgoingPaymentInput!
-            ) {
-              createOutgoingPayment(input: $input) {
+            mutation CreatePayment($input: CreatePaymentInput!) {
+              createPayment(input: $input) {
                 code
                 success
                 message
@@ -351,9 +333,7 @@ describe('OutgoingPayment Resolvers', (): void => {
           `,
           variables: { input }
         })
-        .then(
-          (query): OutgoingPaymentResponse => query.data?.createOutgoingPayment
-        )
+        .then((query): PaymentResponse => query.data?.createPayment)
       expect(query.code).toBe('500')
       expect(query.success).toBe(false)
       expect(query.message).toBe(PaymentError.ReceiverProtocolViolation)
@@ -361,8 +341,8 @@ describe('OutgoingPayment Resolvers', (): void => {
     })
   })
 
-  describe('Account outgoingPayments', (): void => {
-    let outgoingPayments: OutgoingPaymentModel[]
+  describe('Account payments', (): void => {
+    let payments: PaymentModel[]
     let accountId: string
     beforeAll(
       async (): Promise<void> => {
@@ -371,10 +351,10 @@ describe('OutgoingPayment Resolvers', (): void => {
             asset: randomAsset()
           })
         ).id
-        outgoingPayments = []
+        payments = []
         for (let i = 0; i < 50; i++) {
-          outgoingPayments.push(
-            await OutgoingPaymentModel.query(knex).insertAndFetch({
+          payments.push(
+            await PaymentModel.query(knex).insertAndFetch({
               state: PaymentState.Quoting,
               intent: {
                 paymentPointer: 'http://wallet2.example/paymentpointer/bob',
@@ -413,7 +393,7 @@ describe('OutgoingPayment Resolvers', (): void => {
           query: gql`
             query Account($id: String!) {
               account(id: $id) {
-                outgoingPayments {
+                payments {
                   edges {
                     node {
                       id
@@ -443,18 +423,14 @@ describe('OutgoingPayment Resolvers', (): void => {
             }
           }
         )
-      expect(query.outgoingPayments?.edges).toHaveLength(20)
-      expect(query.outgoingPayments?.pageInfo.hasNextPage).toBeTruthy()
-      expect(query.outgoingPayments?.pageInfo.hasPreviousPage).toBeFalsy()
-      expect(query.outgoingPayments?.pageInfo.startCursor).toEqual(
-        outgoingPayments[0].id
-      )
-      expect(query.outgoingPayments?.pageInfo.endCursor).toEqual(
-        outgoingPayments[19].id
-      )
+      expect(query.payments?.edges).toHaveLength(20)
+      expect(query.payments?.pageInfo.hasNextPage).toBeTruthy()
+      expect(query.payments?.pageInfo.hasPreviousPage).toBeFalsy()
+      expect(query.payments?.pageInfo.startCursor).toEqual(payments[0].id)
+      expect(query.payments?.pageInfo.endCursor).toEqual(payments[19].id)
     })
 
-    test('No outgoingPayments, but outgoingPayments requested', async (): Promise<void> => {
+    test('No payments, but payments requested', async (): Promise<void> => {
       const { id: accountId } = await accountService.create({
         asset: randomAsset()
       })
@@ -463,7 +439,7 @@ describe('OutgoingPayment Resolvers', (): void => {
           query: gql`
             query Account($id: String!) {
               account(id: $id) {
-                outgoingPayments {
+                payments {
                   edges {
                     node {
                       id
@@ -493,11 +469,11 @@ describe('OutgoingPayment Resolvers', (): void => {
             }
           }
         )
-      expect(query.outgoingPayments?.edges).toHaveLength(0)
-      expect(query.outgoingPayments?.pageInfo.hasNextPage).toBeFalsy()
-      expect(query.outgoingPayments?.pageInfo.hasPreviousPage).toBeFalsy()
-      expect(query.outgoingPayments?.pageInfo.startCursor).toBeNull()
-      expect(query.outgoingPayments?.pageInfo.endCursor).toBeNull()
+      expect(query.payments?.edges).toHaveLength(0)
+      expect(query.payments?.pageInfo.hasNextPage).toBeFalsy()
+      expect(query.payments?.pageInfo.hasPreviousPage).toBeFalsy()
+      expect(query.payments?.pageInfo.startCursor).toBeNull()
+      expect(query.payments?.pageInfo.endCursor).toBeNull()
     })
 
     test('pageInfo is correct on pagination from start', async (): Promise<void> => {
@@ -506,7 +482,7 @@ describe('OutgoingPayment Resolvers', (): void => {
           query: gql`
             query Account($id: String!) {
               account(id: $id) {
-                outgoingPayments(first: 10) {
+                payments(first: 10) {
                   edges {
                     node {
                       id
@@ -536,15 +512,11 @@ describe('OutgoingPayment Resolvers', (): void => {
             }
           }
         )
-      expect(query.outgoingPayments?.edges).toHaveLength(10)
-      expect(query.outgoingPayments?.pageInfo.hasNextPage).toBeTruthy()
-      expect(query.outgoingPayments?.pageInfo.hasPreviousPage).toBeFalsy()
-      expect(query.outgoingPayments?.pageInfo.startCursor).toEqual(
-        outgoingPayments[0].id
-      )
-      expect(query.outgoingPayments?.pageInfo.endCursor).toEqual(
-        outgoingPayments[9].id
-      )
+      expect(query.payments?.edges).toHaveLength(10)
+      expect(query.payments?.pageInfo.hasNextPage).toBeTruthy()
+      expect(query.payments?.pageInfo.hasPreviousPage).toBeFalsy()
+      expect(query.payments?.pageInfo.startCursor).toEqual(payments[0].id)
+      expect(query.payments?.pageInfo.endCursor).toEqual(payments[9].id)
     })
 
     test('pageInfo is correct on pagination from middle', async (): Promise<void> => {
@@ -553,7 +525,7 @@ describe('OutgoingPayment Resolvers', (): void => {
           query: gql`
             query Account($id: String!, $after: String!) {
               account(id: $id) {
-                outgoingPayments(after: $after) {
+                payments(after: $after) {
                   edges {
                     node {
                       id
@@ -572,7 +544,7 @@ describe('OutgoingPayment Resolvers', (): void => {
           `,
           variables: {
             id: accountId,
-            after: outgoingPayments[19].id
+            after: payments[19].id
           }
         })
         .then(
@@ -584,15 +556,11 @@ describe('OutgoingPayment Resolvers', (): void => {
             }
           }
         )
-      expect(query.outgoingPayments?.edges).toHaveLength(20)
-      expect(query.outgoingPayments?.pageInfo.hasNextPage).toBeTruthy()
-      expect(query.outgoingPayments?.pageInfo.hasPreviousPage).toBeTruthy()
-      expect(query.outgoingPayments?.pageInfo.startCursor).toEqual(
-        outgoingPayments[20].id
-      )
-      expect(query.outgoingPayments?.pageInfo.endCursor).toEqual(
-        outgoingPayments[39].id
-      )
+      expect(query.payments?.edges).toHaveLength(20)
+      expect(query.payments?.pageInfo.hasNextPage).toBeTruthy()
+      expect(query.payments?.pageInfo.hasPreviousPage).toBeTruthy()
+      expect(query.payments?.pageInfo.startCursor).toEqual(payments[20].id)
+      expect(query.payments?.pageInfo.endCursor).toEqual(payments[39].id)
     })
 
     test('pageInfo is correct on pagination near end', async (): Promise<void> => {
@@ -601,7 +569,7 @@ describe('OutgoingPayment Resolvers', (): void => {
           query: gql`
             query Account($id: String!, $after: String!) {
               account(id: $id) {
-                outgoingPayments(after: $after, first: 10) {
+                payments(after: $after, first: 10) {
                   edges {
                     node {
                       id
@@ -620,7 +588,7 @@ describe('OutgoingPayment Resolvers', (): void => {
           `,
           variables: {
             id: accountId,
-            after: outgoingPayments[44].id
+            after: payments[44].id
           }
         })
         .then(
@@ -632,15 +600,11 @@ describe('OutgoingPayment Resolvers', (): void => {
             }
           }
         )
-      expect(query.outgoingPayments?.edges).toHaveLength(5)
-      expect(query.outgoingPayments?.pageInfo.hasNextPage).toBeFalsy()
-      expect(query.outgoingPayments?.pageInfo.hasPreviousPage).toBeTruthy()
-      expect(query.outgoingPayments?.pageInfo.startCursor).toEqual(
-        outgoingPayments[45].id
-      )
-      expect(query.outgoingPayments?.pageInfo.endCursor).toEqual(
-        outgoingPayments[49].id
-      )
+      expect(query.payments?.edges).toHaveLength(5)
+      expect(query.payments?.pageInfo.hasNextPage).toBeFalsy()
+      expect(query.payments?.pageInfo.hasPreviousPage).toBeTruthy()
+      expect(query.payments?.pageInfo.startCursor).toEqual(payments[45].id)
+      expect(query.payments?.pageInfo.endCursor).toEqual(payments[49].id)
     })
   })
 })

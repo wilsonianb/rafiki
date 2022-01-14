@@ -20,7 +20,7 @@ import { IocContract } from '@adonisjs/fold'
 import { initIocContainer } from '../'
 import { AppServices } from '../app'
 import { Invoice } from '../open_payments/invoice/model'
-import { OutgoingPayment } from '../outgoing_payment/model'
+import { Payment } from '../open_payments/payment/model'
 
 describe('Webhook Service', (): void => {
   let deps: IocContract<AppServices>
@@ -28,7 +28,7 @@ describe('Webhook Service', (): void => {
   let webhookService: WebhookService
   let knex: Knex
   let invoice: Invoice
-  let payment: OutgoingPayment
+  let payment: Payment
   let amountReceived: bigint
   let amountSent: bigint
   let balance: bigint
@@ -53,10 +53,10 @@ describe('Webhook Service', (): void => {
         expiresAt: new Date(Date.now() + 60 * 1000),
         description: 'description!'
       })
-      const outgoingPaymentService = await deps.use('outgoingPaymentService')
+      const paymentService = await deps.use('paymentService')
       const config = await deps.use('config')
       const invoiceUrl = `${config.publicHost}/invoices/${invoice.id}`
-      payment = await outgoingPaymentService.create({
+      payment = await paymentService.create({
         accountId,
         invoiceUrl
       })

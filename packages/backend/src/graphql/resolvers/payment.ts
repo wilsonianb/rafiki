@@ -1,41 +1,37 @@
 import { isPaymentError, PaymentError } from '@interledger/pay'
 import {
   MutationResolvers,
-  OutgoingPayment as SchemaOutgoingPayment,
-  OutgoingPaymentResolvers,
-  OutgoingPaymentConnectionResolvers,
+  Payment as SchemaPayment,
+  PaymentResolvers,
+  PaymentConnectionResolvers,
   PaymentState as SchemaPaymentState,
   AccountResolvers,
   PaymentType as SchemaPaymentType,
   QueryResolvers,
   ResolversTypes
 } from '../generated/graphql'
-import { OutgoingPayment } from '../../outgoing_payment/model'
+import { Payment } from '../../open_payments/payment/model'
 import { ApolloContext } from '../../app'
 
-export const getOutgoingPayment: QueryResolvers<ApolloContext>['outgoingPayment'] = async (
+export const getPayment: QueryResolvers<ApolloContext>['payment'] = async (
   parent,
   args,
   ctx
-): ResolversTypes['OutgoingPayment'] => {
-  const outgoingPaymentService = await ctx.container.use(
-    'outgoingPaymentService'
-  )
-  const payment = await outgoingPaymentService.get(args.id)
+): ResolversTypes['Payment'] => {
+  const paymentService = await ctx.container.use('paymentService')
+  const payment = await paymentService.get(args.id)
   if (!payment) throw new Error('payment does not exist')
   return paymentToGraphql(payment)
 }
 
-export const getOutcome: OutgoingPaymentResolvers<ApolloContext>['outcome'] = async (
+export const getOutcome: PaymentResolvers<ApolloContext>['outcome'] = async (
   parent,
   args,
   ctx
-): ResolversTypes['OutgoingPaymentOutcome'] => {
+): ResolversTypes['PaymentOutcome'] => {
   if (!parent.id) throw new Error('missing id')
-  const outgoingPaymentService = await ctx.container.use(
-    'outgoingPaymentService'
-  )
-  const payment = await outgoingPaymentService.get(parent.id)
+  const paymentService = await ctx.container.use('paymentService')
+  const payment = await paymentService.get(parent.id)
   if (!payment) throw new Error('payment does not exist')
 
   const accountingService = await ctx.container.use('accountingService')
@@ -74,17 +70,15 @@ const clientErrors: { [key in PaymentError]: boolean } = {
   MaxSafeEncryptionLimit: false
 }
 
-export const createOutgoingPayment: MutationResolvers<ApolloContext>['createOutgoingPayment'] = async (
+export const createPayment: MutationResolvers<ApolloContext>['createPayment'] = async (
   parent,
   args,
   ctx
-): ResolversTypes['OutgoingPaymentResponse'] => {
-  const outgoingPaymentService = await ctx.container.use(
-    'outgoingPaymentService'
-  )
-  return outgoingPaymentService
+): ResolversTypes['PaymentResponse'] => {
+  const paymentService = await ctx.container.use('paymentService')
+  return paymentService
     .create(args.input)
-    .then((payment: OutgoingPayment) => ({
+    .then((payment: Payment) => ({
       code: '200',
       success: true,
       payment: paymentToGraphql(payment)
@@ -96,17 +90,15 @@ export const createOutgoingPayment: MutationResolvers<ApolloContext>['createOutg
     }))
 }
 
-export const createOutgoingInvoicePayment: MutationResolvers<ApolloContext>['createOutgoingInvoicePayment'] = async (
+export const createInvoicePayment: MutationResolvers<ApolloContext>['createInvoicePayment'] = async (
   parent,
   args,
   ctx
-): ResolversTypes['OutgoingPaymentResponse'] => {
-  const outgoingPaymentService = await ctx.container.use(
-    'outgoingPaymentService'
-  )
-  return outgoingPaymentService
+): ResolversTypes['PaymentResponse'] => {
+  const paymentService = await ctx.container.use('paymentService')
+  return paymentService
     .create(args.input)
-    .then((payment: OutgoingPayment) => ({
+    .then((payment: Payment) => ({
       code: '200',
       success: true,
       payment: paymentToGraphql(payment)
@@ -118,36 +110,29 @@ export const createOutgoingInvoicePayment: MutationResolvers<ApolloContext>['cre
     }))
 }
 
-export const getAccountOutgoingPayments: AccountResolvers<ApolloContext>['outgoingPayments'] = async (
+export const getAccountPayments: AccountResolvers<ApolloContext>['payments'] = async (
   parent,
   args,
   ctx
-): ResolversTypes['OutgoingPaymentConnection'] => {
+): ResolversTypes['PaymentConnection'] => {
   if (!parent.id) throw new Error('missing account id')
-  const outgoingPaymentService = await ctx.container.use(
-    'outgoingPaymentService'
-  )
-  const outgoingPayments = await outgoingPaymentService.getAccountPage(
-    parent.id,
-    args
-  )
+  const paymentService = await ctx.container.use('paymentService')
+  const payments = await paymentService.getAccountPage(parent.id, args)
   return {
-    edges: outgoingPayments.map((payment: OutgoingPayment) => ({
+    edges: payments.map((payment: Payment) => ({
       cursor: payment.id,
       node: paymentToGraphql(payment)
     }))
   }
 }
 
-export const getOutgoingPaymentPageInfo: OutgoingPaymentConnectionResolvers<ApolloContext>['pageInfo'] = async (
+export const getPaymentPageInfo: PaymentConnectionResolvers<ApolloContext>['pageInfo'] = async (
   parent,
   args,
   ctx
 ): ResolversTypes['PageInfo'] => {
   const logger = await ctx.container.use('logger')
-  const outgoingPaymentService = await ctx.container.use(
-    'outgoingPaymentService'
-  )
+  const paymentService = await ctx.container.use('paymentService')
   logger.info({ edges: parent.edges }, 'getPageInfo parent edges')
 
   const edges = parent.edges
@@ -160,12 +145,12 @@ export const getOutgoingPaymentPageInfo: OutgoingPaymentConnectionResolvers<Apol
   const firstEdge = edges[0].cursor
   const lastEdge = edges[edges.length - 1].cursor
 
-  const firstPayment = await outgoingPaymentService.get(edges[0].node.id)
+  const firstPayment = await paymentService.get(edges[0].node.id)
   if (!firstPayment) throw 'payment does not exist'
 
   let hasNextPagePayments, hasPreviousPagePayments
   try {
-    hasNextPagePayments = await outgoingPaymentService.getAccountPage(
+    hasNextPagePayments = await paymentService.getAccountPage(
       firstPayment.accountId,
       {
         after: lastEdge,
@@ -176,7 +161,7 @@ export const getOutgoingPaymentPageInfo: OutgoingPaymentConnectionResolvers<Apol
     hasNextPagePayments = []
   }
   try {
-    hasPreviousPagePayments = await outgoingPaymentService.getAccountPage(
+    hasPreviousPagePayments = await paymentService.getAccountPage(
       firstPayment.accountId,
       {
         before: firstEdge,
@@ -196,8 +181,8 @@ export const getOutgoingPaymentPageInfo: OutgoingPaymentConnectionResolvers<Apol
 }
 
 export function paymentToGraphql(
-  payment: OutgoingPayment
-): Omit<SchemaOutgoingPayment, 'outcome' | 'account'> {
+  payment: Payment
+): Omit<SchemaPayment, 'outcome' | 'account'> {
   return {
     id: payment.id,
     accountId: payment.accountId,

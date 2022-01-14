@@ -2,23 +2,20 @@ import { ForeignKeyViolationError, TransactionOrKnex } from 'objection'
 import * as Pay from '@interledger/pay'
 import { v4 as uuid } from 'uuid'
 
-import { BaseService } from '../shared/baseService'
-import { OutgoingPayment, PaymentIntent, PaymentState } from './model'
-import { AccountingService } from '../accounting/service'
-import { AccountService } from '../open_payments/account/service'
-import { RatesService } from '../rates/service'
-import { WebhookService } from '../webhook/service'
+import { BaseService } from '../../shared/baseService'
+import { Payment, PaymentIntent, PaymentState } from './model'
+import { AccountingService } from '../../accounting/service'
+import { AccountService } from '../account/service'
+import { RatesService } from '../../rates/service'
+import { WebhookService } from '../../webhook/service'
 import { IlpPlugin, IlpPluginOptions } from './ilp_plugin'
 import * as worker from './worker'
 
-export interface OutgoingPaymentService {
-  get(id: string): Promise<OutgoingPayment | undefined>
-  create(options: CreateOutgoingPaymentOptions): Promise<OutgoingPayment>
+export interface PaymentService {
+  get(id: string): Promise<Payment | undefined>
+  create(options: CreatePaymentOptions): Promise<Payment>
   processNext(): Promise<string | undefined>
-  getAccountPage(
-    accountId: string,
-    pagination?: Pagination
-  ): Promise<OutgoingPayment[]>
+  getAccountPage(accountId: string, pagination?: Pagination): Promise<Payment[]>
 }
 
 const PLACEHOLDER_DESTINATION = {
@@ -37,44 +34,41 @@ export interface ServiceDependencies extends BaseService {
   makeIlpPlugin: (options: IlpPluginOptions) => IlpPlugin
 }
 
-export async function createOutgoingPaymentService(
+export async function createPaymentService(
   deps_: ServiceDependencies
-): Promise<OutgoingPaymentService> {
+): Promise<PaymentService> {
   const deps = {
     ...deps_,
-    logger: deps_.logger.child({ service: 'OutgoingPaymentService' })
+    logger: deps_.logger.child({ service: 'PaymentService' })
   }
   return {
-    get: (id) => getOutgoingPayment(deps, id),
-    create: (options: CreateOutgoingPaymentOptions) =>
-      createOutgoingPayment(deps, options),
+    get: (id) => getPayment(deps, id),
+    create: (options: CreatePaymentOptions) => createPayment(deps, options),
     processNext: () => worker.processPendingPayment(deps),
     getAccountPage: (accountId, pagination) =>
       getAccountPage(deps, accountId, pagination)
   }
 }
 
-async function getOutgoingPayment(
+async function getPayment(
   deps: ServiceDependencies,
   id: string
-): Promise<OutgoingPayment | undefined> {
-  return OutgoingPayment.query(deps.knex)
-    .findById(id)
-    .withGraphJoined('account.asset')
+): Promise<Payment | undefined> {
+  return Payment.query(deps.knex).findById(id).withGraphJoined('account.asset')
 }
 
-type CreateOutgoingPaymentOptions = PaymentIntent & {
+type CreatePaymentOptions = PaymentIntent & {
   accountId: string
 }
 
 // TODO ensure this is idempotent/safe for fixed send payments
-async function createOutgoingPayment(
+async function createPayment(
   deps: ServiceDependencies,
-  options: CreateOutgoingPaymentOptions
-): Promise<OutgoingPayment> {
+  options: CreatePaymentOptions
+): Promise<Payment> {
   try {
-    return await OutgoingPayment.transaction(deps.knex, async (trx) => {
-      const payment = await OutgoingPayment.query(trx)
+    return await Payment.transaction(deps.knex, async (trx) => {
+      const payment = await Payment.query(trx)
         .insertAndFetch({
           state: PaymentState.Quoting,
           intent: {
@@ -142,13 +136,13 @@ interface Pagination {
  * @param deps ServiceDependencies.
  * @param accountId The accountId of the payments' sending user.
  * @param pagination Pagination - cursors and limits.
- * @returns OutgoingPayment[] An array of payments that form a page.
+ * @returns Payment[] An array of payments that form a page.
  */
 async function getAccountPage(
   deps: ServiceDependencies,
   accountId: string,
   pagination?: Pagination
-): Promise<OutgoingPayment[]> {
+): Promise<Payment[]> {
   if (
     typeof pagination?.before === 'undefined' &&
     typeof pagination?.last === 'number'
@@ -165,10 +159,10 @@ async function getAccountPage(
    * Forward pagination
    */
   if (typeof pagination?.after === 'string') {
-    return OutgoingPayment.query(deps.knex)
+    return Payment.query(deps.knex)
       .where({ accountId })
       .andWhereRaw(
-        '("createdAt", "id") > (select "createdAt" :: TIMESTAMP, "id" from "outgoingPayments" where "id" = ?)',
+        '("createdAt", "id") > (select "createdAt" :: TIMESTAMP, "id" from "payments" where "id" = ?)',
         [pagination.after]
       )
       .orderBy([
@@ -182,10 +176,10 @@ async function getAccountPage(
    * Backward pagination
    */
   if (typeof pagination?.before === 'string') {
-    return OutgoingPayment.query(deps.knex)
+    return Payment.query(deps.knex)
       .where({ accountId })
       .andWhereRaw(
-        '("createdAt", "id") < (select "createdAt" :: TIMESTAMP, "id" from "outgoingPayments" where "id" = ?)',
+        '("createdAt", "id") < (select "createdAt" :: TIMESTAMP, "id" from "payments" where "id" = ?)',
         [pagination.before]
       )
       .orderBy([
@@ -198,7 +192,7 @@ async function getAccountPage(
       })
   }
 
-  return OutgoingPayment.query(deps.knex)
+  return Payment.query(deps.knex)
     .where({ accountId })
     .orderBy([
       { column: 'createdAt', order: 'asc' },

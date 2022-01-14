@@ -58,8 +58,8 @@ export const Config = {
   slippage: envFloat('SLIPPAGE', 0.01),
   quoteLifespan: envInt('QUOTE_LIFESPAN', 5 * 60_000), // milliseconds
 
-  outgoingPaymentWorkers: envInt('OUTGOING_PAYMENT_WORKERS', 4),
-  outgoingPaymentWorkerIdle: envInt('OUTGOING_PAYMENT_WORKER_IDLE', 200), // milliseconds
+  paymentWorkers: envInt('PAYMENT_WORKERS', 4),
+  paymentWorkerIdle: envInt('PAYMENT_WORKER_IDLE', 200), // milliseconds
 
   invoiceWorkers: envInt('INVOICE_WORKERS', 1),
   invoiceWorkerIdle: envInt('INVOICE_WORKER_IDLE', 200), // milliseconds

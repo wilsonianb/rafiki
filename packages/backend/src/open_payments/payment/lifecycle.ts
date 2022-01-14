@@ -1,10 +1,10 @@
 import * as Pay from '@interledger/pay'
 
 import { LifecycleError } from './errors'
-import { OutgoingPayment, PaymentState } from './model'
+import { Payment, PaymentState } from './model'
 import { ServiceDependencies } from './service'
 import { IlpPlugin } from './ilp_plugin'
-import { EventType } from '../webhook/service'
+import { EventType } from '../../webhook/service'
 
 const MAX_INT64 = BigInt('9223372036854775807')
 
@@ -12,7 +12,7 @@ const MAX_INT64 = BigInt('9223372036854775807')
 // "payment" is locked by the "deps.knex" transaction.
 export async function handleQuoting(
   deps: ServiceDependencies,
-  payment: OutgoingPayment,
+  payment: Payment,
   plugin: IlpPlugin
 ): Promise<void> {
   const prices = await deps.ratesService.prices().catch((_err: Error) => {
@@ -134,7 +134,7 @@ export async function handleQuoting(
 // "payment" is locked by the "deps.knex" transaction.
 export async function handleFunding(
   deps: ServiceDependencies,
-  payment: OutgoingPayment
+  payment: Payment
 ): Promise<void> {
   if (!payment.quote) throw LifecycleError.MissingQuote
   const now = new Date()
@@ -185,7 +185,7 @@ export async function handleFunding(
 // "payment" is locked by the "deps.knex" transaction.
 export async function handleSending(
   deps: ServiceDependencies,
-  payment: OutgoingPayment,
+  payment: Payment,
   plugin: IlpPlugin
 ): Promise<void> {
   if (!payment.quote) throw LifecycleError.MissingQuote
@@ -342,7 +342,7 @@ export async function handleSending(
 
 export async function handleCancelledOrCompleted(
   deps: ServiceDependencies,
-  payment: OutgoingPayment
+  payment: Payment
 ): Promise<void> {
   const amountSent = await deps.accountingService.getTotalSent(payment.id)
   const balance = await deps.accountingService.getBalance(payment.id)

@@ -21,7 +21,7 @@ export type Account = {
   id: Scalars['ID'];
   asset: Asset;
   invoices?: Maybe<InvoiceConnection>;
-  outgoingPayments?: Maybe<OutgoingPaymentConnection>;
+  payments?: Maybe<PaymentConnection>;
 };
 
 
@@ -33,7 +33,7 @@ export type AccountInvoicesArgs = {
 };
 
 
-export type AccountOutgoingPaymentsArgs = {
+export type AccountPaymentsArgs = {
   after?: Maybe<Scalars['String']>;
   before?: Maybe<Scalars['String']>;
   first?: Maybe<Scalars['Int']>;
@@ -135,12 +135,12 @@ export type CreateAssetLiquidityWithdrawalInput = {
   id: Scalars['String'];
 };
 
-export type CreateOutgoingInvoicePaymentInput = {
+export type CreateInvoicePaymentInput = {
   accountId: Scalars['String'];
   invoiceUrl: Scalars['String'];
 };
 
-export type CreateOutgoingPaymentInput = {
+export type CreatePaymentInput = {
   accountId: Scalars['String'];
   paymentPointer: Scalars['String'];
   amountToSend: Scalars['UInt64'];
@@ -261,8 +261,8 @@ export type LiquidityMutationResponse = MutationResponse & {
 
 export type Mutation = {
   __typename?: 'Mutation';
-  createOutgoingPayment: OutgoingPaymentResponse;
-  createOutgoingInvoicePayment: OutgoingPaymentResponse;
+  createPayment: PaymentResponse;
+  createInvoicePayment: PaymentResponse;
   createAccount: CreateAccountMutationResponse;
   /** Create peer */
   createPeer: CreatePeerMutationResponse;
@@ -299,13 +299,13 @@ export type Mutation = {
 };
 
 
-export type MutationCreateOutgoingPaymentArgs = {
-  input: CreateOutgoingPaymentInput;
+export type MutationCreatePaymentArgs = {
+  input: CreatePaymentInput;
 };
 
 
-export type MutationCreateOutgoingInvoicePaymentArgs = {
-  input: CreateOutgoingInvoicePaymentInput;
+export type MutationCreateInvoicePaymentArgs = {
+  input: CreateInvoicePaymentInput;
 };
 
 
@@ -404,45 +404,6 @@ export type MutationResponse = {
   message: Scalars['String'];
 };
 
-export type OutgoingPayment = {
-  __typename?: 'OutgoingPayment';
-  id: Scalars['ID'];
-  accountId: Scalars['ID'];
-  state: PaymentState;
-  error?: Maybe<Scalars['String']>;
-  stateAttempts: Scalars['Int'];
-  intent?: Maybe<PaymentIntent>;
-  quote?: Maybe<PaymentQuote>;
-  destinationAccount: PaymentDestinationAccount;
-  outcome?: Maybe<OutgoingPaymentOutcome>;
-  createdAt: Scalars['String'];
-};
-
-export type OutgoingPaymentConnection = {
-  __typename?: 'OutgoingPaymentConnection';
-  pageInfo: PageInfo;
-  edges: Array<OutgoingPaymentEdge>;
-};
-
-export type OutgoingPaymentEdge = {
-  __typename?: 'OutgoingPaymentEdge';
-  node: OutgoingPayment;
-  cursor: Scalars['String'];
-};
-
-export type OutgoingPaymentOutcome = {
-  __typename?: 'OutgoingPaymentOutcome';
-  amountSent: Scalars['UInt64'];
-};
-
-export type OutgoingPaymentResponse = {
-  __typename?: 'OutgoingPaymentResponse';
-  code: Scalars['String'];
-  success: Scalars['Boolean'];
-  message?: Maybe<Scalars['String']>;
-  payment?: Maybe<OutgoingPayment>;
-};
-
 export type PageInfo = {
   __typename?: 'PageInfo';
   /** Paginating forwards: the cursor to continue. */
@@ -455,6 +416,26 @@ export type PageInfo = {
   startCursor?: Maybe<Scalars['String']>;
 };
 
+export type Payment = {
+  __typename?: 'Payment';
+  id: Scalars['ID'];
+  accountId: Scalars['ID'];
+  state: PaymentState;
+  error?: Maybe<Scalars['String']>;
+  stateAttempts: Scalars['Int'];
+  intent?: Maybe<PaymentIntent>;
+  quote?: Maybe<PaymentQuote>;
+  destinationAccount: PaymentDestinationAccount;
+  outcome?: Maybe<PaymentOutcome>;
+  createdAt: Scalars['String'];
+};
+
+export type PaymentConnection = {
+  __typename?: 'PaymentConnection';
+  pageInfo: PageInfo;
+  edges: Array<PaymentEdge>;
+};
+
 export type PaymentDestinationAccount = {
   __typename?: 'PaymentDestinationAccount';
   scale: Scalars['Int'];
@@ -462,11 +443,22 @@ export type PaymentDestinationAccount = {
   url?: Maybe<Scalars['String']>;
 };
 
+export type PaymentEdge = {
+  __typename?: 'PaymentEdge';
+  node: Payment;
+  cursor: Scalars['String'];
+};
+
 export type PaymentIntent = {
   __typename?: 'PaymentIntent';
   paymentPointer?: Maybe<Scalars['String']>;
   amountToSend?: Maybe<Scalars['UInt64']>;
   invoiceUrl?: Maybe<Scalars['String']>;
+};
+
+export type PaymentOutcome = {
+  __typename?: 'PaymentOutcome';
+  amountSent: Scalars['UInt64'];
 };
 
 export type PaymentQuote = {
@@ -480,6 +472,14 @@ export type PaymentQuote = {
   minExchangeRate: Scalars['Float'];
   lowExchangeRateEstimate: Scalars['Float'];
   highExchangeRateEstimate: Scalars['Float'];
+};
+
+export type PaymentResponse = {
+  __typename?: 'PaymentResponse';
+  code: Scalars['String'];
+  success: Scalars['Boolean'];
+  message?: Maybe<Scalars['String']>;
+  payment?: Maybe<Payment>;
 };
 
 export enum PaymentState {
@@ -523,7 +523,7 @@ export type PeersConnection = {
 
 export type Query = {
   __typename?: 'Query';
-  outgoingPayment?: Maybe<OutgoingPayment>;
+  payment?: Maybe<Payment>;
   account?: Maybe<Account>;
   peer?: Maybe<Peer>;
   /** Fetch a page of peers. */
@@ -531,7 +531,7 @@ export type Query = {
 };
 
 
-export type QueryOutgoingPaymentArgs = {
+export type QueryPaymentArgs = {
   id: Scalars['String'];
 };
 
@@ -718,8 +718,8 @@ export type ResolversTypes = {
   CreateApiKeyInput: ResolverTypeWrapper<Partial<CreateApiKeyInput>>;
   CreateApiKeyMutationResponse: ResolverTypeWrapper<Partial<CreateApiKeyMutationResponse>>;
   CreateAssetLiquidityWithdrawalInput: ResolverTypeWrapper<Partial<CreateAssetLiquidityWithdrawalInput>>;
-  CreateOutgoingInvoicePaymentInput: ResolverTypeWrapper<Partial<CreateOutgoingInvoicePaymentInput>>;
-  CreateOutgoingPaymentInput: ResolverTypeWrapper<Partial<CreateOutgoingPaymentInput>>;
+  CreateInvoicePaymentInput: ResolverTypeWrapper<Partial<CreateInvoicePaymentInput>>;
+  CreatePaymentInput: ResolverTypeWrapper<Partial<CreatePaymentInput>>;
   CreatePeerInput: ResolverTypeWrapper<Partial<CreatePeerInput>>;
   CreatePeerLiquidityWithdrawalInput: ResolverTypeWrapper<Partial<CreatePeerLiquidityWithdrawalInput>>;
   CreatePeerMutationResponse: ResolverTypeWrapper<Partial<CreatePeerMutationResponse>>;
@@ -738,16 +738,16 @@ export type ResolversTypes = {
   LiquidityMutationResponse: ResolverTypeWrapper<Partial<LiquidityMutationResponse>>;
   Mutation: ResolverTypeWrapper<{}>;
   MutationResponse: ResolversTypes['AccountWithdrawalMutationResponse'] | ResolversTypes['CreateAccountMutationResponse'] | ResolversTypes['CreateApiKeyMutationResponse'] | ResolversTypes['CreatePeerMutationResponse'] | ResolversTypes['DeleteAllApiKeysMutationResponse'] | ResolversTypes['DeletePeerMutationResponse'] | ResolversTypes['LiquidityMutationResponse'] | ResolversTypes['RedeemApiKeyMutationResponse'] | ResolversTypes['RefreshSessionMutationResponse'] | ResolversTypes['RevokeSessionMutationResponse'] | ResolversTypes['TransferMutationResponse'] | ResolversTypes['UpdatePeerMutationResponse'];
-  OutgoingPayment: ResolverTypeWrapper<Partial<OutgoingPayment>>;
-  OutgoingPaymentConnection: ResolverTypeWrapper<Partial<OutgoingPaymentConnection>>;
-  OutgoingPaymentEdge: ResolverTypeWrapper<Partial<OutgoingPaymentEdge>>;
-  OutgoingPaymentOutcome: ResolverTypeWrapper<Partial<OutgoingPaymentOutcome>>;
-  OutgoingPaymentResponse: ResolverTypeWrapper<Partial<OutgoingPaymentResponse>>;
   PageInfo: ResolverTypeWrapper<Partial<PageInfo>>;
+  Payment: ResolverTypeWrapper<Partial<Payment>>;
+  PaymentConnection: ResolverTypeWrapper<Partial<PaymentConnection>>;
   PaymentDestinationAccount: ResolverTypeWrapper<Partial<PaymentDestinationAccount>>;
+  PaymentEdge: ResolverTypeWrapper<Partial<PaymentEdge>>;
   PaymentIntent: ResolverTypeWrapper<Partial<PaymentIntent>>;
+  PaymentOutcome: ResolverTypeWrapper<Partial<PaymentOutcome>>;
   PaymentQuote: ResolverTypeWrapper<Partial<PaymentQuote>>;
   Float: ResolverTypeWrapper<Partial<Scalars['Float']>>;
+  PaymentResponse: ResolverTypeWrapper<Partial<PaymentResponse>>;
   PaymentState: ResolverTypeWrapper<Partial<PaymentState>>;
   PaymentType: ResolverTypeWrapper<Partial<PaymentType>>;
   Peer: ResolverTypeWrapper<Partial<Peer>>;
@@ -787,8 +787,8 @@ export type ResolversParentTypes = {
   CreateApiKeyInput: Partial<CreateApiKeyInput>;
   CreateApiKeyMutationResponse: Partial<CreateApiKeyMutationResponse>;
   CreateAssetLiquidityWithdrawalInput: Partial<CreateAssetLiquidityWithdrawalInput>;
-  CreateOutgoingInvoicePaymentInput: Partial<CreateOutgoingInvoicePaymentInput>;
-  CreateOutgoingPaymentInput: Partial<CreateOutgoingPaymentInput>;
+  CreateInvoicePaymentInput: Partial<CreateInvoicePaymentInput>;
+  CreatePaymentInput: Partial<CreatePaymentInput>;
   CreatePeerInput: Partial<CreatePeerInput>;
   CreatePeerLiquidityWithdrawalInput: Partial<CreatePeerLiquidityWithdrawalInput>;
   CreatePeerMutationResponse: Partial<CreatePeerMutationResponse>;
@@ -806,16 +806,16 @@ export type ResolversParentTypes = {
   LiquidityMutationResponse: Partial<LiquidityMutationResponse>;
   Mutation: {};
   MutationResponse: ResolversParentTypes['AccountWithdrawalMutationResponse'] | ResolversParentTypes['CreateAccountMutationResponse'] | ResolversParentTypes['CreateApiKeyMutationResponse'] | ResolversParentTypes['CreatePeerMutationResponse'] | ResolversParentTypes['DeleteAllApiKeysMutationResponse'] | ResolversParentTypes['DeletePeerMutationResponse'] | ResolversParentTypes['LiquidityMutationResponse'] | ResolversParentTypes['RedeemApiKeyMutationResponse'] | ResolversParentTypes['RefreshSessionMutationResponse'] | ResolversParentTypes['RevokeSessionMutationResponse'] | ResolversParentTypes['TransferMutationResponse'] | ResolversParentTypes['UpdatePeerMutationResponse'];
-  OutgoingPayment: Partial<OutgoingPayment>;
-  OutgoingPaymentConnection: Partial<OutgoingPaymentConnection>;
-  OutgoingPaymentEdge: Partial<OutgoingPaymentEdge>;
-  OutgoingPaymentOutcome: Partial<OutgoingPaymentOutcome>;
-  OutgoingPaymentResponse: Partial<OutgoingPaymentResponse>;
   PageInfo: Partial<PageInfo>;
+  Payment: Partial<Payment>;
+  PaymentConnection: Partial<PaymentConnection>;
   PaymentDestinationAccount: Partial<PaymentDestinationAccount>;
+  PaymentEdge: Partial<PaymentEdge>;
   PaymentIntent: Partial<PaymentIntent>;
+  PaymentOutcome: Partial<PaymentOutcome>;
   PaymentQuote: Partial<PaymentQuote>;
   Float: Partial<Scalars['Float']>;
+  PaymentResponse: Partial<PaymentResponse>;
   Peer: Partial<Peer>;
   PeerEdge: Partial<PeerEdge>;
   PeersConnection: Partial<PeersConnection>;
@@ -845,7 +845,7 @@ export type AccountResolvers<ContextType = any, ParentType extends ResolversPare
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   asset?: Resolver<ResolversTypes['Asset'], ParentType, ContextType>;
   invoices?: Resolver<Maybe<ResolversTypes['InvoiceConnection']>, ParentType, ContextType, RequireFields<AccountInvoicesArgs, never>>;
-  outgoingPayments?: Resolver<Maybe<ResolversTypes['OutgoingPaymentConnection']>, ParentType, ContextType, RequireFields<AccountOutgoingPaymentsArgs, never>>;
+  payments?: Resolver<Maybe<ResolversTypes['PaymentConnection']>, ParentType, ContextType, RequireFields<AccountPaymentsArgs, never>>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -960,8 +960,8 @@ export type LiquidityMutationResponseResolvers<ContextType = any, ParentType ext
 };
 
 export type MutationResolvers<ContextType = any, ParentType extends ResolversParentTypes['Mutation'] = ResolversParentTypes['Mutation']> = {
-  createOutgoingPayment?: Resolver<ResolversTypes['OutgoingPaymentResponse'], ParentType, ContextType, RequireFields<MutationCreateOutgoingPaymentArgs, 'input'>>;
-  createOutgoingInvoicePayment?: Resolver<ResolversTypes['OutgoingPaymentResponse'], ParentType, ContextType, RequireFields<MutationCreateOutgoingInvoicePaymentArgs, 'input'>>;
+  createPayment?: Resolver<ResolversTypes['PaymentResponse'], ParentType, ContextType, RequireFields<MutationCreatePaymentArgs, 'input'>>;
+  createInvoicePayment?: Resolver<ResolversTypes['PaymentResponse'], ParentType, ContextType, RequireFields<MutationCreateInvoicePaymentArgs, 'input'>>;
   createAccount?: Resolver<ResolversTypes['CreateAccountMutationResponse'], ParentType, ContextType, RequireFields<MutationCreateAccountArgs, 'input'>>;
   createPeer?: Resolver<ResolversTypes['CreatePeerMutationResponse'], ParentType, ContextType, RequireFields<MutationCreatePeerArgs, 'input'>>;
   updatePeer?: Resolver<ResolversTypes['UpdatePeerMutationResponse'], ParentType, ContextType, RequireFields<MutationUpdatePeerArgs, 'input'>>;
@@ -988,7 +988,15 @@ export type MutationResponseResolvers<ContextType = any, ParentType extends Reso
   message?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
 };
 
-export type OutgoingPaymentResolvers<ContextType = any, ParentType extends ResolversParentTypes['OutgoingPayment'] = ResolversParentTypes['OutgoingPayment']> = {
+export type PageInfoResolvers<ContextType = any, ParentType extends ResolversParentTypes['PageInfo'] = ResolversParentTypes['PageInfo']> = {
+  endCursor?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  hasNextPage?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  hasPreviousPage?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  startCursor?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type PaymentResolvers<ContextType = any, ParentType extends ResolversParentTypes['Payment'] = ResolversParentTypes['Payment']> = {
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   accountId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   state?: Resolver<ResolversTypes['PaymentState'], ParentType, ContextType>;
@@ -997,41 +1005,14 @@ export type OutgoingPaymentResolvers<ContextType = any, ParentType extends Resol
   intent?: Resolver<Maybe<ResolversTypes['PaymentIntent']>, ParentType, ContextType>;
   quote?: Resolver<Maybe<ResolversTypes['PaymentQuote']>, ParentType, ContextType>;
   destinationAccount?: Resolver<ResolversTypes['PaymentDestinationAccount'], ParentType, ContextType>;
-  outcome?: Resolver<Maybe<ResolversTypes['OutgoingPaymentOutcome']>, ParentType, ContextType>;
+  outcome?: Resolver<Maybe<ResolversTypes['PaymentOutcome']>, ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
-export type OutgoingPaymentConnectionResolvers<ContextType = any, ParentType extends ResolversParentTypes['OutgoingPaymentConnection'] = ResolversParentTypes['OutgoingPaymentConnection']> = {
+export type PaymentConnectionResolvers<ContextType = any, ParentType extends ResolversParentTypes['PaymentConnection'] = ResolversParentTypes['PaymentConnection']> = {
   pageInfo?: Resolver<ResolversTypes['PageInfo'], ParentType, ContextType>;
-  edges?: Resolver<Array<ResolversTypes['OutgoingPaymentEdge']>, ParentType, ContextType>;
-  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
-};
-
-export type OutgoingPaymentEdgeResolvers<ContextType = any, ParentType extends ResolversParentTypes['OutgoingPaymentEdge'] = ResolversParentTypes['OutgoingPaymentEdge']> = {
-  node?: Resolver<ResolversTypes['OutgoingPayment'], ParentType, ContextType>;
-  cursor?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
-  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
-};
-
-export type OutgoingPaymentOutcomeResolvers<ContextType = any, ParentType extends ResolversParentTypes['OutgoingPaymentOutcome'] = ResolversParentTypes['OutgoingPaymentOutcome']> = {
-  amountSent?: Resolver<ResolversTypes['UInt64'], ParentType, ContextType>;
-  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
-};
-
-export type OutgoingPaymentResponseResolvers<ContextType = any, ParentType extends ResolversParentTypes['OutgoingPaymentResponse'] = ResolversParentTypes['OutgoingPaymentResponse']> = {
-  code?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
-  success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
-  message?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
-  payment?: Resolver<Maybe<ResolversTypes['OutgoingPayment']>, ParentType, ContextType>;
-  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
-};
-
-export type PageInfoResolvers<ContextType = any, ParentType extends ResolversParentTypes['PageInfo'] = ResolversParentTypes['PageInfo']> = {
-  endCursor?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
-  hasNextPage?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
-  hasPreviousPage?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
-  startCursor?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  edges?: Resolver<Array<ResolversTypes['PaymentEdge']>, ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -1042,10 +1023,21 @@ export type PaymentDestinationAccountResolvers<ContextType = any, ParentType ext
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
+export type PaymentEdgeResolvers<ContextType = any, ParentType extends ResolversParentTypes['PaymentEdge'] = ResolversParentTypes['PaymentEdge']> = {
+  node?: Resolver<ResolversTypes['Payment'], ParentType, ContextType>;
+  cursor?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export type PaymentIntentResolvers<ContextType = any, ParentType extends ResolversParentTypes['PaymentIntent'] = ResolversParentTypes['PaymentIntent']> = {
   paymentPointer?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   amountToSend?: Resolver<Maybe<ResolversTypes['UInt64']>, ParentType, ContextType>;
   invoiceUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type PaymentOutcomeResolvers<ContextType = any, ParentType extends ResolversParentTypes['PaymentOutcome'] = ResolversParentTypes['PaymentOutcome']> = {
+  amountSent?: Resolver<ResolversTypes['UInt64'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -1059,6 +1051,14 @@ export type PaymentQuoteResolvers<ContextType = any, ParentType extends Resolver
   minExchangeRate?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   lowExchangeRateEstimate?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   highExchangeRateEstimate?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type PaymentResponseResolvers<ContextType = any, ParentType extends ResolversParentTypes['PaymentResponse'] = ResolversParentTypes['PaymentResponse']> = {
+  code?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  success?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  message?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  payment?: Resolver<Maybe<ResolversTypes['Payment']>, ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -1084,7 +1084,7 @@ export type PeersConnectionResolvers<ContextType = any, ParentType extends Resol
 };
 
 export type QueryResolvers<ContextType = any, ParentType extends ResolversParentTypes['Query'] = ResolversParentTypes['Query']> = {
-  outgoingPayment?: Resolver<Maybe<ResolversTypes['OutgoingPayment']>, ParentType, ContextType, RequireFields<QueryOutgoingPaymentArgs, 'id'>>;
+  payment?: Resolver<Maybe<ResolversTypes['Payment']>, ParentType, ContextType, RequireFields<QueryPaymentArgs, 'id'>>;
   account?: Resolver<Maybe<ResolversTypes['Account']>, ParentType, ContextType, RequireFields<QueryAccountArgs, 'id'>>;
   peer?: Resolver<Maybe<ResolversTypes['Peer']>, ParentType, ContextType, RequireFields<QueryPeerArgs, 'id'>>;
   peers?: Resolver<ResolversTypes['PeersConnection'], ParentType, ContextType, RequireFields<QueryPeersArgs, never>>;
@@ -1157,15 +1157,15 @@ export type Resolvers<ContextType = any> = {
   LiquidityMutationResponse?: LiquidityMutationResponseResolvers<ContextType>;
   Mutation?: MutationResolvers<ContextType>;
   MutationResponse?: MutationResponseResolvers<ContextType>;
-  OutgoingPayment?: OutgoingPaymentResolvers<ContextType>;
-  OutgoingPaymentConnection?: OutgoingPaymentConnectionResolvers<ContextType>;
-  OutgoingPaymentEdge?: OutgoingPaymentEdgeResolvers<ContextType>;
-  OutgoingPaymentOutcome?: OutgoingPaymentOutcomeResolvers<ContextType>;
-  OutgoingPaymentResponse?: OutgoingPaymentResponseResolvers<ContextType>;
   PageInfo?: PageInfoResolvers<ContextType>;
+  Payment?: PaymentResolvers<ContextType>;
+  PaymentConnection?: PaymentConnectionResolvers<ContextType>;
   PaymentDestinationAccount?: PaymentDestinationAccountResolvers<ContextType>;
+  PaymentEdge?: PaymentEdgeResolvers<ContextType>;
   PaymentIntent?: PaymentIntentResolvers<ContextType>;
+  PaymentOutcome?: PaymentOutcomeResolvers<ContextType>;
   PaymentQuote?: PaymentQuoteResolvers<ContextType>;
+  PaymentResponse?: PaymentResponseResolvers<ContextType>;
   Peer?: PeerResolvers<ContextType>;
   PeerEdge?: PeerEdgeResolvers<ContextType>;
   PeersConnection?: PeersConnectionResolvers<ContextType>;

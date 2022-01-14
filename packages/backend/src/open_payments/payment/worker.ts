@@ -2,7 +2,7 @@ import * as knex from 'knex'
 import { v4 as uuid } from 'uuid'
 
 import { ServiceDependencies } from './service'
-import { OutgoingPayment, PaymentState } from './model'
+import { Payment, PaymentState } from './model'
 import { canRetryError, PaymentError } from './errors'
 import * as lifecycle from './lifecycle'
 import { IlpPlugin } from './ilp_plugin'
@@ -45,9 +45,9 @@ export async function processPendingPayment(
 // Exported for testing.
 export async function getPendingPayment(
   trx: knex.Transaction
-): Promise<OutgoingPayment | undefined> {
+): Promise<Payment | undefined> {
   const now = new Date(Date.now()).toISOString()
-  const payments = await OutgoingPayment.query(trx)
+  const payments = await Payment.query(trx)
     .limit(1)
     // Ensure the payment cannot be processed concurrently by multiple workers.
     .forUpdate()
@@ -79,7 +79,7 @@ export async function getPendingPayment(
 // Exported for testing.
 export async function handlePaymentLifecycle(
   deps: ServiceDependencies,
-  payment: OutgoingPayment
+  payment: Payment
 ): Promise<void> {
   const onError = async (err: Error | PaymentError): Promise<void> => {
     const error = typeof err === 'string' ? err : err.message

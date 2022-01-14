@@ -5,7 +5,7 @@ import { Logger } from 'pino'
 
 import { IAppConfig } from '../config/app'
 import { Invoice } from '../open_payments/invoice/model'
-import { OutgoingPayment, PaymentState } from '../outgoing_payment/model'
+import { Payment, PaymentState } from '../open_payments/payment/model'
 
 enum InvoiceEventType {
   InvoiceExpired = 'invoice.expired',
@@ -13,9 +13,9 @@ enum InvoiceEventType {
 }
 
 enum PaymentEventType {
-  PaymentFunding = 'outgoing_payment.funding',
-  PaymentCancelled = 'outgoing_payment.cancelled',
-  PaymentCompleted = 'outgoing_payment.completed'
+  PaymentFunding = 'payment.funding',
+  PaymentCancelled = 'payment.cancelled',
+  PaymentCompleted = 'payment.completed'
 }
 
 export const EventType = { ...InvoiceEventType, ...PaymentEventType }
@@ -39,7 +39,7 @@ interface PaymentEvent {
   id: string
   type: PaymentEventType
   invoice?: never
-  payment: OutgoingPayment
+  payment: Payment
   amountReceived?: never
   amountSent: bigint
   balance: bigint
@@ -196,7 +196,7 @@ export function invoiceToData(
 }
 
 export function paymentToData(
-  payment: OutgoingPayment,
+  payment: Payment,
   amountSent: bigint,
   balance: bigint
 ): PaymentData {

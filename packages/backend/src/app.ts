@@ -32,8 +32,8 @@ import { GrantService } from './open_payments/grant/service'
 import { InvoiceService } from './open_payments/invoice/service'
 import { StreamServer } from '@interledger/stream-receiver'
 import { WebhookService } from './webhook/service'
-import { OutgoingPaymentService } from './outgoing_payment/service'
-import { IlpPlugin, IlpPluginOptions } from './outgoing_payment/ilp_plugin'
+import { PaymentService } from './open_payments/payment/service'
+import { IlpPlugin, IlpPluginOptions } from './open_payments/payment/ilp_plugin'
 import { ApiKeyService } from './apiKey/service'
 import { SessionService } from './session/service'
 import { addDirectivesToSchema } from './graphql/directives'
@@ -75,7 +75,7 @@ export interface AppServices {
   invoiceService: Promise<InvoiceService>
   streamServer: Promise<StreamServer>
   webhookService: Promise<WebhookService>
-  outgoingPaymentService: Promise<OutgoingPaymentService>
+  paymentService: Promise<PaymentService>
   makeIlpPlugin: Promise<(options: IlpPluginOptions) => IlpPlugin>
   ratesService: Promise<RatesService>
   apiKeyService: Promise<ApiKeyService>
@@ -94,7 +94,7 @@ export class App {
   private logger!: Logger
   private messageProducer!: MessageProducer
   private config!: IAppConfig
-  private outgoingPaymentTimer!: NodeJS.Timer
+  private paymentTimer!: NodeJS.Timer
   private deactivateInvoiceTimer!: NodeJS.Timer
 
   public constructor(private container: IocContract<AppServices>) {}
@@ -139,8 +139,8 @@ export class App {
 
     // Workers are in the way during tests.
     if (this.config.env !== 'test') {
-      for (let i = 0; i < this.config.outgoingPaymentWorkers; i++) {
-        process.nextTick(() => this.processOutgoingPayment())
+      for (let i = 0; i < this.config.paymentWorkers; i++) {
+        process.nextTick(() => this.processPayment())
       }
       for (let i = 0; i < this.config.invoiceWorkers; i++) {
         process.nextTick(() => this.processInvoice())
@@ -255,23 +255,21 @@ export class App {
     this.koa.use(this.publicRouter.middleware())
   }
 
-  private async processOutgoingPayment(): Promise<void> {
+  private async processPayment(): Promise<void> {
     if (this.isShuttingDown) return
-    const outgoingPaymentService = await this.container.use(
-      'outgoingPaymentService'
-    )
-    return outgoingPaymentService
+    const paymentService = await this.container.use('paymentService')
+    return paymentService
       .processNext()
       .catch((err) => {
-        this.logger.warn({ error: err.message }, 'processOutgoingPayment error')
+        this.logger.warn({ error: err.message }, 'processPayment error')
         return true
       })
       .then((hasMoreWork) => {
-        if (hasMoreWork) process.nextTick(() => this.processOutgoingPayment())
+        if (hasMoreWork) process.nextTick(() => this.processPayment())
         else
           setTimeout(
-            () => this.processOutgoingPayment(),
-            this.config.outgoingPaymentWorkerIdle
+            () => this.processPayment(),
+            this.config.paymentWorkerIdle
           ).unref()
       })
   }

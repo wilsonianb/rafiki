@@ -107,7 +107,7 @@
             "deprecationReason": null
           },
           {
-            "name": "outgoingPayments",
+            "name": "payments",
             "description": null,
             "args": [
               {
@@ -161,7 +161,7 @@
             ],
             "type": {
               "kind": "OBJECT",
-              "name": "OutgoingPaymentConnection",
+              "name": "PaymentConnection",
               "ofType": null
             },
             "isDeprecated": false,
@@ -968,7 +968,7 @@
       },
       {
         "kind": "INPUT_OBJECT",
-        "name": "CreateOutgoingInvoicePaymentInput",
+        "name": "CreateInvoicePaymentInput",
         "description": null,
         "fields": null,
         "inputFields": [
@@ -1011,7 +1011,7 @@
       },
       {
         "kind": "INPUT_OBJECT",
-        "name": "CreateOutgoingPaymentInput",
+        "name": "CreatePaymentInput",
         "description": null,
         "fields": null,
         "inputFields": [
@@ -1982,7 +1982,7 @@
         "description": null,
         "fields": [
           {
-            "name": "createOutgoingPayment",
+            "name": "createPayment",
             "description": null,
             "args": [
               {
@@ -1993,7 +1993,7 @@
                   "name": null,
                   "ofType": {
                     "kind": "INPUT_OBJECT",
-                    "name": "CreateOutgoingPaymentInput",
+                    "name": "CreatePaymentInput",
                     "ofType": null
                   }
                 },
@@ -2007,7 +2007,7 @@
               "name": null,
               "ofType": {
                 "kind": "OBJECT",
-                "name": "OutgoingPaymentResponse",
+                "name": "PaymentResponse",
                 "ofType": null
               }
             },
@@ -2015,7 +2015,7 @@
             "deprecationReason": null
           },
           {
-            "name": "createOutgoingInvoicePayment",
+            "name": "createInvoicePayment",
             "description": null,
             "args": [
               {
@@ -2026,7 +2026,7 @@
                   "name": null,
                   "ofType": {
                     "kind": "INPUT_OBJECT",
-                    "name": "CreateOutgoingInvoicePaymentInput",
+                    "name": "CreateInvoicePaymentInput",
                     "ofType": null
                   }
                 },
@@ -2040,7 +2040,7 @@
               "name": null,
               "ofType": {
                 "kind": "OBJECT",
-                "name": "OutgoingPaymentResponse",
+                "name": "PaymentResponse",
                 "ofType": null
               }
             },
@@ -2756,7 +2756,74 @@
       },
       {
         "kind": "OBJECT",
-        "name": "OutgoingPayment",
+        "name": "PageInfo",
+        "description": null,
+        "fields": [
+          {
+            "name": "endCursor",
+            "description": "Paginating forwards: the cursor to continue.",
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "hasNextPage",
+            "description": "Paginating forwards: Are there more pages?",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "Boolean",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "hasPreviousPage",
+            "description": "Paginating backwards: Are there more pages?",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "Boolean",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "startCursor",
+            "description": "Paginating backwards: the cursor to continue.",
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
+        "name": "Payment",
         "description": null,
         "fields": [
           {
@@ -2881,7 +2948,7 @@
             "args": [],
             "type": {
               "kind": "OBJECT",
-              "name": "OutgoingPaymentOutcome",
+              "name": "PaymentOutcome",
               "ofType": null
             },
             "isDeprecated": false,
@@ -2911,7 +2978,7 @@
       },
       {
         "kind": "OBJECT",
-        "name": "OutgoingPaymentConnection",
+        "name": "PaymentConnection",
         "description": null,
         "fields": [
           {
@@ -2945,215 +3012,11 @@
                   "name": null,
                   "ofType": {
                     "kind": "OBJECT",
-                    "name": "OutgoingPaymentEdge",
+                    "name": "PaymentEdge",
                     "ofType": null
                   }
                 }
               }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          }
-        ],
-        "inputFields": null,
-        "interfaces": [],
-        "enumValues": null,
-        "possibleTypes": null
-      },
-      {
-        "kind": "OBJECT",
-        "name": "OutgoingPaymentEdge",
-        "description": null,
-        "fields": [
-          {
-            "name": "node",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "kind": "OBJECT",
-                "name": "OutgoingPayment",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "cursor",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          }
-        ],
-        "inputFields": null,
-        "interfaces": [],
-        "enumValues": null,
-        "possibleTypes": null
-      },
-      {
-        "kind": "OBJECT",
-        "name": "OutgoingPaymentOutcome",
-        "description": null,
-        "fields": [
-          {
-            "name": "amountSent",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "kind": "SCALAR",
-                "name": "UInt64",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          }
-        ],
-        "inputFields": null,
-        "interfaces": [],
-        "enumValues": null,
-        "possibleTypes": null
-      },
-      {
-        "kind": "OBJECT",
-        "name": "OutgoingPaymentResponse",
-        "description": null,
-        "fields": [
-          {
-            "name": "code",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "success",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "kind": "SCALAR",
-                "name": "Boolean",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "message",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "SCALAR",
-              "name": "String",
-              "ofType": null
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "payment",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "OBJECT",
-              "name": "OutgoingPayment",
-              "ofType": null
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          }
-        ],
-        "inputFields": null,
-        "interfaces": [],
-        "enumValues": null,
-        "possibleTypes": null
-      },
-      {
-        "kind": "OBJECT",
-        "name": "PageInfo",
-        "description": null,
-        "fields": [
-          {
-            "name": "endCursor",
-            "description": "Paginating forwards: the cursor to continue.",
-            "args": [],
-            "type": {
-              "kind": "SCALAR",
-              "name": "String",
-              "ofType": null
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "hasNextPage",
-            "description": "Paginating forwards: Are there more pages?",
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "kind": "SCALAR",
-                "name": "Boolean",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "hasPreviousPage",
-            "description": "Paginating backwards: Are there more pages?",
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "kind": "SCALAR",
-                "name": "Boolean",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "startCursor",
-            "description": "Paginating backwards: the cursor to continue.",
-            "args": [],
-            "type": {
-              "kind": "SCALAR",
-              "name": "String",
-              "ofType": null
             },
             "isDeprecated": false,
             "deprecationReason": null
@@ -3221,6 +3084,49 @@
       },
       {
         "kind": "OBJECT",
+        "name": "PaymentEdge",
+        "description": null,
+        "fields": [
+          {
+            "name": "node",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "OBJECT",
+                "name": "Payment",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "cursor",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
         "name": "PaymentIntent",
         "description": null,
         "fields": [
@@ -3256,6 +3162,33 @@
               "kind": "SCALAR",
               "name": "String",
               "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
+        "name": "PaymentOutcome",
+        "description": null,
+        "fields": [
+          {
+            "name": "amountSent",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "UInt64",
+                "ofType": null
+              }
             },
             "isDeprecated": false,
             "deprecationReason": null
@@ -3428,6 +3361,73 @@
         "fields": null,
         "inputFields": null,
         "interfaces": null,
+        "enumValues": null,
+        "possibleTypes": null
+      },
+      {
+        "kind": "OBJECT",
+        "name": "PaymentResponse",
+        "description": null,
+        "fields": [
+          {
+            "name": "code",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "success",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "Boolean",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "message",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "payment",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "OBJECT",
+              "name": "Payment",
+              "ofType": null
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          }
+        ],
+        "inputFields": null,
+        "interfaces": [],
         "enumValues": null,
         "possibleTypes": null
       },
@@ -3682,7 +3682,7 @@
         "description": null,
         "fields": [
           {
-            "name": "outgoingPayment",
+            "name": "payment",
             "description": null,
             "args": [
               {
@@ -3704,7 +3704,7 @@
             ],
             "type": {
               "kind": "OBJECT",
-              "name": "OutgoingPayment",
+              "name": "Payment",
               "ofType": null
             },
             "isDeprecated": false,

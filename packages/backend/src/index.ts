@@ -12,12 +12,12 @@ import { App, AppServices } from './app'
 import { Config } from './config/app'
 import { GraphileProducer } from './messaging/graphileProducer'
 import { createRatesService } from './rates/service'
-import { createOutgoingPaymentService } from './outgoing_payment/service'
+import { createPaymentService } from './open_payments/payment/service'
 import {
   createIlpPlugin,
   IlpPlugin,
   IlpPluginOptions
-} from './outgoing_payment/ilp_plugin'
+} from './open_payments/payment/ilp_plugin'
 import { createHttpTokenService } from './httpToken/service'
 import { createAssetService } from './asset/service'
 import { createAccountingService } from './accounting/service'
@@ -235,9 +235,9 @@ export function initIocContainer(
     }
   })
 
-  container.singleton('outgoingPaymentService', async (deps) => {
+  container.singleton('paymentService', async (deps) => {
     const config = await deps.use('config')
-    return await createOutgoingPaymentService({
+    return await createPaymentService({
       slippage: config.slippage,
       quoteLifespan: config.quoteLifespan,
       logger: await deps.use('logger'),

@@ -6,7 +6,7 @@ export enum LifecycleError {
   QuoteExpired = 'QuoteExpired',
   // Rate fetch failed.
   PricesUnavailable = 'PricesUnavailable',
-  // Payment aborted via outgoing_payment.funding webhook response.
+  // Payment aborted via payment.funding webhook response.
   CancelledByWebhook = 'CancelledByWebhook',
   // Edge error due to retries, partial payment, and database write errors.
   BadState = 'BadState',
