@@ -207,8 +207,7 @@ export function initIocContainer(
   container.singleton('grantService', async (deps) => {
     return await createGrantService({
       logger: await deps.use('logger'),
-      knex: await deps.use('knex'),
-      ratesService: await deps.use('ratesService')
+      knex: await deps.use('knex')
     })
   })
 
