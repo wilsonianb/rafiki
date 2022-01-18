@@ -74,7 +74,6 @@ interface PaymentData {
       paymentPointer?: string
       invoiceUrl?: string
       amountToSend?: string
-      autoApprove: boolean
     }
 
     quote?: {

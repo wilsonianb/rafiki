@@ -3,12 +3,14 @@ import {
   MutationResolvers,
   OutgoingPayment as SchemaOutgoingPayment,
   OutgoingPaymentResolvers,
+  OutgoingPaymentResponse,
   OutgoingPaymentConnectionResolvers,
   AccountResolvers,
   PaymentType as SchemaPaymentType,
   QueryResolvers,
   ResolversTypes
 } from '../generated/graphql'
+import { CreateError, isCreateError } from '../../outgoing_payment/errors'
 import { OutgoingPayment } from '../../outgoing_payment/model'
 import { ApolloContext } from '../../app'
 
@@ -83,11 +85,41 @@ export const createOutgoingPayment: MutationResolvers<ApolloContext>['createOutg
   )
   return outgoingPaymentService
     .create(args.input)
-    .then((payment: OutgoingPayment) => ({
-      code: '200',
-      success: true,
-      payment: paymentToGraphql(payment)
+    .then((paymentOrErr: OutgoingPayment | CreateError) =>
+      isCreateError(paymentOrErr)
+        ? createErrorToResponse[paymentOrErr]
+        : {
+            code: '200',
+            success: true,
+            payment: paymentToGraphql(paymentOrErr)
+          }
+    )
+    .catch((err: Error | PaymentError) => ({
+      code: isPaymentError(err) && clientErrors[err] ? '400' : '500',
+      success: false,
+      message: typeof err === 'string' ? err : err.message
     }))
+}
+
+export const createOutgoingInvoicePayment: MutationResolvers<ApolloContext>['createOutgoingInvoicePayment'] = async (
+  parent,
+  args,
+  ctx
+): ResolversTypes['OutgoingPaymentResponse'] => {
+  const outgoingPaymentService = await ctx.container.use(
+    'outgoingPaymentService'
+  )
+  return outgoingPaymentService
+    .create(args.input)
+    .then((paymentOrErr: OutgoingPayment | CreateError) =>
+      isCreateError(paymentOrErr)
+        ? createErrorToResponse[paymentOrErr]
+        : {
+            code: '200',
+            success: true,
+            payment: paymentToGraphql(paymentOrErr)
+          }
+    )
     .catch((err: Error | PaymentError) => ({
       code: isPaymentError(err) && clientErrors[err] ? '400' : '500',
       success: false,
@@ -193,5 +225,20 @@ export function paymentToGraphql(
     },
     destinationAccount: payment.destinationAccount,
     createdAt: new Date(+payment.createdAt).toISOString()
+  }
+}
+
+const createErrorToResponse: {
+  [key in CreateError]: OutgoingPaymentResponse
+} = {
+  [CreateError.UnknownAccount]: {
+    code: '404',
+    message: 'Unknown account',
+    success: false
+  },
+  [CreateError.UnknownMandate]: {
+    code: '404',
+    message: 'Unknown mandate',
+    success: false
   }
 }

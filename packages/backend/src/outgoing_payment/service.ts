@@ -3,6 +3,7 @@ import * as Pay from '@interledger/pay'
 import { v4 as uuid } from 'uuid'
 
 import { BaseService } from '../shared/baseService'
+import { CreateError } from './errors'
 import { OutgoingPayment, PaymentIntent, PaymentState } from './model'
 import { AccountingService } from '../accounting/service'
 import { AccountService } from '../open_payments/account/service'
@@ -13,7 +14,9 @@ import * as worker from './worker'
 
 export interface OutgoingPaymentService {
   get(id: string): Promise<OutgoingPayment | undefined>
-  create(options: CreateOutgoingPaymentOptions): Promise<OutgoingPayment>
+  create(
+    options: CreateOutgoingPaymentOptions
+  ): Promise<OutgoingPayment | CreateError>
   processNext(): Promise<string | undefined>
   getAccountPage(
     accountId: string,
@@ -63,30 +66,15 @@ async function getOutgoingPayment(
     .withGraphJoined('account.asset')
 }
 
-type CreateOutgoingPaymentOptions = PaymentIntent & {
+export type CreateOutgoingPaymentOptions = PaymentIntent & {
   accountId: string
 }
 
-// TODO ensure this is idempotent/safe for autoApprove:true payments
+// TODO ensure this is idempotent/safe for fixed send payments
 async function createOutgoingPayment(
   deps: ServiceDependencies,
   options: CreateOutgoingPaymentOptions
-): Promise<OutgoingPayment> {
-  if (
-    options.invoiceUrl &&
-    (options.paymentPointer || options.amountToSend !== undefined)
-  ) {
-    deps.logger.warn(
-      {
-        options
-      },
-      'createOutgoingPayment invalid parameters'
-    )
-    throw new Error(
-      'invoiceUrl and (paymentPointer,amountToSend) are mutually exclusive'
-    )
-  }
-
+): Promise<OutgoingPayment | CreateError> {
   try {
     return await OutgoingPayment.transaction(deps.knex, async (trx) => {
       const payment = await OutgoingPayment.query(trx)
@@ -95,8 +83,7 @@ async function createOutgoingPayment(
           intent: {
             paymentPointer: options.paymentPointer,
             invoiceUrl: options.invoiceUrl,
-            amountToSend: options.amountToSend,
-            autoApprove: options.autoApprove
+            amountToSend: options.amountToSend
           },
           accountId: options.accountId,
           destinationAccount: PLACEHOLDER_DESTINATION
@@ -138,7 +125,7 @@ async function createOutgoingPayment(
     })
   } catch (err) {
     if (err instanceof ForeignKeyViolationError) {
-      throw new Error('outgoing payment account does not exist')
+      return CreateError.UnknownAccount
     }
     throw err
   }
