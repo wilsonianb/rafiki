@@ -81,8 +81,9 @@ async function createOutgoingPayment(
         .insertAndFetch({
           state: PaymentState.Quoting,
           intent: {
-            paymentPointer: options.paymentPointer,
             invoiceUrl: options.invoiceUrl,
+            maxSourceAmount: options.maxSourceAmount,
+            paymentPointer: options.paymentPointer,
             amountToSend: options.amountToSend
           },
           accountId: options.accountId,

@@ -4,6 +4,7 @@ export interface ConvertOptions {
   sourceAmount: bigint
   sourceAsset: Asset
   destinationAsset: Asset
+  slippage?: number
 }
 
 export interface Asset {
@@ -15,7 +16,8 @@ export function convert(opts: ConvertOptions): bigint {
   const maxScale = Math.max(opts.sourceAsset.scale, opts.destinationAsset.scale)
   const shiftUp = 10 ** maxScale
   const scaleDiff = opts.destinationAsset.scale - opts.sourceAsset.scale
-  const scaledExchangeRate = opts.exchangeRate * 10 ** scaleDiff
+  const scaledExchangeRate =
+    opts.exchangeRate * (1 + (opts.slippage || 0)) * 10 ** scaleDiff
   return (
     (opts.sourceAmount * BigInt(scaledExchangeRate * shiftUp)) / BigInt(shiftUp)
   )

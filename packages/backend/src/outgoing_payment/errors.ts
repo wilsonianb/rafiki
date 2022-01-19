@@ -12,6 +12,7 @@ export type PaymentError = LifecycleError | Pay.PaymentError
 
 export enum LifecycleError {
   QuoteExpired = 'QuoteExpired',
+  QuoteTooExpensive = 'QuoteTooExpensive',
   // Rate fetch failed.
   PricesUnavailable = 'PricesUnavailable',
   // Payment aborted via outgoing_payment.funding webhook response.

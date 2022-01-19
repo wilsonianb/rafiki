@@ -74,6 +74,7 @@ interface PaymentData {
       paymentPointer?: string
       invoiceUrl?: string
       amountToSend?: string
+      maxSourceAmount?: string
     }
 
     quote?: {
@@ -209,7 +210,8 @@ export function paymentToData(
       stateAttempts: payment.stateAttempts,
       intent: {
         ...payment.intent,
-        amountToSend: payment.intent.amountToSend?.toString()
+        amountToSend: payment.intent.amountToSend?.toString(),
+        maxSourceAmount: payment.intent.maxSourceAmount?.toString()
       },
       quote: payment.quote && {
         ...payment.quote,

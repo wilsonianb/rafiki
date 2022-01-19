@@ -283,14 +283,17 @@ describe('OutgoingPaymentService', (): void => {
     })
 
     it('creates an OutgoingPayment (FixedDelivery)', async () => {
+      const maxSourceAmount = BigInt(123)
       const payment = await outgoingPaymentService.create({
         accountId,
-        invoiceUrl
+        invoiceUrl,
+        maxSourceAmount
       })
       assert.ok(!isCreateError(payment))
       expect(payment.state).toEqual(PaymentState.Quoting)
       expect(payment.intent).toEqual({
-        invoiceUrl
+        invoiceUrl,
+        maxSourceAmount
       })
       expect(payment.accountId).toBe(accountId)
       await expectOutcome(payment, { accountBalance: BigInt(0) })
@@ -451,6 +454,39 @@ describe('OutgoingPaymentService', (): void => {
         await processNext(paymentId, PaymentState.Completed)
       })
 
+      it('CANCELLED (FixedDelivery, intent.maxSourceAmount<quote.maxSourceAmount)', async (): Promise<void> => {
+        const { id: paymentId } = await paymentFactory.build({
+          accountId,
+          invoiceUrl,
+          maxSourceAmount: BigInt(112)
+        })
+        await processNext(
+          paymentId,
+          PaymentState.Cancelled,
+          LifecycleError.QuoteTooExpensive
+        )
+      })
+
+      it('CANCELLED (FixedDelivery, intent.maxSourceAmount<amountSent+quote.maxSourceAmount)', async (): Promise<void> => {
+        const { id: paymentId } = await paymentFactory.build({
+          accountId,
+          invoiceUrl,
+          maxSourceAmount: BigInt(112)
+        })
+        await payInvoice(invoice.amount / 2n)
+        jest
+          .spyOn(accountingService, 'getTotalSent')
+          .mockImplementation(async (id: string) => {
+            expect(id).toStrictEqual(paymentId)
+            return BigInt(invoice.amount)
+          })
+        await processNext(
+          paymentId,
+          PaymentState.Cancelled,
+          LifecycleError.QuoteTooExpensive
+        )
+      })
+
       it('CANCELLED (destination asset changed)', async (): Promise<void> => {
         const originalPayment = await paymentFactory.build({
           accountId,
@@ -593,7 +629,8 @@ describe('OutgoingPaymentService', (): void => {
 
       it('COMPLETED (FixedDelivery)', async (): Promise<void> => {
         const paymentId = await setup({
-          invoiceUrl
+          invoiceUrl,
+          maxSourceAmount: BigInt(123)
         })
 
         const payment = await processNext(paymentId, PaymentState.Completed)
@@ -611,7 +648,8 @@ describe('OutgoingPaymentService', (): void => {
         const amountAlreadyDelivered = BigInt(34)
         await payInvoice(amountAlreadyDelivered)
         const paymentId = await setup({
-          invoiceUrl
+          invoiceUrl,
+          maxSourceAmount: BigInt(123)
         })
 
         const payment = await processNext(paymentId, PaymentState.Completed)
@@ -744,7 +782,8 @@ describe('OutgoingPaymentService', (): void => {
       // Caused by retry after failed SENDING→COMPLETED transition commit.
       it('COMPLETED (FixedDelivery, already fully paid)', async (): Promise<void> => {
         const paymentId = await setup({
-          invoiceUrl
+          invoiceUrl,
+          maxSourceAmount: BigInt(123)
         })
         // The quote thinks there's a full amount to pay, but actually sending will find the invoice has been paid (e.g. by another payment).
         await payInvoice(invoice.amount)
@@ -761,7 +800,8 @@ describe('OutgoingPaymentService', (): void => {
 
       it('CANCELLED (destination asset changed)', async (): Promise<void> => {
         const paymentId = await setup({
-          invoiceUrl
+          invoiceUrl,
+          maxSourceAmount: BigInt(123)
         })
         // Pretend that the destination asset was initially different.
         await OutgoingPayment.query(knex)
