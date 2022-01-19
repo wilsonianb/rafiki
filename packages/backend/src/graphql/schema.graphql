@@ -382,6 +382,7 @@ input CreateOutgoingPaymentInput {
 input CreateOutgoingInvoicePaymentInput {
   accountId: String!
   invoiceUrl: String!
+  maxSourceAmount: UInt64!
 }
 
 type OutgoingPaymentResponse {
