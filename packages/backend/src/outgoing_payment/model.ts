@@ -13,15 +13,17 @@ const ratioFields = [
 ]
 
 export interface FixedSendIntent {
-  paymentPointer: string
   invoiceUrl?: never
+  paymentPointer: string
   amountToSend: bigint
+  maxSourceAmount?: never
 }
 
 export interface InvoiceIntent {
-  paymentPointer?: never
   invoiceUrl: string
+  paymentPointer?: never
   amountToSend?: never
+  maxSourceAmount: bigint
 }
 
 export type PaymentIntent = FixedSendIntent | InvoiceIntent
@@ -37,9 +39,10 @@ export class OutgoingPayment extends BaseModel {
   public webhookId?: string | null
 
   public intent!: {
-    paymentPointer?: string
     invoiceUrl?: string
+    paymentPointer?: string
     amountToSend?: bigint
+    maxSourceAmount?: bigint
   }
 
   public quote?: {

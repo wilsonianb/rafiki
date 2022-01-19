@@ -138,6 +138,7 @@ export type CreateAssetLiquidityWithdrawalInput = {
 export type CreateOutgoingInvoicePaymentInput = {
   accountId: Scalars['String'];
   invoiceUrl: Scalars['String'];
+  maxSourceAmount: Scalars['UInt64'];
 };
 
 export type CreateOutgoingPaymentInput = {

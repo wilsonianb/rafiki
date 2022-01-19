@@ -8,7 +8,7 @@ A user creates a payment by passing a `PaymentIntent` to `Mutation.createOutgoin
 
 If the payment destination cannot be resolved, no payment is created and the query returns an error.
 
-### QUOTING
+### Quoting
 
 To begin a payment attempt, an instance acquires a lock to setup and quote the payment, advancing it from `QUOTING` to the `FUNDING` state.
 
@@ -22,19 +22,15 @@ Quotes can end in 3 states:
 
 After the quote ends and state advances, the lock on the payment is released.
 
-### Authorization
+### Funding
 
 After quoting completes, Rafiki notifies the wallet operator via an `outgoing_payment.funding` [webhook event](#webhooks) to add `maxSourceAmount` of the quote from the funding wallet account owned by the payer to the payment, reserving the maximum requisite funds for the payment attempt.
 
-If the payment is to an invoice, a client should manually approve the payment, based on the parameters of the quote, before the wallet adds payment liquidity.
+Funding ends in two possible states:
 
-This step is necessary so the end user can precisely know the maximum amount of source units that will leave their account. Typically, the payment application will present these parameters in the user interface before the user elects to approve the payment. This step is particularly important for invoices, to prevent an unbounded sum from leaving the user's account. During this step, the user may also be presented with additional information about the payment, such as details of the payment recipient, or how much is expected to be delivered.
+1. The wallet funds the payment and the state advances to `SENDING`.
 
-Authorization ends in two possible states:
-
-1. Approval. If the user approves the payment before its funding deadline, or `amountToSend` was specified, the wallet funds the payment and the state advances to `SENDING`.
-
-2. Cancellation. If the user explicitly cancels the quote, or the funding deadline is exceeded, the state advances to `CANCELLED`. In the latter case, too much time has elapsed for the enforced exchange rate to remain accurate.
+2. Cancellation. If the wallet explicitly cancels the quote, or the funding deadline is exceeded, the state advances to `CANCELLED`. In the latter case, too much time has elapsed for the enforced exchange rate to remain accurate.
 
 ### Payment execution
 
@@ -135,13 +131,14 @@ Credit `payment.balance` to the wallet balance for `payment.accountId` and retur
 
 ### `PaymentIntent`
 
-The intent must include `invoiceUrl` xor (`paymentPointer` and `amountToSend`).
+The intent must include (`invoiceUrl` and `maxSourceAmount`) xor (`paymentPointer` and `amountToSend`).
 
-| Name             | Optional | Type     | Description                                                                                           |
-| :--------------- | :------- | :------- | :---------------------------------------------------------------------------------------------------- |
-| `paymentPointer` | Yes      | `String` | Payment pointer or URL of the destination Open Payments or SPSP account. Requires `amountToSend`.     |
-| `invoiceUrl`     | Yes      | `String` | URL of an Open Payments invoice, for a fixed-delivery payment.                                        |
-| `amountToSend`   | Yes      | `String` | Fixed amount to send to the recipient, in base units of the sending asset. Requires `paymentPointer`. |
+| Name              | Optional | Type     | Description                                                                                           |
+| :---------------- | :------- | :------- | :---------------------------------------------------------------------------------------------------- |
+| `invoiceUrl`      | Yes      | `String` | URL of an Open Payments invoice, for a fixed-delivery payment. Requires `maxSourceAmount`             |
+| `maxSourceAmount` | Yes      | `String` | Maximum amount to send to the invoice, in base units of the sending asset. Requires `invoiceUrl`.     |
+| `paymentPointer`  | Yes      | `String` | Payment pointer or URL of the destination Open Payments or SPSP account. Requires `amountToSend`.     |
+| `amountToSend`    | Yes      | `String` | Fixed amount to send to the recipient, in base units of the sending asset. Requires `paymentPointer`. |
 
 ### `OutgoingPayment`
 

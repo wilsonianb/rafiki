@@ -108,12 +108,18 @@ export async function handleQuoting(
   }
 
   const state =
-    balance < quote.maxSourceAmount
-      ? PaymentState.Funding
-      : PaymentState.Sending
+    payment.intent.maxSourceAmount &&
+    payment.intent.maxSourceAmount < amountSent + quote.maxSourceAmount
+      ? PaymentState.Cancelled
+      : PaymentState.Funding
+  const error =
+    state === PaymentState.Cancelled
+      ? LifecycleError.QuoteTooExpensive
+      : undefined
 
   await payment.$query(deps.knex).patch({
     state,
+    error,
     quote: {
       timestamp: new Date(),
       activationDeadline: new Date(Date.now() + deps.quoteLifespan),
