@@ -13,20 +13,31 @@ const ratioFields = [
 ]
 
 export interface FixedSendIntent {
-  invoiceUrl?: never
-  paymentPointer: string
   amountToSend: bigint
+  amountToDeliver?: never
   maxSourceAmount?: never
+}
+
+export interface FixedDeliveryIntent {
+  amountToSend?: never
+  amountToDeliver: bigint
+  maxSourceAmount: bigint
+}
+
+export type PaymentPointerIntent = (FixedSendIntent | FixedDeliveryIntent) & {
+  paymentPointer: string
+  invoiceUrl?: never
 }
 
 export interface InvoiceIntent {
   invoiceUrl: string
+  maxSourceAmount: bigint
   paymentPointer?: never
   amountToSend?: never
-  maxSourceAmount: bigint
+  amountToDeliver?: never
 }
 
-export type PaymentIntent = FixedSendIntent | InvoiceIntent
+export type PaymentIntent = PaymentPointerIntent | InvoiceIntent
 
 export class OutgoingPayment extends BaseModel {
   public static readonly tableName = 'outgoingPayments'
@@ -42,6 +53,7 @@ export class OutgoingPayment extends BaseModel {
     invoiceUrl?: string
     paymentPointer?: string
     amountToSend?: bigint
+    amountToDeliver?: bigint
     maxSourceAmount?: bigint
   }
 
@@ -59,6 +71,8 @@ export class OutgoingPayment extends BaseModel {
     highExchangeRateEstimate: Pay.Ratio
     // Amount already sent at the time of the quote
     amountSent: bigint
+    // Approximate amount already delivered at the time of the quote
+    amountDelivered: bigint
   }
   // Open payments account id of the sender
   public accountId!: string

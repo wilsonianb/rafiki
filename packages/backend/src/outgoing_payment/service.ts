@@ -84,7 +84,8 @@ async function createOutgoingPayment(
             invoiceUrl: options.invoiceUrl,
             maxSourceAmount: options.maxSourceAmount,
             paymentPointer: options.paymentPointer,
-            amountToSend: options.amountToSend
+            amountToSend: options.amountToSend,
+            amountToDeliver: options.amountToDeliver
           },
           accountId: options.accountId,
           destinationAccount: PLACEHOLDER_DESTINATION

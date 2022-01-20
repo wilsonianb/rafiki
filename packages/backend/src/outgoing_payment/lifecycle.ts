@@ -67,6 +67,47 @@ export async function handleQuoting(
     }
   }
 
+  // This is the amount of money *remaining* to deliver, which may be less than the payment intent's amountToDeliver due to retries (FixedDelivery payments only).
+  let amountToDeliver: bigint | undefined
+  let amountDelivered = BigInt(0)
+
+  if (payment.intent.amountToDeliver) {
+    if (payment.quote) {
+      const amountSentSinceQuote = amountSent - payment.quote.amountSent
+
+      // This is only an approximation of the true amount delivered due to exchange rate variance. The true amount delivered is returned on stream response packets, but due to connection failures there isn't a reliable way to track that in sync with the amount sent.
+      // eslint-disable-next-line no-case-declarations
+      const amountDeliveredSinceQuote = BigInt(
+        Math.ceil(
+          +amountSentSinceQuote.toString() *
+            payment.quote.minExchangeRate.valueOf()
+        )
+      )
+      amountDelivered =
+        payment.quote.amountDelivered + amountDeliveredSinceQuote
+      amountToDeliver = payment.intent.amountToDeliver - amountDelivered
+
+      if (amountToDeliver <= BigInt(0)) {
+        // The FixedDelivery payment completed (in Tigerbeetle) but the backend's update to state=COMPLETED didn't commit. Then the payment retried and ended up here.
+        // This error is extremely unlikely to happen, but it can recover gracefully(ish) by shortcutting to the COMPLETED state.
+        deps.logger.error(
+          {
+            amountToDeliver,
+            intentAmountToDeliver: payment.intent.amountToDeliver,
+            amountSent
+          },
+          'quote amountToDeliver bounds error'
+        )
+        await payment.$query(deps.knex).patch({
+          state: PaymentState.Completed
+        })
+        return
+      }
+    } else {
+      amountToDeliver = payment.intent.amountToDeliver
+    }
+  }
+
   const quote = await Pay.startQuote({
     plugin,
     destination,
@@ -75,6 +116,7 @@ export async function handleQuoting(
       code: payment.account.asset.code
     },
     amountToSend,
+    amountToDeliver,
     slippage: deps.slippage,
     prices
   })
@@ -132,7 +174,8 @@ export async function handleQuoting(
       minExchangeRate: quote.minExchangeRate,
       lowExchangeRateEstimate: quote.lowEstimatedExchangeRate,
       highExchangeRateEstimate: quote.highEstimatedExchangeRate,
-      amountSent
+      amountSent,
+      amountDelivered
     }
   })
 }
@@ -228,25 +271,20 @@ export async function handleSending(
     payment.quote.maxSourceAmount - amountSentSinceQuote
 
   let newMinDeliveryAmount
-  switch (payment.quote.targetType) {
-    case Pay.PaymentType.FixedSend:
-      // This is only an approximation of the true amount delivered due to exchange rate variance. The true amount delivered is returned on stream response packets, but due to connection failures there isn't a reliable way to track that in sync with the amount sent.
-      // eslint-disable-next-line no-case-declarations
-      const amountDeliveredSinceQuote = BigInt(
-        Math.ceil(
-          +amountSentSinceQuote.toString() *
-            payment.quote.minExchangeRate.valueOf()
-        )
+  if (destination.invoice) {
+    newMinDeliveryAmount =
+      destination.invoice.amountToDeliver - destination.invoice.amountDelivered
+  } else {
+    // This is only an approximation of the true amount delivered due to exchange rate variance. The true amount delivered is returned on stream response packets, but due to connection failures there isn't a reliable way to track that in sync with the amount sent.
+    // eslint-disable-next-line no-case-declarations
+    const amountDeliveredSinceQuote = BigInt(
+      Math.ceil(
+        +amountSentSinceQuote.toString() *
+          payment.quote.minExchangeRate.valueOf()
       )
-      newMinDeliveryAmount =
-        payment.quote.minDeliveryAmount - amountDeliveredSinceQuote
-      break
-    case Pay.PaymentType.FixedDelivery:
-      if (!destination.invoice) throw LifecycleError.MissingInvoice
-      newMinDeliveryAmount =
-        destination.invoice.amountToDeliver -
-        destination.invoice.amountDelivered
-      break
+    )
+    newMinDeliveryAmount =
+      payment.quote.minDeliveryAmount - amountDeliveredSinceQuote
   }
 
   if (

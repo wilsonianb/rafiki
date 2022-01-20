@@ -102,7 +102,8 @@ describe('OutgoingPayment Resolvers', (): void => {
           lowExchangeRateEstimate: Pay.Ratio.from(1.2)!,
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           highExchangeRateEstimate: Pay.Ratio.from(2.3)!,
-          amountSent: BigInt(0)
+          amountSent: BigInt(0),
+          amountDelivered: BigInt(0)
         },
         accountId,
         destinationAccount: {
@@ -393,7 +394,8 @@ describe('OutgoingPayment Resolvers', (): void => {
                 lowExchangeRateEstimate: Pay.Ratio.from(1.2)!,
                 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                 highExchangeRateEstimate: Pay.Ratio.from(2.3)!,
-                amountSent: BigInt(0)
+                amountSent: BigInt(0),
+                amountDelivered: BigInt(0)
               },
               accountId,
               destinationAccount: {

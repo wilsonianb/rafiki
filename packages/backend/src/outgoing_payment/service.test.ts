@@ -36,7 +36,6 @@ describe('OutgoingPaymentService', (): void => {
   let invoice: Invoice
   let invoiceUrl: string
   let accountUrl: string
-  let paymentPointer: string
   let amtDelivered: bigint
   let config: IAppConfig
 
@@ -221,19 +220,17 @@ describe('OutgoingPaymentService', (): void => {
   })
 
   describe.each`
-    invoiceAmount | amountToSend   | maxSourceAmount | description
-    ${BigInt(56)} | ${undefined}   | ${BigInt(123)}  | ${'Invoice'}
-    ${undefined}  | ${BigInt(123)} | ${undefined}    | ${'FixedSend'}
+    invoiceAmount | amountToSend   | amountToDeliver | maxSourceAmount | description
+    ${BigInt(56)} | ${undefined}   | ${undefined}    | ${BigInt(123)}  | ${'Invoice'}
+    ${undefined}  | ${BigInt(123)} | ${undefined}    | ${undefined}    | ${'FixedSend'}
+    ${undefined}  | ${undefined}   | ${BigInt(56)}   | ${BigInt(123)}  | ${'FixedDelivery'}
   `(
     '$description',
     ({
       invoiceAmount,
       amountToSend,
+      amountToDeliver,
       maxSourceAmount
-    }: {
-      invoiceAmount: bigint | undefined
-      amountToSend: bigint | undefined
-      maxSourceAmount: bigint | undefined
     }): void => {
       let options: CreateOutgoingPaymentOptions
 
@@ -258,14 +255,7 @@ describe('OutgoingPaymentService', (): void => {
             })
           ).resolves.toBeUndefined()
           accountUrl = `${config.publicHost}/pay/${destinationAccount.id}`
-          if (amountToSend) {
-            paymentPointer = accountUrl.replace('https://', '$')
-            options = {
-              accountId,
-              paymentPointer,
-              amountToSend
-            }
-          } else if (invoiceAmount) {
+          if (invoiceAmount) {
             const invoiceService = await deps.use('invoiceService')
             invoice = await invoiceService.create({
               accountId: destinationAccount.id,
@@ -279,6 +269,23 @@ describe('OutgoingPaymentService', (): void => {
               accountId,
               invoiceUrl,
               maxSourceAmount
+            }
+          } else {
+            const paymentPointer = accountUrl.replace('https://', '$')
+            if (amountToSend) {
+              options = {
+                accountId,
+                paymentPointer,
+                amountToSend
+              }
+            } else {
+              assert.ok(amountToDeliver && maxSourceAmount)
+              options = {
+                accountId,
+                paymentPointer,
+                amountToDeliver,
+                maxSourceAmount
+              }
             }
           }
           amtDelivered = BigInt(0)
@@ -332,18 +339,23 @@ describe('OutgoingPaymentService', (): void => {
 
         describe('QUOTING→', (): void => {
           let minExchangeRate: number
-          let maxSourceAmount: bigint
+          let quoteMaxSourceAmount: bigint
           let minDeliveryAmount: bigint
 
           beforeAll((): void => {
             minExchangeRate = 0.5 * (1 - config.slippage)
-            maxSourceAmount =
+            quoteMaxSourceAmount =
               amountToSend ||
               BigInt(
-                Math.ceil(Number(invoiceAmount) * 2 * (1 + config.slippage))
+                Math.ceil(
+                  Number(invoiceAmount || amountToDeliver) *
+                    2 *
+                    (1 + config.slippage)
+                )
               )
             minDeliveryAmount =
               invoiceAmount ||
+              amountToDeliver ||
               BigInt(
                 Math.ceil(Number(amountToSend) * minExchangeRate.valueOf())
               )
@@ -365,7 +377,7 @@ describe('OutgoingPaymentService', (): void => {
               : Pay.PaymentType.FixedDelivery
             expect(payment.quote.targetType).toBe(expectedType)
             expect(payment.quote.minDeliveryAmount).toBe(minDeliveryAmount)
-            expect(payment.quote.maxSourceAmount).toBe(maxSourceAmount)
+            expect(payment.quote.maxSourceAmount).toBe(quoteMaxSourceAmount)
             expect(payment.quote.maxPacketAmount).toBe(
               BigInt('9223372036854775807')
             )
@@ -397,60 +409,67 @@ describe('OutgoingPaymentService', (): void => {
               )
 
             const payment2 = await processNext(paymentId, PaymentState.Funding)
-            expect(payment2.quote?.maxSourceAmount).toBe(maxSourceAmount)
+            expect(payment2.quote?.maxSourceAmount).toBe(quoteMaxSourceAmount)
           })
 
-          // This mocks QUOTING→FUNDING, but for it to trigger for real, it would go from SENDING→QUOTING(retry)→FUNDING (when the sending partially failed).
-          it('FUNDING (previous partial payment)', async (): Promise<void> => {
-            const amountSent = BigInt(30)
-            const amountDelivered = BigInt(15)
-            jest
-              .spyOn(accountingService, 'getTotalSent')
-              .mockImplementation(async (id: string) => {
-                expect(id).toStrictEqual(paymentId)
-                return amountSent
-              })
-            if (invoice) {
-              await payInvoice(amountDelivered)
-            }
-            const payment2 = await processNext(paymentId, PaymentState.Funding)
-            if (amountToSend) {
-              expect(payment2.quote?.maxSourceAmount).toBe(
-                maxSourceAmount - amountSent
-              )
-            } else {
-              expect(payment2.quote?.minDeliveryAmount).toBe(
-                minDeliveryAmount - amountDelivered
-              )
-            }
-          })
-
-          // This mocks QUOTING→COMPLETED
-          // For it to trigger for real, it would go from SENDING→QUOTING(retry)→COMPLETED (when the SENDING→COMPLETED transition failed to commit).
-          // Or maybe another person or payment paid the invoice already.
-          it('COMPLETED (intent.amountToSend===amountSent / invoice paid)', async (): Promise<void> => {
-            if (amountToSend) {
+          // TODO: these depend on a prior quote for FixedDelivery
+          //       consider using mockPay
+          if (!amountToDeliver) {
+            // This mocks QUOTING→FUNDING, but for it to trigger for real, it would go from SENDING→QUOTING(retry)→FUNDING (when the sending partially failed).
+            it('FUNDING (previous partial payment)', async (): Promise<void> => {
+              const amountSent = BigInt(30)
+              const amountDelivered = BigInt(15)
               jest
                 .spyOn(accountingService, 'getTotalSent')
                 .mockImplementation(async (id: string) => {
                   expect(id).toStrictEqual(paymentId)
-                  return amountToSend
+                  return amountSent
                 })
-            } else {
-              assert.ok(invoiceAmount)
-              await payInvoice(invoiceAmount)
-            }
-            await processNext(paymentId, PaymentState.Completed)
-          })
+              if (invoice) {
+                await payInvoice(amountDelivered)
+              }
+              const payment2 = await processNext(
+                paymentId,
+                PaymentState.Funding
+              )
+              if (amountToSend) {
+                expect(payment2.quote?.maxSourceAmount).toBe(
+                  quoteMaxSourceAmount - amountSent
+                )
+              } else {
+                expect(payment2.quote?.minDeliveryAmount).toBe(
+                  minDeliveryAmount - amountDelivered
+                )
+              }
+            })
 
-          if (invoiceAmount) {
+            // This mocks QUOTING→COMPLETED
+            // For it to trigger for real, it would go from SENDING→QUOTING(retry)→COMPLETED (when the SENDING→COMPLETED transition failed to commit).
+            // Or maybe another person or payment paid the invoice already.
+            it('COMPLETED (intent.amountToSend===amountSent / invoice paid)', async (): Promise<void> => {
+              if (invoiceAmount) {
+                await payInvoice(invoiceAmount)
+              } else {
+                jest
+                  .spyOn(accountingService, 'getTotalSent')
+                  .mockImplementation(async (id: string) => {
+                    expect(id).toStrictEqual(paymentId)
+                    return quoteMaxSourceAmount
+                  })
+              }
+
+              await processNext(paymentId, PaymentState.Completed)
+            })
+          }
+
+          if (maxSourceAmount) {
             it('CANCELLED (intent.maxSourceAmount<quote.maxSourceAmount)', async (): Promise<void> => {
               const payment = await outgoingPaymentService.get(paymentId)
-              assert.ok(payment?.intent?.maxSourceAmount)
+              assert.ok(payment)
               await payment.$query(knex).patch({
                 intent: {
                   ...payment.intent,
-                  maxSourceAmount: payment.intent.maxSourceAmount - BigInt(10)
+                  maxSourceAmount: maxSourceAmount - BigInt(10)
                 }
               })
               await processNext(
@@ -586,6 +605,9 @@ describe('OutgoingPaymentService', (): void => {
               if (amountToSend) {
                 amountSent = amountToSend
                 amountDelivered = BigInt(Math.floor(Number(amountToSend) / 2))
+              } else if (amountToDeliver) {
+                amountSent = amountToDeliver * BigInt(2)
+                amountDelivered = amountToDeliver
               } else {
                 assert.ok(invoiceAmount)
                 amountSent = invoiceAmount * BigInt(2)
@@ -616,32 +638,40 @@ describe('OutgoingPaymentService', (): void => {
             })
           })
 
-          it('COMPLETED (initially partially paid)', async (): Promise<void> => {
-            const amountAlreadySent = BigInt(30)
-            const amountAlreadyDelivered = BigInt(15)
-            const mockTotalSent = jest
-              .spyOn(accountingService, 'getTotalSent')
-              .mockImplementation(async (id: string) => {
-                expect(id).toStrictEqual(paymentId)
-                return amountAlreadySent
+          // TODO: This depend on a prior quote for FixedDelivery
+          //       consider using mockPay
+          if (!amountToDeliver) {
+            it('COMPLETED (initially partially paid)', async (): Promise<void> => {
+              const amountAlreadySent = BigInt(30)
+              const amountAlreadyDelivered = BigInt(15)
+              const mockTotalSent = jest
+                .spyOn(accountingService, 'getTotalSent')
+                .mockImplementation(async (id: string) => {
+                  expect(id).toStrictEqual(paymentId)
+                  return amountAlreadySent
+                })
+              if (invoice) {
+                await payInvoice(amountAlreadyDelivered)
+              }
+
+              await setup()
+
+              const payment = await processNext(
+                paymentId,
+                PaymentState.Completed
+              )
+              if (!payment.quote) throw 'no quote'
+              mockTotalSent.mockRestore()
+              const partialAmountSent = amountSent - amountAlreadySent
+              await expectOutcome(payment, {
+                accountBalance:
+                  payment.quote.maxSourceAmount - partialAmountSent,
+                amountSent: partialAmountSent,
+                amountDelivered: amountDelivered - amountAlreadyDelivered,
+                invoiceReceived
               })
-            if (invoice) {
-              await payInvoice(amountAlreadyDelivered)
-            }
-
-            await setup()
-
-            const payment = await processNext(paymentId, PaymentState.Completed)
-            if (!payment.quote) throw 'no quote'
-            mockTotalSent.mockRestore()
-            const partialAmountSent = amountSent - amountAlreadySent
-            await expectOutcome(payment, {
-              accountBalance: payment.quote.maxSourceAmount - partialAmountSent,
-              amountSent: partialAmountSent,
-              amountDelivered: amountDelivered - amountAlreadyDelivered,
-              invoiceReceived
             })
-          })
+          }
 
           it('SENDING (partial payment then retryable Pay error)', async (): Promise<void> => {
             await setup()
@@ -846,6 +876,14 @@ describe('OutgoingPaymentService', (): void => {
                     amountDelivered: BigInt(
                       Math.floor(Number(amountToSend) / 2)
                     )
+                  })
+                } else if (amountToDeliver) {
+                  const amountSent = amountToDeliver * BigInt(2)
+                  accountBalance = payment.quote?.maxSourceAmount - amountSent
+                  await expectOutcome(payment, {
+                    accountBalance,
+                    amountSent,
+                    amountDelivered: amountToDeliver
                   })
                 } else {
                   assert.ok(invoiceAmount)

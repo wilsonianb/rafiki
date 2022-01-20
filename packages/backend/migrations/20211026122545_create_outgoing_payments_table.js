@@ -10,6 +10,7 @@ exports.up = function (knex) {
     table.string('intentPaymentPointer').nullable()
     table.string('intentInvoiceUrl').nullable()
     table.bigInteger('intentAmountToSend').nullable()
+    table.bigInteger('intentAmountToDeliver').nullable()
     table.bigInteger('intentMaxSourceAmount').nullable()
 
     table.timestamp('quoteTimestamp').nullable()
@@ -28,6 +29,8 @@ exports.up = function (knex) {
 
     // Amount already sent at the time of the quote
     table.bigInteger('quoteAmountSent').nullable()
+    // Approximate amount already delivered at the time of the quote
+    table.bigInteger('quoteAmountDelivered').nullable()
 
     // Open payments account corresponding to wallet account
     // from which to request funds for payment
