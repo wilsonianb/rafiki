@@ -49,23 +49,31 @@ export async function handleQuoting(
   let amountToSend: bigint | undefined
   if (payment.intent.amountToSend) {
     amountToSend = payment.intent.amountToSend - amountSent
-    if (amountToSend <= BigInt(0)) {
-      // The FixedSend payment completed (in Tigerbeetle) but the backend's update to state=COMPLETED didn't commit. Then the payment retried and ended up here.
-      // This error is extremely unlikely to happen, but it can recover gracefully(ish) by shortcutting to the COMPLETED state.
-      deps.logger.error(
-        {
-          amountToSend,
-          intentAmountToSend: payment.intent.amountToSend,
-          amountSent
-        },
-        'quote amountToSend bounds error'
-      )
-      await payment.$query(deps.knex).patch({
-        state: PaymentState.Completed
-      })
-      return
-    }
+  } else if (payment.intent.amount) {
+    // calc amountToSend
   }
+  if (amountToSend <= BigInt(0)) {
+    // The FixedSend payment completed (in Tigerbeetle) but the backend's update to state=COMPLETED didn't commit. Then the payment retried and ended up here.
+    // This error is extremely unlikely to happen, but it can recover gracefully(ish) by shortcutting to the COMPLETED state.
+    deps.logger.error(
+      {
+        amountToSend,
+        intentAmountToSend: payment.intent.amountToSend,
+        amountSent
+      },
+      'quote amountToSend bounds error'
+    )
+    await payment.$query(deps.knex).patch({
+      state: PaymentState.Completed
+    })
+    return
+  }
+
+  // This is the amount of money *remaining* to deliver, which may be less than the payment intent's amountToDeliver due to retries (FixedDelivery payments only).
+  // let amountToDeliver: bigint | undefined
+  // if (payment.intent.amountToDeliver) {
+  //   amountToDeliver = payment.intent.amountToSend - amountToDeliver
+  // }
 
   const quote = await Pay.startQuote({
     plugin,

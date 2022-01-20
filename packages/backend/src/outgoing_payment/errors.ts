@@ -1,7 +1,8 @@
 import * as Pay from '@interledger/pay'
 
 export enum CreateError {
-  UnknownAccount = 'UnknownAccount'
+  UnknownAccount = 'UnknownAccount',
+  UnknownAsset = 'UnknownAsset'
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types

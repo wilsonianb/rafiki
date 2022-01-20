@@ -13,20 +13,49 @@ const ratioFields = [
 ]
 
 export interface FixedSendIntent {
-  invoiceUrl?: never
-  paymentPointer: string
   amountToSend: bigint
+  amountToDeliver?: never
+  amount?: never
+  assetCode?: never
+  assetScale?: never
   maxSourceAmount?: never
+}
+
+export interface FixedDeliveryIntent {
+  amountToSend?: never
+  amountToDeliver: bigint
+  amount?: never
+  assetCode?: never
+  assetScale?: never
+  maxSourceAmount: bigint
+}
+
+export interface ArbitraryAssetIntent {
+  amountToSend?: never
+  amountToDeliver?: never
+  amount: bigint
+  assetCode: string
+  assetScale: number
+  maxSourceAmount: bigint
+}
+
+export type PaymentPointerIntent = (FixedSendIntent | ArbitraryAssetIntent) & {
+  paymentPointer: string
+  invoiceUrl?: never
 }
 
 export interface InvoiceIntent {
   invoiceUrl: string
+  maxSourceAmount: bigint
   paymentPointer?: never
   amountToSend?: never
-  maxSourceAmount: bigint
+  amountToDeliver?: never
+  amount?: never
+  assetCode?: never
+  assetScale?: never
 }
 
-export type PaymentIntent = FixedSendIntent | InvoiceIntent
+export type PaymentIntent = PaymentPointerIntent | InvoiceIntent
 
 export class OutgoingPayment extends BaseModel {
   public static readonly tableName = 'outgoingPayments'
@@ -42,6 +71,10 @@ export class OutgoingPayment extends BaseModel {
     invoiceUrl?: string
     paymentPointer?: string
     amountToSend?: bigint
+    amountToDeliver?: bigint
+    amount?: bigint
+    assetCode?: string
+    assetScale?: number
     maxSourceAmount?: bigint
   }
 

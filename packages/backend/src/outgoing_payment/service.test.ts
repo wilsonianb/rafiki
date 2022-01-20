@@ -5,7 +5,7 @@ import * as Pay from '@interledger/pay'
 import { URL } from 'url'
 import { v4 as uuid } from 'uuid'
 
-import { OutgoingPaymentService } from './service'
+import { CreateOutgoingPaymentOptions, OutgoingPaymentService } from './service'
 import { createTestApp, TestContainer } from '../tests/app'
 import { IAppConfig, Config } from '../config/app'
 import { IocContract } from '@adonisjs/fold'
@@ -181,7 +181,8 @@ describe('OutgoingPaymentService', (): void => {
         .get('/')
         .reply(200, () => ({
           USD: 1.0, // base
-          XRP: 2.0
+          XRP: 2.0,
+          CNY: 6.0
         }))
         .persist()
       deps = await initIocContainer(Config)
@@ -255,73 +256,309 @@ describe('OutgoingPaymentService', (): void => {
   })
 
   describe('create', (): void => {
-    it('creates an OutgoingPayment (FixedSend)', async () => {
-      const payment = await outgoingPaymentService.create({
-        accountId,
-        paymentPointer,
-        amountToSend: BigInt(123)
-      })
-      assert.ok(!isCreateError(payment))
-      expect(payment.state).toEqual(PaymentState.Quoting)
-      expect(payment.intent).toEqual({
-        paymentPointer,
-        amountToSend: BigInt(123)
-      })
-      expect(payment.accountId).toBe(accountId)
-      await expectOutcome(payment, { accountBalance: BigInt(0) })
-      expect(payment.account.asset.code).toBe('USD')
-      expect(payment.account.asset.scale).toBe(9)
-      expect(payment.destinationAccount).toEqual({
-        scale: 9,
-        code: 'XRP',
-        url: accountUrl
-      })
+    describe.each`
+      amountToSend   | amount          | assetCode    | assetScale   | expectedAmountToSend | description
+      ${BigInt(123)} | ${undefined}    | ${undefined} | ${undefined} | ${BigInt(123)}       | ${'amountToSend'}
+      ${undefined}   | ${BigInt(123)}  | ${'USD'}     | ${9}         | ${BigInt(123)}       | ${'amount, same asset'}
+      ${undefined}   | ${BigInt(1231)} | ${'USD'}     | ${10}        | ${BigInt(123)}       | ${'amount, larger scale'}
+      ${undefined}   | ${BigInt(12)}   | ${'USD'}     | ${8}         | ${BigInt(120)}       | ${'amount, smaller scale'}
+    `(
+      'FixedSend ($description)',
+      ({
+        amountToSend,
+        amount,
+        assetCode,
+        assetScale,
+        expectedAmountToSend
+      }): void => {
+        it('creates an OutgoingPayment', async () => {
+          const payment = await outgoingPaymentService.create({
+            accountId,
+            paymentPointer,
+            amountToSend,
+            amount,
+            assetCode,
+            assetScale,
+            maxSourceAmount: amount || undefined
+          })
+          assert.ok(!isCreateError(payment))
+          expect(payment.state).toEqual(PaymentState.Quoting)
+          expect(payment.intent).toEqual({
+            paymentPointer,
+            amountToSend: expectedAmountToSend
+          })
+          expect(payment.accountId).toBe(accountId)
+          await expectOutcome(payment, { accountBalance: BigInt(0) })
+          expect(payment.account.asset.code).toBe('USD')
+          expect(payment.account.asset.scale).toBe(9)
+          expect(payment.destinationAccount).toEqual({
+            scale: 9,
+            code: 'XRP',
+            url: accountUrl
+          })
 
-      const payment2 = await outgoingPaymentService.get(payment.id)
-      if (!payment2) throw 'no payment'
-      expect(payment2.id).toEqual(payment.id)
-    })
-
-    it('creates an OutgoingPayment (FixedDelivery)', async () => {
-      const maxSourceAmount = BigInt(123)
-      const payment = await outgoingPaymentService.create({
-        accountId,
-        invoiceUrl,
-        maxSourceAmount
-      })
-      assert.ok(!isCreateError(payment))
-      expect(payment.state).toEqual(PaymentState.Quoting)
-      expect(payment.intent).toEqual({
-        invoiceUrl,
-        maxSourceAmount
-      })
-      expect(payment.accountId).toBe(accountId)
-      await expectOutcome(payment, { accountBalance: BigInt(0) })
-      expect(payment.account.asset.code).toBe('USD')
-      expect(payment.account.asset.scale).toBe(9)
-      expect(payment.destinationAccount).toEqual({
-        scale: invoice.account.asset.scale,
-        code: invoice.account.asset.code,
-        url: accountUrl
-      })
-
-      const payment2 = await outgoingPaymentService.get(payment.id)
-      if (!payment2) throw 'no payment'
-      expect(payment2.id).toEqual(payment.id)
-    })
-
-    it('fails to create with nonexistent account', async () => {
-      await expect(
-        outgoingPaymentService.create({
-          accountId: uuid(),
-          paymentPointer,
-          amountToSend: BigInt(123)
+          const payment2 = await outgoingPaymentService.get(payment.id)
+          if (!payment2) throw 'no payment'
+          expect(payment2.id).toEqual(payment.id)
         })
-      ).resolves.toEqual(CreateError.UnknownAccount)
+
+        it('fails to create with nonexistent account', async () => {
+          await expect(
+            outgoingPaymentService.create({
+              accountId: uuid(),
+              paymentPointer,
+              amountToSend,
+              amount,
+              assetCode,
+              assetScale
+            })
+          ).resolves.toEqual(CreateError.UnknownAccount)
+        })
+      }
+    )
+
+    describe.each`
+      amountToDeliver | amount          | assetCode    | assetScale   | expectedAmountToDeliver | description
+      ${BigInt(123)}  | ${undefined}    | ${undefined} | ${undefined} | ${BigInt(123)}          | ${'amountToDeliver'}
+      ${undefined}    | ${BigInt(123)}  | ${'XRP'}     | ${9}         | ${BigInt(123)}          | ${'amount, same asset'}
+      ${undefined}    | ${BigInt(1231)} | ${'XRP'}     | ${10}        | ${BigInt(123)}          | ${'amount, larger scale'}
+      ${undefined}    | ${BigInt(12)}   | ${'XRP'}     | ${8}         | ${BigInt(120)}          | ${'amount, smaller scale'}
+    `(
+      'FixedDelivery ($description)',
+      ({
+        amountToDeliver,
+        amount,
+        assetCode,
+        assetScale,
+        expectedAmountToDeliver
+      }): void => {
+        it('creates an OutgoingPayment', async () => {
+          const maxSourceAmount = BigInt(123)
+          const payment = await outgoingPaymentService.create({
+            accountId,
+            paymentPointer,
+            amountToDeliver,
+            amount,
+            assetCode,
+            assetScale,
+            maxSourceAmount
+          })
+          assert.ok(!isCreateError(payment))
+          expect(payment.state).toEqual(PaymentState.Quoting)
+          expect(payment.intent).toEqual({
+            paymentPointer,
+            amountToDeliver: expectedAmountToDeliver,
+            maxSourceAmount
+          })
+          expect(payment.accountId).toBe(accountId)
+          await expectOutcome(payment, { accountBalance: BigInt(0) })
+          expect(payment.account.asset.code).toBe('USD')
+          expect(payment.account.asset.scale).toBe(9)
+          expect(payment.destinationAccount).toEqual({
+            scale: 9,
+            code: 'XRP',
+            url: accountUrl
+          })
+
+          const payment2 = await outgoingPaymentService.get(payment.id)
+          if (!payment2) throw 'no payment'
+          expect(payment2.id).toEqual(payment.id)
+        })
+
+        it('fails to create with nonexistent account', async () => {
+          await expect(
+            outgoingPaymentService.create({
+              accountId: uuid(),
+              paymentPointer,
+              amountToDeliver,
+              amount,
+              assetCode,
+              assetScale,
+              maxSourceAmount: BigInt(123)
+            })
+          ).resolves.toEqual(CreateError.UnknownAccount)
+        })
+      }
+    )
+
+    describe('Arbitrary Asset', (): void => {
+      it('creates an OutgoingPayment', async () => {
+        const maxSourceAmount = BigInt(123)
+        const amount = maxSourceAmount * BigInt(6)
+        const assetCode = 'CNY'
+        const assetScale = 9
+        const payment = await outgoingPaymentService.create({
+          accountId,
+          paymentPointer,
+          amount,
+          assetCode,
+          assetScale,
+          maxSourceAmount
+        })
+        assert.ok(!isCreateError(payment))
+        expect(payment.state).toEqual(PaymentState.Quoting)
+        expect(payment.intent).toEqual({
+          paymentPointer,
+          amount,
+          assetCode,
+          assetScale,
+          maxSourceAmount
+        })
+        expect(payment.accountId).toBe(accountId)
+        await expectOutcome(payment, { accountBalance: BigInt(0) })
+        expect(payment.account.asset.code).toBe('USD')
+        expect(payment.account.asset.scale).toBe(9)
+        expect(payment.destinationAccount).toEqual({
+          scale: 9,
+          code: 'XRP',
+          url: accountUrl
+        })
+
+        const payment2 = await outgoingPaymentService.get(payment.id)
+        if (!payment2) throw 'no payment'
+        expect(payment2.id).toEqual(payment.id)
+      })
+
+      it('fails to create with nonexistent account', async () => {
+        await expect(
+          outgoingPaymentService.create({
+            accountId: uuid(),
+            paymentPointer,
+            amount: BigInt(123 * 6),
+            assetCode: 'CNY',
+            assetScale: 9,
+            maxSourceAmount: BigInt(123)
+          })
+        ).resolves.toEqual(CreateError.UnknownAccount)
+      })
+
+      it('fails to create with unknown asset', async () => {
+        await expect(
+          outgoingPaymentService.create({
+            accountId,
+            paymentPointer,
+            amount: BigInt(123 * 6),
+            assetCode: '???',
+            assetScale: 9,
+            maxSourceAmount: BigInt(123)
+          })
+        ).resolves.toEqual(CreateError.UnknownAsset)
+      })
+    })
+
+    describe('Invoice', (): void => {
+      it('creates an OutgoingPayment', async () => {
+        const maxSourceAmount = BigInt(123)
+        const payment = await outgoingPaymentService.create({
+          accountId,
+          invoiceUrl,
+          maxSourceAmount
+        })
+        assert.ok(!isCreateError(payment))
+        expect(payment.state).toEqual(PaymentState.Quoting)
+        expect(payment.intent).toEqual({
+          invoiceUrl,
+          maxSourceAmount
+        })
+        expect(payment.accountId).toBe(accountId)
+        await expectOutcome(payment, { accountBalance: BigInt(0) })
+        expect(payment.account.asset.code).toBe('USD')
+        expect(payment.account.asset.scale).toBe(9)
+        expect(payment.destinationAccount).toEqual({
+          scale: invoice.account.asset.scale,
+          code: invoice.account.asset.code,
+          url: accountUrl
+        })
+
+        const payment2 = await outgoingPaymentService.get(payment.id)
+        if (!payment2) throw 'no payment'
+        expect(payment2.id).toEqual(payment.id)
+      })
+
+      it('fails to create with nonexistent account', async () => {
+        await expect(
+          outgoingPaymentService.create({
+            accountId: uuid(),
+            invoiceUrl,
+            maxSourceAmount: BigInt(123)
+          })
+        ).resolves.toEqual(CreateError.UnknownAccount)
+      })
     })
   })
 
-  describe('processNext', (): void => {
+  describe.only('processNext', (): void => {
+    describe.only.each`
+      amountToSend   | amountToDeliver | amount         | assetCode    | assetScale   | description
+      ${undefined}   | ${undefined}    | ${undefined}   | ${undefined} | ${undefined} | ${'Invoice'}
+      ${BigInt(123)} | ${undefined}    | ${undefined}   | ${undefined} | ${undefined} | ${'FixedSend'}
+      ${undefined}   | ${BigInt(123)}  | ${undefined}   | ${undefined} | ${undefined} | ${'FixedDelivery'}
+      ${undefined}   | ${undefined}    | ${BigInt(123)} | ${'CNY'}     | ${9}         | ${'Arbitrary Asset'}
+    `(
+      '$description',
+      ({
+        amountToSend,
+        amountToDeliver,
+        amount,
+        assetCode,
+        assetScale
+      }): void => {
+        let options: CreateOutgoingPaymentOptions
+
+        beforeEach((): void => {
+          const toPaymentPointer = amountToSend || amountToDeliver || amount
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore
+          options = {
+            accountId,
+            invoiceUrl: toPaymentPointer ? undefined : invoiceUrl,
+            paymentPointer: toPaymentPointer ? paymentPointer : undefined,
+            amountToSend,
+            amountToDeliver,
+            amount,
+            assetCode,
+            assetScale,
+            maxSourceAmount: amountToSend ? undefined : BigInt(123)
+          }
+        })
+
+        describe('QUOTING→', (): void => {
+          it('FUNDING', async (): Promise<void> => {
+            const { id: paymentId } = await paymentFactory.build(options)
+            const payment = await processNext(paymentId, PaymentState.Funding)
+            if (!payment.quote) throw 'no quote'
+
+            expect(payment.quote.timestamp).toBeInstanceOf(Date)
+            expect(
+              payment.quote.activationDeadline.getTime() - Date.now()
+            ).toBeGreaterThan(0)
+            expect(
+              payment.quote.activationDeadline.getTime() - Date.now()
+            ).toBeLessThanOrEqual(config.quoteLifespan)
+            const expectedType =
+              amountToSend || amount
+                ? Pay.PaymentType.FixedSend
+                : Pay.PaymentType.FixedDelivery
+            expect(payment.quote.targetType).toBe(expectedType)
+            expect(payment.quote.minDeliveryAmount).toBe(
+              BigInt(Math.ceil(123 * payment.quote.minExchangeRate.valueOf()))
+            )
+            expect(payment.quote.maxSourceAmount).toBe(BigInt(123))
+            expect(payment.quote.maxPacketAmount).toBe(
+              BigInt('9223372036854775807')
+            )
+            expect(payment.quote.minExchangeRate.valueOf()).toBe(
+              0.5 * (1 - config.slippage)
+            )
+            expect(payment.quote.lowExchangeRateEstimate.valueOf()).toBe(0.5)
+            expect(payment.quote.highExchangeRateEstimate.valueOf()).toBe(
+              0.500000000001
+            )
+          })
+        })
+      }
+    )
+
     describe('QUOTING→', (): void => {
       it('FUNDING (FixedSend)', async (): Promise<void> => {
         const paymentId = (
