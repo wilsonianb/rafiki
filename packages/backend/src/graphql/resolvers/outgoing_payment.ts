@@ -235,5 +235,10 @@ const createErrorToResponse: {
     code: '404',
     message: 'Unknown account',
     success: false
+  },
+  [CreateError.UnknownAsset]: {
+    code: '404',
+    message: 'Unknown asset',
+    success: false
   }
 }

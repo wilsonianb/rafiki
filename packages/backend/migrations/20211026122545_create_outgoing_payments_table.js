@@ -11,6 +11,9 @@ exports.up = function (knex) {
     table.string('intentInvoiceUrl').nullable()
     table.bigInteger('intentAmountToSend').nullable()
     table.bigInteger('intentAmountToDeliver').nullable()
+    table.bigInteger('intentAmount').nullable()
+    table.string('intentAssetCode').nullable()
+    table.integer('intentAssetScale').nullable()
     table.bigInteger('intentMaxSourceAmount').nullable()
 
     table.timestamp('quoteTimestamp').nullable()

@@ -4,6 +4,7 @@ import { LifecycleError } from './errors'
 import { OutgoingPayment, PaymentState } from './model'
 import { ServiceDependencies } from './service'
 import { IlpPlugin } from './ilp_plugin'
+import { toDestinationAmount } from './util'
 import { EventType } from '../webhook/service'
 
 const MAX_INT64 = BigInt('9223372036854775807')
@@ -45,26 +46,38 @@ export async function handleQuoting(
     throw LifecycleError.MissingBalance
   }
 
-  // This is the amount of money *remaining* to send, which may be less than the payment intent's amountToSend due to retries (FixedSend payments only).
+  // This is the amount of money *remaining* to send, which may be less than the payment intent's amountToSend/amount due to retries (FixedSend payments only).
   let amountToSend: bigint | undefined
   if (payment.intent.amountToSend) {
     amountToSend = payment.intent.amountToSend - amountSent
-    if (amountToSend <= BigInt(0)) {
-      // The FixedSend payment completed (in Tigerbeetle) but the backend's update to state=COMPLETED didn't commit. Then the payment retried and ended up here.
-      // This error is extremely unlikely to happen, but it can recover gracefully(ish) by shortcutting to the COMPLETED state.
-      deps.logger.error(
-        {
-          amountToSend,
-          intentAmountToSend: payment.intent.amountToSend,
-          amountSent
-        },
-        'quote amountToSend bounds error'
-      )
-      await payment.$query(deps.knex).patch({
-        state: PaymentState.Completed
-      })
-      return
-    }
+  } else if (payment.intent.amount) {
+    const amountOrErr = await deps.ratesService.convert({
+      sourceAmount: payment.intent.amount,
+      sourceAsset: {
+        code: payment.intent.assetCode,
+        scale: payment.intent.assetScale
+      },
+      destinationAsset: payment.account.asset
+    })
+    if (typeof amountOrErr !== 'bigint') throw LifecycleError.PricesUnavailable
+    amountToSend = amountOrErr - amountSent
+  }
+
+  if (amountToSend !== undefined && amountToSend <= BigInt(0)) {
+    // The FixedSend payment completed (in Tigerbeetle) but the backend's update to state=COMPLETED didn't commit. Then the payment retried and ended up here.
+    // This error is extremely unlikely to happen, but it can recover gracefully(ish) by shortcutting to the COMPLETED state.
+    deps.logger.error(
+      {
+        amountToSend,
+        intentAmountToSend: payment.intent.amountToSend,
+        amountSent
+      },
+      'quote amountToSend bounds error'
+    )
+    await payment.$query(deps.knex).patch({
+      state: PaymentState.Completed
+    })
+    return
   }
 
   // This is the amount of money *remaining* to deliver, which may be less than the payment intent's amountToDeliver due to retries (FixedDelivery payments only).
@@ -76,12 +89,9 @@ export async function handleQuoting(
       const amountSentSinceQuote = amountSent - payment.quote.amountSent
 
       // This is only an approximation of the true amount delivered due to exchange rate variance. The true amount delivered is returned on stream response packets, but due to connection failures there isn't a reliable way to track that in sync with the amount sent.
-      // eslint-disable-next-line no-case-declarations
-      const amountDeliveredSinceQuote = BigInt(
-        Math.ceil(
-          +amountSentSinceQuote.toString() *
-            payment.quote.minExchangeRate.valueOf()
-        )
+      const amountDeliveredSinceQuote = toDestinationAmount(
+        amountSentSinceQuote,
+        payment.quote.minExchangeRate
       )
       amountDelivered =
         payment.quote.amountDelivered + amountDeliveredSinceQuote
@@ -276,12 +286,9 @@ export async function handleSending(
       destination.invoice.amountToDeliver - destination.invoice.amountDelivered
   } else {
     // This is only an approximation of the true amount delivered due to exchange rate variance. The true amount delivered is returned on stream response packets, but due to connection failures there isn't a reliable way to track that in sync with the amount sent.
-    // eslint-disable-next-line no-case-declarations
-    const amountDeliveredSinceQuote = BigInt(
-      Math.ceil(
-        +amountSentSinceQuote.toString() *
-          payment.quote.minExchangeRate.valueOf()
-      )
+    const amountDeliveredSinceQuote = toDestinationAmount(
+      amountSentSinceQuote,
+      payment.quote.minExchangeRate
     )
     newMinDeliveryAmount =
       payment.quote.minDeliveryAmount - amountDeliveredSinceQuote

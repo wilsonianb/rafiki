@@ -1,3 +1,4 @@
+import assert from 'assert'
 import { ForeignKeyViolationError, TransactionOrKnex } from 'objection'
 import * as Pay from '@interledger/pay'
 import { v4 as uuid } from 'uuid'
@@ -75,6 +76,13 @@ async function createOutgoingPayment(
   deps: ServiceDependencies,
   options: CreateOutgoingPaymentOptions
 ): Promise<OutgoingPayment | CreateError> {
+  if (options.assetCode) {
+    const prices = await deps.ratesService.prices()
+    if (!prices[options.assetCode]) {
+      return CreateError.UnknownAsset
+    }
+  }
+
   try {
     return await OutgoingPayment.transaction(deps.knex, async (trx) => {
       const payment = await OutgoingPayment.query(trx)
@@ -85,8 +93,11 @@ async function createOutgoingPayment(
             maxSourceAmount: options.maxSourceAmount,
             paymentPointer: options.paymentPointer,
             amountToSend: options.amountToSend,
-            amountToDeliver: options.amountToDeliver
-          },
+            amountToDeliver: options.amountToDeliver,
+            amount: options.amount,
+            assetCode: options.assetCode,
+            assetScale: options.assetScale
+          } as PaymentIntent,
           accountId: options.accountId,
           destinationAccount: PLACEHOLDER_DESTINATION
         })
@@ -109,6 +120,43 @@ async function createOutgoingPayment(
           deps.logger.warn({ error: err.message }, 'error disconnecting plugin')
         })
       })
+
+      if (options.amount) {
+        if (options.assetCode === payment.account.asset.code) {
+          const amountToSend = await deps.ratesService.convert({
+            sourceAmount: options.amount,
+            sourceAsset: {
+              code: options.assetCode,
+              scale: options.assetScale
+            },
+            destinationAsset: payment.account.asset
+          })
+          assert(typeof amountToSend === 'bigint')
+          await payment.$query(trx).patch({
+            intent: {
+              paymentPointer: options.paymentPointer,
+              amountToSend
+            }
+          })
+        } else if (options.assetCode === destination.destinationAsset.code) {
+          const amountToDeliver = await deps.ratesService.convert({
+            sourceAmount: options.amount,
+            sourceAsset: {
+              code: options.assetCode,
+              scale: options.assetScale
+            },
+            destinationAsset: destination.destinationAsset
+          })
+          assert(typeof amountToDeliver === 'bigint')
+          await payment.$query(trx).patch({
+            intent: {
+              paymentPointer: options.paymentPointer,
+              amountToDeliver,
+              maxSourceAmount: options.maxSourceAmount
+            }
+          })
+        }
+      }
 
       await payment.$query(trx).patch({
         destinationAccount: {

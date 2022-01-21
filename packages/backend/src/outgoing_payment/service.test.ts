@@ -15,6 +15,7 @@ import { PaymentFactory } from '../tests/paymentFactory'
 import { truncateTables } from '../tests/tableManager'
 import { OutgoingPayment, PaymentState } from './model'
 import { CreateError, isCreateError, LifecycleError } from './errors'
+import { toDestinationAmount, toSourceAmount } from './util'
 import { RETRY_BACKOFF_SECONDS } from './worker'
 import { isTransferError } from '../accounting/errors'
 import { AccountingService, TransferOptions } from '../accounting/service'
@@ -180,7 +181,8 @@ describe('OutgoingPaymentService', (): void => {
         .get('/')
         .reply(200, () => ({
           USD: 1.0, // base
-          XRP: 2.0
+          XRP: 2.0,
+          CNY: 0.2
         }))
         .persist()
       deps = await initIocContainer(Config)
@@ -220,16 +222,18 @@ describe('OutgoingPaymentService', (): void => {
   })
 
   describe.each`
-    invoiceAmount | amountToSend   | amountToDeliver | maxSourceAmount | description
-    ${BigInt(56)} | ${undefined}   | ${undefined}    | ${BigInt(123)}  | ${'Invoice'}
-    ${undefined}  | ${BigInt(123)} | ${undefined}    | ${undefined}    | ${'FixedSend'}
-    ${undefined}  | ${undefined}   | ${BigInt(56)}   | ${BigInt(123)}  | ${'FixedDelivery'}
+    invoiceAmount | amountToSend   | amountToDeliver | amount         | maxSourceAmount | description
+    ${BigInt(56)} | ${undefined}   | ${undefined}    | ${undefined}   | ${BigInt(123)}  | ${'Invoice'}
+    ${undefined}  | ${BigInt(123)} | ${undefined}    | ${undefined}   | ${undefined}    | ${'FixedSend'}
+    ${undefined}  | ${undefined}   | ${BigInt(56)}   | ${undefined}   | ${BigInt(123)}  | ${'FixedDelivery'}
+    ${undefined}  | ${undefined}   | ${undefined}    | ${BigInt(600)} | ${BigInt(123)}  | ${'Arbitrary Asset'}
   `(
     '$description',
     ({
       invoiceAmount,
       amountToSend,
       amountToDeliver,
+      amount,
       maxSourceAmount
     }): void => {
       let options: CreateOutgoingPaymentOptions
@@ -278,12 +282,22 @@ describe('OutgoingPaymentService', (): void => {
                 paymentPointer,
                 amountToSend
               }
-            } else {
-              assert.ok(amountToDeliver && maxSourceAmount)
+            } else if (amountToDeliver) {
+              assert.ok(maxSourceAmount)
               options = {
                 accountId,
                 paymentPointer,
                 amountToDeliver,
+                maxSourceAmount
+              }
+            } else {
+              assert.ok(amount && maxSourceAmount)
+              options = {
+                accountId,
+                paymentPointer,
+                amount,
+                assetCode: 'CNY',
+                assetScale: 9,
                 maxSourceAmount
               }
             }
@@ -324,6 +338,58 @@ describe('OutgoingPaymentService', (): void => {
             })
           ).resolves.toEqual(CreateError.UnknownAccount)
         })
+
+        if (amount) {
+          describe.each`
+            assetCode | type
+            ${'USD'}  | ${Pay.PaymentType.FixedSend}
+            ${'XRP'}  | ${Pay.PaymentType.FixedDelivery}
+          `('creates a $type OutgoingPayment', ({ assetCode, type }): void => {
+            it.each`
+              amount          | assetScale | expectedAmount | description
+              ${BigInt(123)}  | ${9}       | ${BigInt(123)} | ${'same asset'}
+              ${BigInt(1231)} | ${10}      | ${BigInt(123)} | ${'larger scale'}
+              ${BigInt(12)}   | ${8}       | ${BigInt(120)} | ${'smaller scale'}
+            `(
+              'from $description',
+              async ({ amount, assetScale, expectedAmount }): Promise<void> => {
+                const payment = await outgoingPaymentService.create({
+                  ...options,
+                  amount,
+                  assetCode,
+                  assetScale
+                } as CreateOutgoingPaymentOptions)
+                assert.ok(!isCreateError(payment))
+                expect(payment.state).toEqual(PaymentState.Quoting)
+                expect(payment.intent).toEqual(
+                  type === Pay.PaymentType.FixedSend
+                    ? {
+                        paymentPointer: options.paymentPointer,
+                        amountToSend: expectedAmount
+                      }
+                    : {
+                        paymentPointer: options.paymentPointer,
+                        amountToDeliver: expectedAmount,
+                        maxSourceAmount
+                      }
+                )
+                expect(payment.accountId).toBe(accountId)
+                await expectOutcome(payment, { accountBalance: BigInt(0) })
+                expect(payment.account.asset.code).toBe('USD')
+                expect(payment.account.asset.scale).toBe(9)
+                expect(payment.destinationAccount).toEqual({
+                  scale: 9,
+                  code: 'XRP',
+                  url: accountUrl
+                })
+
+                const payment2 = await outgoingPaymentService.get(payment.id)
+                if (!payment2) throw 'no payment'
+                expect(payment2.id).toEqual(payment.id)
+              }
+            )
+          })
+        }
       })
 
       describe('processNext', (): void => {
@@ -338,27 +404,31 @@ describe('OutgoingPaymentService', (): void => {
         )
 
         describe('QUOTING→', (): void => {
-          let minExchangeRate: number
+          let type: Pay.PaymentType
+          let minExchangeRate: Pay.Ratio
           let quoteMaxSourceAmount: bigint
           let minDeliveryAmount: bigint
 
           beforeAll((): void => {
-            minExchangeRate = 0.5 * (1 - config.slippage)
-            quoteMaxSourceAmount =
-              amountToSend ||
-              BigInt(
-                Math.ceil(
-                  Number(invoiceAmount || amountToDeliver) *
-                    2 *
-                    (1 + config.slippage)
-                )
+            minExchangeRate = Pay.Ratio.from(
+              0.5 * (1 - config.slippage)
+            ) as Pay.Ratio
+            if (amountToSend || amount) {
+              quoteMaxSourceAmount =
+                amountToSend || BigInt(Math.floor(Number(amount) / 5))
+              minDeliveryAmount = toDestinationAmount(
+                quoteMaxSourceAmount,
+                minExchangeRate
               )
-            minDeliveryAmount =
-              invoiceAmount ||
-              amountToDeliver ||
-              BigInt(
-                Math.ceil(Number(amountToSend) * minExchangeRate.valueOf())
+              type = Pay.PaymentType.FixedSend
+            } else {
+              minDeliveryAmount = amountToDeliver || invoiceAmount
+              quoteMaxSourceAmount = toSourceAmount(
+                minDeliveryAmount,
+                minExchangeRate
               )
+              type = Pay.PaymentType.FixedDelivery
+            }
           })
 
           it('FUNDING', async (): Promise<void> => {
@@ -372,18 +442,13 @@ describe('OutgoingPaymentService', (): void => {
             expect(
               payment.quote.activationDeadline.getTime() - Date.now()
             ).toBeLessThanOrEqual(config.quoteLifespan)
-            const expectedType = amountToSend
-              ? Pay.PaymentType.FixedSend
-              : Pay.PaymentType.FixedDelivery
-            expect(payment.quote.targetType).toBe(expectedType)
+            expect(payment.quote.targetType).toBe(type)
             expect(payment.quote.minDeliveryAmount).toBe(minDeliveryAmount)
             expect(payment.quote.maxSourceAmount).toBe(quoteMaxSourceAmount)
             expect(payment.quote.maxPacketAmount).toBe(
               BigInt('9223372036854775807')
             )
-            expect(payment.quote.minExchangeRate.valueOf()).toBe(
-              minExchangeRate
-            )
+            expect(payment.quote.minExchangeRate).toStrictEqual(minExchangeRate)
             expect(payment.quote.lowExchangeRateEstimate.valueOf()).toBe(0.5)
             expect(payment.quote.highExchangeRateEstimate.valueOf()).toBe(
               0.500000000001
@@ -432,7 +497,7 @@ describe('OutgoingPaymentService', (): void => {
                 paymentId,
                 PaymentState.Funding
               )
-              if (amountToSend) {
+              if (type === Pay.PaymentType.FixedSend) {
                 expect(payment2.quote?.maxSourceAmount).toBe(
                   quoteMaxSourceAmount - amountSent
                 )
@@ -464,14 +529,15 @@ describe('OutgoingPaymentService', (): void => {
 
           if (maxSourceAmount) {
             it('CANCELLED (intent.maxSourceAmount<quote.maxSourceAmount)', async (): Promise<void> => {
-              const payment = await outgoingPaymentService.get(paymentId)
-              assert.ok(payment)
-              await payment.$query(knex).patch({
-                intent: {
-                  ...payment.intent,
-                  maxSourceAmount: maxSourceAmount - BigInt(10)
-                }
-              })
+              jest
+                .spyOn(Pay, 'startQuote')
+                .mockImplementationOnce(async (options: Pay.QuoteOptions) => {
+                  const quote = await Pay.startQuote(options)
+                  return {
+                    ...quote,
+                    maxSourceAmount: maxSourceAmount + BigInt(1)
+                  }
+                })
               await processNext(
                 paymentId,
                 PaymentState.Cancelled,
@@ -480,11 +546,21 @@ describe('OutgoingPaymentService', (): void => {
             })
 
             it('CANCELLED (intent.maxSourceAmount<amountSent+quote.maxSourceAmount)', async (): Promise<void> => {
+              const amountSent = BigInt(10)
               jest
                 .spyOn(accountingService, 'getTotalSent')
                 .mockImplementation(async (id: string) => {
                   expect(id).toStrictEqual(paymentId)
-                  return BigInt(BigInt(10))
+                  return amountSent
+                })
+              jest
+                .spyOn(Pay, 'startQuote')
+                .mockImplementationOnce(async (options: Pay.QuoteOptions) => {
+                  const quote = await Pay.startQuote(options)
+                  return {
+                    ...quote,
+                    maxSourceAmount: maxSourceAmount - amountSent + BigInt(1)
+                  }
                 })
               await processNext(
                 paymentId,
@@ -602,17 +678,14 @@ describe('OutgoingPaymentService', (): void => {
                 .spyOn(invoiceService, 'handlePayment')
                 .mockResolvedValue(undefined)
 
-              if (amountToSend) {
-                amountSent = amountToSend
-                amountDelivered = BigInt(Math.floor(Number(amountToSend) / 2))
-              } else if (amountToDeliver) {
-                amountSent = amountToDeliver * BigInt(2)
-                amountDelivered = amountToDeliver
+              if (amountToSend || amount) {
+                amountSent =
+                  amountToSend || BigInt(Math.floor(Number(amount) / 5))
+                amountDelivered = BigInt(Math.floor(Number(amountSent) / 2))
               } else {
-                assert.ok(invoiceAmount)
-                amountSent = invoiceAmount * BigInt(2)
-                amountDelivered = invoiceAmount
-                invoiceReceived = amountDelivered
+                amountDelivered = amountToDeliver || invoiceAmount
+                amountSent = amountDelivered * BigInt(2)
+                invoiceReceived = invoiceAmount
               }
             }
           )
@@ -784,6 +857,13 @@ describe('OutgoingPaymentService', (): void => {
               .patch({ state: PaymentState.Sending })
             const payment = await processNext(paymentId, PaymentState.Completed)
             if (!payment.quote) throw 'no quote'
+            if (amountToDeliver) {
+              // Approximate newMinDeliveryAmount causes a little extra to be sent
+              // on the retry for FixedDelivery
+              const extraSent = payment.quote.maxSourceAmount - amountSent
+              amountSent = payment.quote.maxSourceAmount
+              amountDelivered = amountToDeliver + extraSent / BigInt(2)
+            }
             await expectOutcome(payment, {
               accountBalance: payment.quote.maxSourceAmount - amountSent,
               amountSent,
@@ -868,31 +948,27 @@ describe('OutgoingPaymentService', (): void => {
                   amountDelivered: BigInt(0)
                 })
               } else {
-                if (amountToSend) {
+                if (amountToSend || amount) {
                   accountBalance = BigInt(0)
-                  await expectOutcome(payment, {
-                    accountBalance,
-                    amountSent: amountToSend,
-                    amountDelivered: BigInt(
-                      Math.floor(Number(amountToSend) / 2)
-                    )
-                  })
-                } else if (amountToDeliver) {
-                  const amountSent = amountToDeliver * BigInt(2)
-                  accountBalance = payment.quote?.maxSourceAmount - amountSent
+                  const amountSent =
+                    amountToSend || BigInt(Math.floor(Number(amount) / 5))
+                  const amountDelivered = BigInt(
+                    Math.floor(Number(amountSent) / 2)
+                  )
+
                   await expectOutcome(payment, {
                     accountBalance,
                     amountSent,
-                    amountDelivered: amountToDeliver
+                    amountDelivered
                   })
                 } else {
-                  assert.ok(invoiceAmount)
-                  const amountSent = invoiceAmount * BigInt(2)
+                  const amountDelivered = amountToDeliver || invoiceAmount
+                  const amountSent = amountDelivered * BigInt(2)
                   accountBalance = payment.quote?.maxSourceAmount - amountSent
                   await expectOutcome(payment, {
                     accountBalance,
                     amountSent,
-                    amountDelivered: invoiceAmount,
+                    amountDelivered,
                     invoiceReceived: invoiceAmount
                   })
                 }

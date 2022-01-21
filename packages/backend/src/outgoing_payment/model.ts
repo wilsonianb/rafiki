@@ -15,16 +15,35 @@ const ratioFields = [
 export interface FixedSendIntent {
   amountToSend: bigint
   amountToDeliver?: never
+  amount?: never
+  assetCode?: never
+  assetScale?: never
   maxSourceAmount?: never
 }
 
 export interface FixedDeliveryIntent {
   amountToSend?: never
   amountToDeliver: bigint
+  amount?: never
+  assetCode?: never
+  assetScale?: never
   maxSourceAmount: bigint
 }
 
-export type PaymentPointerIntent = (FixedSendIntent | FixedDeliveryIntent) & {
+export interface ArbitraryAssetIntent {
+  amountToSend?: never
+  amountToDeliver?: never
+  amount: bigint
+  assetCode: string
+  assetScale: number
+  maxSourceAmount: bigint
+}
+
+export type PaymentPointerIntent = (
+  | FixedSendIntent
+  | FixedDeliveryIntent
+  | ArbitraryAssetIntent
+) & {
   paymentPointer: string
   invoiceUrl?: never
 }
@@ -35,6 +54,9 @@ export interface InvoiceIntent {
   paymentPointer?: never
   amountToSend?: never
   amountToDeliver?: never
+  amount?: never
+  assetCode?: never
+  assetScale?: never
 }
 
 export type PaymentIntent = PaymentPointerIntent | InvoiceIntent
@@ -49,13 +71,7 @@ export class OutgoingPayment extends BaseModel {
   // The "| null" is necessary so that `$beforeUpdate` can modify a patch to remove the webhookId. If `$beforeUpdate` set `webhookId = undefined`, the patch would ignore the modification.
   public webhookId?: string | null
 
-  public intent!: {
-    invoiceUrl?: string
-    paymentPointer?: string
-    amountToSend?: bigint
-    amountToDeliver?: bigint
-    maxSourceAmount?: bigint
-  }
+  public intent!: PaymentIntent
 
   public quote?: {
     timestamp: Date
