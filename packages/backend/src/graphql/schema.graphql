@@ -23,6 +23,10 @@ type Mutation {
     input: CreateOutgoingPaymentInput!
   ): OutgoingPaymentResponse!
 
+  createOutgoingInvoicePayment(
+    input: CreateOutgoingInvoicePaymentInput!
+  ): OutgoingPaymentResponse!
+
   createAccount(input: CreateAccountInput!): CreateAccountMutationResponse!
 
   "Create peer"
@@ -327,7 +331,6 @@ type PaymentIntent {
   paymentPointer: String
   amountToSend: UInt64
   invoiceUrl: String
-  autoApprove: Boolean!
 }
 
 enum PaymentState {
@@ -372,10 +375,14 @@ type OutgoingPaymentOutcome {
 
 input CreateOutgoingPaymentInput {
   accountId: String!
-  paymentPointer: String
-  amountToSend: UInt64
-  invoiceUrl: String
-  autoApprove: Boolean!
+  paymentPointer: String!
+  amountToSend: UInt64!
+}
+
+input CreateOutgoingInvoicePaymentInput {
+  accountId: String!
+  invoiceUrl: String!
+  maxSourceAmount: UInt64!
 }
 
 type OutgoingPaymentResponse {

@@ -1,9 +1,19 @@
 import * as Pay from '@interledger/pay'
 
+export enum CreateError {
+  UnknownAccount = 'UnknownAccount',
+  UnknownAsset = 'UnknownAsset'
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types
+export const isCreateError = (o: any): o is CreateError =>
+  Object.values(CreateError).includes(o)
+
 export type PaymentError = LifecycleError | Pay.PaymentError
 
 export enum LifecycleError {
   QuoteExpired = 'QuoteExpired',
+  QuoteTooExpensive = 'QuoteTooExpensive',
   // Rate fetch failed.
   PricesUnavailable = 'PricesUnavailable',
   // Payment aborted via outgoing_payment.funding webhook response.

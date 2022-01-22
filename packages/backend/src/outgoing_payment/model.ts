@@ -12,12 +12,54 @@ const ratioFields = [
   'quoteHighExchangeRateEstimate'
 ]
 
-export type PaymentIntent = {
-  paymentPointer?: string
-  invoiceUrl?: string
-  amountToSend?: bigint
-  autoApprove: boolean
+export interface FixedSendIntent {
+  amountToSend: bigint
+  amountToDeliver?: never
+  amount?: never
+  assetCode?: never
+  assetScale?: never
+  maxSourceAmount?: never
 }
+
+export interface FixedDeliveryIntent {
+  amountToSend?: never
+  amountToDeliver: bigint
+  amount?: never
+  assetCode?: never
+  assetScale?: never
+  maxSourceAmount: bigint
+}
+
+export interface ArbitraryAssetIntent {
+  amountToSend?: never
+  amountToDeliver?: never
+  amount: bigint
+  assetCode: string
+  assetScale: number
+  maxSourceAmount: bigint
+}
+
+export type PaymentPointerIntent = (
+  | FixedSendIntent
+  | FixedDeliveryIntent
+  | ArbitraryAssetIntent
+) & {
+  paymentPointer: string
+  invoiceUrl?: never
+}
+
+export interface InvoiceIntent {
+  invoiceUrl: string
+  maxSourceAmount: bigint
+  paymentPointer?: never
+  amountToSend?: never
+  amountToDeliver?: never
+  amount?: never
+  assetCode?: never
+  assetScale?: never
+}
+
+export type PaymentIntent = PaymentPointerIntent | InvoiceIntent
 
 export class OutgoingPayment extends BaseModel {
   public static readonly tableName = 'outgoingPayments'
@@ -45,6 +87,8 @@ export class OutgoingPayment extends BaseModel {
     highExchangeRateEstimate: Pay.Ratio
     // Amount already sent at the time of the quote
     amountSent: bigint
+    // Approximate amount already delivered at the time of the quote
+    amountDelivered: bigint
   }
   // Open payments account id of the sender
   public accountId!: string

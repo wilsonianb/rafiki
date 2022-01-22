@@ -87,8 +87,7 @@ describe('OutgoingPayment Resolvers', (): void => {
         state: PaymentState.Quoting,
         intent: {
           paymentPointer: 'http://wallet2.example/paymentpointer/bob',
-          amountToSend: BigInt(123),
-          autoApprove: false
+          amountToSend: BigInt(123)
         },
         quote: {
           timestamp: new Date(),
@@ -103,7 +102,8 @@ describe('OutgoingPayment Resolvers', (): void => {
           lowExchangeRateEstimate: Pay.Ratio.from(1.2)!,
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           highExchangeRateEstimate: Pay.Ratio.from(2.3)!,
-          amountSent: BigInt(0)
+          amountSent: BigInt(0),
+          amountDelivered: BigInt(0)
         },
         accountId,
         destinationAccount: {
@@ -160,7 +160,6 @@ describe('OutgoingPayment Resolvers', (): void => {
                     paymentPointer
                     invoiceUrl
                     amountToSend
-                    autoApprove
                   }
                   quote {
                     timestamp
@@ -250,8 +249,7 @@ describe('OutgoingPayment Resolvers', (): void => {
     const input = {
       accountId: uuid(),
       paymentPointer: 'http://wallet2.example/paymentpointer/bob',
-      amountToSend: '123',
-      autoApprove: false
+      amountToSend: '123'
     }
 
     test('200', async (): Promise<void> => {
@@ -381,8 +379,7 @@ describe('OutgoingPayment Resolvers', (): void => {
               state: PaymentState.Quoting,
               intent: {
                 paymentPointer: 'http://wallet2.example/paymentpointer/bob',
-                amountToSend: BigInt(123),
-                autoApprove: false
+                amountToSend: BigInt(123)
               },
               quote: {
                 timestamp: new Date(),
@@ -397,7 +394,8 @@ describe('OutgoingPayment Resolvers', (): void => {
                 lowExchangeRateEstimate: Pay.Ratio.from(1.2)!,
                 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                 highExchangeRateEstimate: Pay.Ratio.from(2.3)!,
-                amountSent: BigInt(0)
+                amountSent: BigInt(0),
+                amountDelivered: BigInt(0)
               },
               accountId,
               destinationAccount: {

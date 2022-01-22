@@ -1,8 +1,10 @@
+import assert from 'assert'
 import { ForeignKeyViolationError, TransactionOrKnex } from 'objection'
 import * as Pay from '@interledger/pay'
 import { v4 as uuid } from 'uuid'
 
 import { BaseService } from '../shared/baseService'
+import { CreateError } from './errors'
 import { OutgoingPayment, PaymentIntent, PaymentState } from './model'
 import { AccountingService } from '../accounting/service'
 import { AccountService } from '../open_payments/account/service'
@@ -13,7 +15,9 @@ import * as worker from './worker'
 
 export interface OutgoingPaymentService {
   get(id: string): Promise<OutgoingPayment | undefined>
-  create(options: CreateOutgoingPaymentOptions): Promise<OutgoingPayment>
+  create(
+    options: CreateOutgoingPaymentOptions
+  ): Promise<OutgoingPayment | CreateError>
   processNext(): Promise<string | undefined>
   getAccountPage(
     accountId: string,
@@ -63,28 +67,20 @@ async function getOutgoingPayment(
     .withGraphJoined('account.asset')
 }
 
-type CreateOutgoingPaymentOptions = PaymentIntent & {
+export type CreateOutgoingPaymentOptions = PaymentIntent & {
   accountId: string
 }
 
-// TODO ensure this is idempotent/safe for autoApprove:true payments
+// TODO ensure this is idempotent/safe for fixed send payments
 async function createOutgoingPayment(
   deps: ServiceDependencies,
   options: CreateOutgoingPaymentOptions
-): Promise<OutgoingPayment> {
-  if (
-    options.invoiceUrl &&
-    (options.paymentPointer || options.amountToSend !== undefined)
-  ) {
-    deps.logger.warn(
-      {
-        options
-      },
-      'createOutgoingPayment invalid parameters'
-    )
-    throw new Error(
-      'invoiceUrl and (paymentPointer,amountToSend) are mutually exclusive'
-    )
+): Promise<OutgoingPayment | CreateError> {
+  if (options.assetCode) {
+    const prices = await deps.ratesService.prices()
+    if (!prices[options.assetCode]) {
+      return CreateError.UnknownAsset
+    }
   }
 
   try {
@@ -93,11 +89,15 @@ async function createOutgoingPayment(
         .insertAndFetch({
           state: PaymentState.Quoting,
           intent: {
-            paymentPointer: options.paymentPointer,
             invoiceUrl: options.invoiceUrl,
+            maxSourceAmount: options.maxSourceAmount,
+            paymentPointer: options.paymentPointer,
             amountToSend: options.amountToSend,
-            autoApprove: options.autoApprove
-          },
+            amountToDeliver: options.amountToDeliver,
+            amount: options.amount,
+            assetCode: options.assetCode,
+            assetScale: options.assetScale
+          } as PaymentIntent,
           accountId: options.accountId,
           destinationAccount: PLACEHOLDER_DESTINATION
         })
@@ -121,6 +121,43 @@ async function createOutgoingPayment(
         })
       })
 
+      if (options.amount) {
+        if (options.assetCode === payment.account.asset.code) {
+          const amountToSend = await deps.ratesService.convert({
+            sourceAmount: options.amount,
+            sourceAsset: {
+              code: options.assetCode,
+              scale: options.assetScale
+            },
+            destinationAsset: payment.account.asset
+          })
+          assert(typeof amountToSend === 'bigint')
+          await payment.$query(trx).patch({
+            intent: {
+              paymentPointer: options.paymentPointer,
+              amountToSend
+            }
+          })
+        } else if (options.assetCode === destination.destinationAsset.code) {
+          const amountToDeliver = await deps.ratesService.convert({
+            sourceAmount: options.amount,
+            sourceAsset: {
+              code: options.assetCode,
+              scale: options.assetScale
+            },
+            destinationAsset: destination.destinationAsset
+          })
+          assert(typeof amountToDeliver === 'bigint')
+          await payment.$query(trx).patch({
+            intent: {
+              paymentPointer: options.paymentPointer,
+              amountToDeliver,
+              maxSourceAmount: options.maxSourceAmount
+            }
+          })
+        }
+      }
+
       await payment.$query(trx).patch({
         destinationAccount: {
           scale: destination.destinationAsset.scale,
@@ -138,7 +175,7 @@ async function createOutgoingPayment(
     })
   } catch (err) {
     if (err instanceof ForeignKeyViolationError) {
-      throw new Error('outgoing payment account does not exist')
+      return CreateError.UnknownAccount
     }
     throw err
   }
