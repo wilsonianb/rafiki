@@ -1,3 +1,4 @@
+import assert from 'assert'
 import { Model } from 'objection'
 
 import { Asset } from '../../asset/model'
@@ -22,9 +23,23 @@ export class Account extends BaseAccountModel {
   public readonly assetId!: string
   public asset!: Asset
 
+  public processAt!: Date | null
+  public webhookAttempts!: number
+
   public async handlePayment(
-    _accountingService: AccountingService
+    accountingService: AccountingService
   ): Promise<void> {
-    // TODO: send webhook events
+    if (this.processAt === null) {
+      const balance = await accountingService.getBalance(this.id)
+
+      // This should be both defined and >0
+      assert.ok(balance)
+
+      if (this.asset.minAccountWithdrawalAmount <= balance) {
+        await this.$query().patch({
+          processAt: new Date()
+        })
+      }
+    }
   }
 }

@@ -143,6 +143,9 @@ export class App {
       for (let i = 0; i < this.config.invoiceWorkers; i++) {
         process.nextTick(() => this.processInvoice())
       }
+      for (let i = 0; i < this.config.accountWorkers; i++) {
+        process.nextTick(() => this.processAccount())
+      }
     }
   }
 
@@ -285,6 +288,24 @@ export class App {
           setTimeout(
             () => this.processInvoice(),
             this.config.invoiceWorkerIdle
+          ).unref()
+      })
+  }
+
+  private async processAccount(): Promise<void> {
+    const accountService = await this.container.use('accountService')
+    return accountService
+      .processNext()
+      .catch((err) => {
+        this.logger.warn({ error: err.message }, 'processAccount error')
+        return true
+      })
+      .then((hasMoreWork) => {
+        if (hasMoreWork) process.nextTick(() => this.processAccount())
+        else
+          setTimeout(
+            () => this.processAccount(),
+            this.config.accountWorkerIdle
           ).unref()
       })
   }

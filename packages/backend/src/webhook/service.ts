@@ -76,11 +76,7 @@ export type EventOptions = AccountEvent | InvoiceEvent | PaymentEvent
 interface AccountData {
   account: {
     id: string
-    asset: {
-      id: string
-      code: string
-      scale: number
-    }
+    assetId: string
     balance: string
   }
   invoice?: never
@@ -230,11 +226,7 @@ export function accountToData(account: Account, balance: bigint): AccountData {
   return {
     account: {
       id: account.id,
-      asset: {
-        id: account.asset.id,
-        code: account.asset.code,
-        scale: account.asset.scale
-      },
+      assetId: account.assetId,
       balance: balance.toString()
     }
   }

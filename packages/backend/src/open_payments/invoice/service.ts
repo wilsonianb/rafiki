@@ -199,14 +199,12 @@ async function handleDeactivated(
       invoice,
       amountReceived
     })
-    if (status === 200 || status === 205) {
-      const error = await deps.accountingService.commitWithdrawal(invoice.id)
-      if (error) throw error
-      if (status === 200) {
-        await invoice.$query(deps.knex).patch({
-          processAt: null
-        })
-      }
+    const err = await deps.accountingService.commitWithdrawal(invoice.id)
+    if (err) throw err
+    if (status === 200) {
+      await invoice.$query(deps.knex).patch({
+        processAt: null
+      })
     }
   } catch (error) {
     const webhookAttempts = invoice.webhookAttempts + 1

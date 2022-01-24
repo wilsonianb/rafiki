@@ -61,6 +61,9 @@ export const Config = {
   outgoingPaymentWorkers: envInt('OUTGOING_PAYMENT_WORKERS', 4),
   outgoingPaymentWorkerIdle: envInt('OUTGOING_PAYMENT_WORKER_IDLE', 200), // milliseconds
 
+  accountWorkers: envInt('ACCOUNT_WORKERS', 1),
+  accountWorkerIdle: envInt('ACCOUNT_WORKER_IDLE', 200), // milliseconds
+
   invoiceWorkers: envInt('INVOICE_WORKERS', 1),
   invoiceWorkerIdle: envInt('INVOICE_WORKER_IDLE', 200), // milliseconds
 

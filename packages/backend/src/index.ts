@@ -161,7 +161,8 @@ export function initIocContainer(
       knex: await deps.use('knex'),
       logger: logger,
       accountingService: await deps.use('accountingService'),
-      assetService: assetService
+      assetService: assetService,
+      webhookService: await deps.use('webhookService')
     })
   })
   container.singleton('spspRoutes', async (deps) => {

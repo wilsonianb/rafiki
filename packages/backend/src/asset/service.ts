@@ -8,9 +8,13 @@ export interface AssetOptions {
   scale: number
 }
 
+export interface CreateOptions extends AssetOptions {
+  minAccountWithdrawalAmount?: bigint
+}
+
 export interface AssetService {
   get(asset: AssetOptions, trx?: Transaction): Promise<void | Asset>
-  getOrCreate(asset: AssetOptions): Promise<Asset>
+  getOrCreate(asset: CreateOptions): Promise<Asset>
   getById(id: string, trx?: Transaction): Promise<void | Asset>
 }
 
@@ -48,7 +52,7 @@ async function getAsset(
 
 async function getOrCreateAsset(
   deps: ServiceDependencies,
-  { code, scale }: AssetOptions
+  { code, scale, minAccountWithdrawalAmount }: CreateOptions
 ): Promise<Asset> {
   const asset = await Asset.query(deps.knex).findOne({ code, scale })
   if (asset) {
@@ -63,7 +67,8 @@ async function getOrCreateAsset(
     return await Asset.transaction(async (trx) => {
       const asset = await Asset.query(trx).insertAndFetch({
         code,
-        scale
+        scale,
+        minAccountWithdrawalAmount
       })
       await deps.accountingService.createAssetAccounts(asset.unit)
 
