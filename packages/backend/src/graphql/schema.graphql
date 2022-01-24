@@ -60,11 +60,6 @@ type Mutation {
     input: CreateAssetLiquidityWithdrawalInput!
   ): LiquidityMutationResponse
 
-  "Create liquidity withdrawal from Open Payments account"
-  createAccountWithdrawal(
-    input: CreateAccountWithdrawalInput!
-  ): AccountWithdrawalMutationResponse
-
   "Finalize liquidity withdrawal"
   finalizeLiquidityWithdrawal(
     "The id of the liquidity withdrawal to finalize."
@@ -181,13 +176,6 @@ input CreateAssetLiquidityWithdrawalInput {
   assetId: String!
   "Amount of withdrawal."
   amount: UInt64!
-  "The id of the withdrawal."
-  id: String!
-}
-
-input CreateAccountWithdrawalInput {
-  "The id of the Open Payments account to create the withdrawal for."
-  accountId: String!
   "The id of the withdrawal."
   id: String!
 }
@@ -402,12 +390,6 @@ type Session {
   expiresAt: String!
 }
 
-type AccountWithdrawal {
-  id: ID!
-  amount: UInt64!
-  account: Account!
-}
-
 type CreateAccountMutationResponse implements MutationResponse {
   code: String!
   success: Boolean!
@@ -446,14 +428,6 @@ type LiquidityMutationResponse implements MutationResponse {
   success: Boolean!
   message: String!
   error: LiquidityError
-}
-
-type AccountWithdrawalMutationResponse implements MutationResponse {
-  code: String!
-  success: Boolean!
-  message: String!
-  error: LiquidityError
-  withdrawal: AccountWithdrawal
 }
 
 type CreateApiKeyMutationResponse implements MutationResponse {
