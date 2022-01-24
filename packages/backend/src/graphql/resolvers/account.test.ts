@@ -65,6 +65,7 @@ describe('Account Resolvers', (): void => {
                     code
                     scale
                   }
+                  balance
                 }
               }
             }
@@ -93,7 +94,8 @@ describe('Account Resolvers', (): void => {
           __typename: 'Asset',
           code: input.asset.code,
           scale: input.asset.scale
-        }
+        },
+        balance: '0'
       })
       await expect(
         accountService.get(response.account.id)
@@ -166,6 +168,7 @@ describe('Account Resolvers', (): void => {
                   code
                   scale
                 }
+                balance
               }
             }
           `,
@@ -190,7 +193,8 @@ describe('Account Resolvers', (): void => {
           __typename: 'Asset',
           code: account.asset.code,
           scale: account.asset.scale
-        }
+        },
+        balance: '0'
       })
     })
 

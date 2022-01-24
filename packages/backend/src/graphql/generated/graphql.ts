@@ -20,6 +20,7 @@ export type Account = {
   __typename?: 'Account';
   id: Scalars['ID'];
   asset: Asset;
+  balance: Scalars['UInt64'];
   invoices?: Maybe<InvoiceConnection>;
   outgoingPayments?: Maybe<OutgoingPaymentConnection>;
 };
@@ -798,6 +799,7 @@ export type IsAdminDirectiveResolver<Result, Parent, ContextType = any, Args = I
 export type AccountResolvers<ContextType = any, ParentType extends ResolversParentTypes['Account'] = ResolversParentTypes['Account']> = {
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   asset?: Resolver<ResolversTypes['Asset'], ParentType, ContextType>;
+  balance?: Resolver<ResolversTypes['UInt64'], ParentType, ContextType>;
   invoices?: Resolver<Maybe<ResolversTypes['InvoiceConnection']>, ParentType, ContextType, RequireFields<AccountInvoicesArgs, never>>;
   outgoingPayments?: Resolver<Maybe<ResolversTypes['OutgoingPaymentConnection']>, ParentType, ContextType, RequireFields<AccountOutgoingPaymentsArgs, never>>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;

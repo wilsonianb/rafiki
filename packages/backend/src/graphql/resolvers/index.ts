@@ -1,5 +1,5 @@
 import { Resolvers } from '../generated/graphql'
-import { getAccount, createAccount } from './account'
+import { getAccount, getAccountBalance, createAccount } from './account'
 import { getAccountInvoices, getPageInfo } from './invoice'
 import {
   getOutgoingPayment,
@@ -37,6 +37,7 @@ export const resolvers: Resolvers = {
     peers: getPeers
   },
   Account: {
+    balance: getAccountBalance,
     invoices: getAccountInvoices,
     outgoingPayments: getAccountOutgoingPayments
   },

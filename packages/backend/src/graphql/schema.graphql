@@ -247,6 +247,7 @@ type HttpOutgoing {
 type Account {
   id: ID!
   asset: Asset!
+  balance: UInt64!
   invoices(
     "Paginating forwards: the cursor before the the requested page."
     after: String
