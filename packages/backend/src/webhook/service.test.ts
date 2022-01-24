@@ -6,9 +6,11 @@ import { v4 as uuid } from 'uuid'
 
 import {
   EventType,
+  isInvoiceEventType,
   isPaymentEventType,
   WebhookService,
   generateWebhookSignature,
+  accountToData,
   invoiceToData,
   paymentToData
 } from './service'
@@ -19,6 +21,7 @@ import { Config } from '../config/app'
 import { IocContract } from '@adonisjs/fold'
 import { initIocContainer } from '../'
 import { AppServices } from '../app'
+import { Account } from '../open_payments/account/model'
 import { Invoice } from '../open_payments/invoice/model'
 import { OutgoingPayment } from '../outgoing_payment/model'
 
@@ -27,6 +30,7 @@ describe('Webhook Service', (): void => {
   let appContainer: TestContainer
   let webhookService: WebhookService
   let knex: Knex
+  let account: Account
   let invoice: Invoice
   let payment: OutgoingPayment
   let amountReceived: bigint
@@ -43,12 +47,12 @@ describe('Webhook Service', (): void => {
       knex = await deps.use('knex')
       webhookService = await deps.use('webhookService')
       const accountService = await deps.use('accountService')
-      const { id: accountId } = await accountService.create({
+      account = await accountService.create({
         asset: randomAsset()
       })
       const invoiceService = await deps.use('invoiceService')
       invoice = await invoiceService.create({
-        accountId,
+        accountId: account.id,
         amount: BigInt(56),
         expiresAt: new Date(Date.now() + 60 * 1000),
         description: 'description!'
@@ -57,7 +61,7 @@ describe('Webhook Service', (): void => {
       const config = await deps.use('config')
       const invoiceUrl = `${config.publicHost}/invoices/${invoice.id}`
       payment = await outgoingPaymentService.create({
-        accountId,
+        accountId: account.id,
         invoiceUrl,
         autoApprove: false
       })
@@ -97,8 +101,10 @@ describe('Webhook Service', (): void => {
               expect(body.data).toEqual(
                 paymentToData(payment, amountSent, balance)
               )
-            } else {
+            } else if (isInvoiceEventType(type)) {
               expect(body.data).toEqual(invoiceToData(invoice, amountReceived))
+            } else {
+              expect(body.data).toEqual(accountToData(account, balance))
             }
             return true
           })
@@ -112,12 +118,19 @@ describe('Webhook Service', (): void => {
             amountSent,
             balance
           })
-        } else {
+        } else if (isInvoiceEventType(type)) {
           await webhookService.send({
             id,
             type,
             invoice,
             amountReceived
+          })
+        } else {
+          await webhookService.send({
+            id,
+            type,
+            account,
+            balance
           })
         }
       }
