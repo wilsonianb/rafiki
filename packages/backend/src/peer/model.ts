@@ -1,9 +1,9 @@
 import { Model, Pojo } from 'objection'
 import { Asset } from '../asset/model'
 import { HttpToken } from '../httpToken/model'
-import { BaseModel } from '../shared/baseModel'
+import { AccountingService, BaseAccountModel } from '../shared/baseModel'
 
-export class Peer extends BaseModel {
+export class Peer extends BaseAccountModel {
   public static get tableName(): string {
     return 'peers'
   }
@@ -40,6 +40,12 @@ export class Peer extends BaseModel {
   public maxPacketAmount?: bigint
 
   public staticIlpAddress!: string
+
+  public async handlePayment(
+    _accountingService: AccountingService
+  ): Promise<void> {
+    // TODO: send webhook events
+  }
 
   $formatDatabaseJson(json: Pojo): Pojo {
     if (json.http?.outgoing) {

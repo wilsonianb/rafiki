@@ -14,18 +14,18 @@ const accountAttrs = {
   balance: 0n
 }
 
+const outgoingAttrs = {
+  ...accountAttrs,
+  handlePayment: () => () => Promise.resolve()
+}
+
 export const IncomingAccountFactory = Factory.define<MockIncomingAccount>(
   'IncomingAccountFactory'
 ).attrs(accountAttrs)
 
 export const OutgoingAccountFactory = Factory.define<MockOutgoingAccount>(
   'OutgoingAccountFactory'
-).attrs({
-  ...accountAttrs,
-  stream: {
-    enabled: true
-  }
-})
+).attrs(outgoingAttrs)
 
 export const IncomingPeerFactory = Factory.define<MockIncomingAccount>(
   'IncomingPeerFactory'
@@ -53,10 +53,7 @@ export const OutgoingPeerFactory = Factory.define<MockOutgoingAccount>(
         authToken: Faker.datatype.string(32),
         endpoint: Faker.internet.url()
       }
-    }),
-    stream: {
-      enabled: false
-    }
+    })
   })
   .attr('staticIlpAddress', ['id'], (id: string) => {
     return `test.${id}`

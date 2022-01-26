@@ -2,7 +2,7 @@ import { Model, ModelOptions, QueryContext } from 'objection'
 import { DbErrors } from 'objection-db-errors'
 import { v4 as uuid } from 'uuid'
 
-export class BaseModel extends DbErrors(Model) {
+export abstract class BaseModel extends DbErrors(Model) {
   public static get modelPaths(): string[] {
     return [__dirname]
   }
@@ -20,4 +20,20 @@ export class BaseModel extends DbErrors(Model) {
   public $beforeUpdate(_opts: ModelOptions, _queryContext: QueryContext): void {
     this.updatedAt = new Date()
   }
+}
+
+export interface AccountingService {
+  getBalance(id: string): Promise<bigint | undefined>
+  getTotalReceived(id: string): Promise<bigint | undefined>
+}
+
+export abstract class BaseAccountModel extends BaseModel {
+  public abstract asset: {
+    code: string
+    scale: number
+  }
+
+  public abstract handlePayment(
+    accountingService: AccountingService
+  ): Promise<void>
 }

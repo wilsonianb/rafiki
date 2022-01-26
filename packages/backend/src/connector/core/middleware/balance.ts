@@ -66,9 +66,7 @@ export function createBalanceMiddleware(): ILPMiddleware {
 
       if (response.fulfill) {
         await trxOrError.commit()
-        if (accounts.outgoing.invoice) {
-          await services.invoices.handlePayment(accounts.outgoing.id)
-        }
+        await accounts.outgoing.handlePayment(services.accounting)
       } else {
         await trxOrError.rollback()
       }
