@@ -14,33 +14,24 @@ import {
 import { createTokenAuthMiddleware } from './middleware'
 import { RatesService } from '../../rates/service'
 import { TransferError } from '../../accounting/errors'
-import { AccountOptions, Transaction } from '../../accounting/service'
-import { AssetOptions } from '../../asset/service'
+import { Transaction } from '../../accounting/service'
+import { Account } from '../../open_payments/account/model'
 import { AccountService } from '../../open_payments/account/service'
+import { Invoice } from '../../open_payments/invoice/model'
 import { InvoiceService } from '../../open_payments/invoice/service'
+import { OutgoingPayment } from '../../outgoing_payment/model'
+import { Peer } from '../../peer/model'
 import { PeerService } from '../../peer/service'
 
-type Account = AccountOptions & {
-  asset: AssetOptions
-}
+export type IncomingAccount = OutgoingPayment | Peer
 
-export type IncomingAccount = Account & {
-  maxPacketAmount?: bigint
-  staticIlpAddress?: string
-}
+export type OutgoingAccount = Account | Invoice | Peer
 
-export type OutgoingAccount = Account & {
-  http?: {
-    outgoing: {
-      authToken: string
-      endpoint: string
-    }
-  }
-  stream?: {
-    enabled: boolean
-  }
-  invoice?: boolean
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types
+export const isInvoice = (o: any): o is Invoice => o.amount !== undefined
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types
+export const isPeer = (o: any): o is Peer => o.staticIlpAddress
 
 export interface TransferOptions {
   sourceAccount: IncomingAccount
@@ -52,6 +43,8 @@ export interface TransferOptions {
 
 export interface AccountingService {
   createTransfer(options: TransferOptions): Promise<Transaction | TransferError>
+  getBalance(id: string): Promise<bigint | undefined>
+  getTotalReceived(id: string): Promise<bigint | undefined>
 }
 
 export interface RafikiServices {

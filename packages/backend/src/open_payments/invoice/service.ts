@@ -27,7 +27,7 @@ export interface InvoiceService {
     accountId: string,
     pagination?: Pagination
   ): Promise<Invoice[]>
-  handlePayment(invoiceId: string): Promise<void>
+  // handlePayment(invoiceId: string): Promise<void>
   processNext(): Promise<string | undefined>
 }
 
@@ -52,7 +52,7 @@ export async function createInvoiceService(
     create: (options, trx) => createInvoice(deps, options, trx),
     getAccountInvoicesPage: (accountId, pagination) =>
       getAccountInvoicesPage(deps, accountId, pagination),
-    handlePayment: (invoiceId) => handleInvoicePayment(deps, invoiceId),
+    // handlePayment: (invoiceId) => handleInvoicePayment(deps, invoiceId),
     processNext: () => processNextInvoice(deps)
   }
 }
@@ -106,24 +106,24 @@ async function createInvoice(
   }
 }
 
-async function handleInvoicePayment(
-  deps: ServiceDependencies,
-  invoiceId: string
-): Promise<void> {
-  const amountReceived = await deps.accountingService.getTotalReceived(
-    invoiceId
-  )
-  if (!amountReceived) {
-    return
-  }
-  await Invoice.query(deps.knex)
-    .patch({
-      active: false,
-      processAt: new Date()
-    })
-    .where('id', invoiceId)
-    .andWhere('amount', '<=', amountReceived.toString())
-}
+// async function handleInvoicePayment(
+//   deps: ServiceDependencies,
+//   invoiceId: string
+// ): Promise<void> {
+//   const amountReceived = await deps.accountingService.getTotalReceived(
+//     invoiceId
+//   )
+//   if (!amountReceived) {
+//     return
+//   }
+//   await Invoice.query(deps.knex)
+//     .patch({
+//       active: false,
+//       processAt: new Date()
+//     })
+//     .where('id', invoiceId)
+//     .andWhere('amount', '<=', amountReceived.toString())
+// }
 
 // Fetch (and lock) an invoice for work.
 // Returns the id of the processed invoice (if any).

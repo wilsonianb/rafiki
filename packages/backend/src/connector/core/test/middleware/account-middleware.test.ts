@@ -2,7 +2,7 @@ import { createILPContext } from '../../utils'
 import {
   AccountFactory,
   IlpPrepareFactory,
-  InvoiceAccountFactory,
+  InvoiceFactory,
   IncomingPeerFactory,
   OutgoingPeerFactory,
   RafikiServicesFactory
@@ -46,7 +46,7 @@ describe('Account Middleware', () => {
   })
 
   test('set the accounts according to state and streamDestination invoice', async () => {
-    const outgoingAccount = InvoiceAccountFactory.build({
+    const outgoingAccount = InvoiceFactory.build({
       id: 'outgoingInvoice'
     })
     await rafikiServices.accounting.create(outgoingAccount)
@@ -68,12 +68,7 @@ describe('Account Middleware', () => {
     await expect(middleware(ctx, next)).resolves.toBeUndefined()
 
     expect(ctx.accounts.incoming).toEqual(incomingAccount)
-    expect(ctx.accounts.outgoing).toEqual({
-      id: outgoingAccount.id,
-      asset: outgoingAccount.asset,
-      stream: { enabled: true },
-      invoice: true
-    })
+    expect(ctx.accounts.outgoing).toMatchObject(outgoingAccount)
   })
 
   test('set the accounts according to state and streamDestination SPSP fallback', async () => {
@@ -99,15 +94,11 @@ describe('Account Middleware', () => {
     await expect(middleware(ctx, next)).resolves.toBeUndefined()
 
     expect(ctx.accounts.incoming).toEqual(incomingAccount)
-    expect(ctx.accounts.outgoing).toEqual({
-      id: outgoingAccount.id,
-      asset: outgoingAccount.asset,
-      stream: { enabled: true }
-    })
+    expect(ctx.accounts.outgoing).toMatchObject(outgoingAccount)
   })
 
   test('return an error when the destination account is disabled', async () => {
-    const outgoingAccount = InvoiceAccountFactory.build({
+    const outgoingAccount = InvoiceFactory.build({
       id: 'deactivatedInvoice',
       active: false
     })

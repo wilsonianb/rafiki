@@ -4,8 +4,8 @@ import { createILPContext } from '../../utils'
 import { ZeroCopyIlpPrepare } from '../..'
 import { createBalanceMiddleware } from '../../middleware'
 import {
-  IncomingAccountFactory,
-  OutgoingAccountFactory,
+  AccountFactory,
+  IncomingPeerFactory,
   IlpPrepareFactory,
   IlpFulfillFactory,
   IlpRejectFactory,
@@ -13,8 +13,8 @@ import {
 } from '../../factories'
 
 // TODO: make one peer to many account relationship
-const aliceAccount = IncomingAccountFactory.build({ id: 'alice' })
-const bobAccount = OutgoingAccountFactory.build({ id: 'bob' })
+const aliceAccount = IncomingPeerFactory.build({ id: 'alice' })
+const bobAccount = AccountFactory.build({ id: 'bob' })
 assert.ok(aliceAccount.id)
 assert.ok(bobAccount.id)
 const services = RafikiServicesFactory.build({})
@@ -29,7 +29,7 @@ const ctx = createILPContext({
   },
   services
 })
-const { accounting, invoices, rates } = services
+const { accounting, rates } = services
 
 beforeEach(async () => {
   ctx.response.fulfill = undefined
@@ -53,7 +53,7 @@ describe('Balance Middleware', function () {
       ctx.response.fulfill = fulfill
     })
 
-    const spy = jest.spyOn(invoices, 'handlePayment')
+    const spy = jest.spyOn(bobAccount, 'handlePayment')
 
     await expect(middleware(ctx, next)).resolves.toBeUndefined()
 
@@ -66,7 +66,7 @@ describe('Balance Middleware', function () {
     expect(spy).not.toHaveBeenCalled()
   })
 
-  it('fulfill response calls handlePayment for outgoing invoice', async () => {
+  it('fulfill response calls handlePayment for outgoing account', async () => {
     const prepare = IlpPrepareFactory.build({ amount: '100' })
     const fulfill = IlpFulfillFactory.build()
     ctx.request.prepare = new ZeroCopyIlpPrepare(prepare)
@@ -74,9 +74,7 @@ describe('Balance Middleware', function () {
       ctx.response.fulfill = fulfill
     })
 
-    bobAccount.invoice = true
-
-    const spy = jest.spyOn(invoices, 'handlePayment')
+    const spy = jest.spyOn(bobAccount, 'handlePayment')
 
     await expect(middleware(ctx, next)).resolves.toBeUndefined()
 
@@ -87,7 +85,6 @@ describe('Balance Middleware', function () {
     expect(bobBalance).toEqual(BigInt(100))
 
     expect(spy).toHaveBeenCalledTimes(1)
-    expect(spy).toHaveBeenCalledWith(bobAccount.id)
   })
 
   it('converts prepare amount to destination asset', async () => {

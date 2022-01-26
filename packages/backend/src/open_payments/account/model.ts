@@ -1,9 +1,9 @@
 import { Model } from 'objection'
 
 import { Asset } from '../../asset/model'
-import { BaseModel } from '../../shared/baseModel'
+import { AccountingService, BaseAccountModel } from '../../shared/baseModel'
 
-export class Account extends BaseModel {
+export class Account extends BaseAccountModel {
   public static get tableName(): string {
     return 'accounts'
   }
@@ -21,4 +21,20 @@ export class Account extends BaseModel {
 
   public readonly assetId!: string
   public asset!: Asset
+
+  public async handlePayment(
+    _accountingService: AccountingService
+  ): Promise<void> {
+    // const balance = await accountingService.getBalance(
+    //   this.id
+    // )
+    // if (!balance || balance < this.asset.minAccountWithdrawAmount) {
+    //   return
+    // }
+    // await this.$query()
+    //   .patch({
+    //     active: false,
+    //     processAt: new Date()
+    //   })
+  }
 }

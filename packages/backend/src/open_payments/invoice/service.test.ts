@@ -160,7 +160,7 @@ describe('Invoice Service', (): void => {
         })
       ).resolves.toBeUndefined()
 
-      await invoiceService.handlePayment(invoice.id)
+      await invoice.handlePayment(accountingService)
       await expect(invoiceService.get(invoice.id)).resolves.toMatchObject({
         active: true
       })
@@ -178,7 +178,7 @@ describe('Invoice Service', (): void => {
       const now = new Date()
       jest.useFakeTimers('modern')
       jest.setSystemTime(now)
-      await invoiceService.handlePayment(invoice.id)
+      await invoice.handlePayment(accountingService)
       await expect(invoiceService.get(invoice.id)).resolves.toMatchObject({
         active: false,
         processAt: now
@@ -267,7 +267,7 @@ describe('Invoice Service', (): void => {
                 invoice.id
               )
             } else {
-              await invoiceService.handlePayment(invoice.id)
+              await invoice.handlePayment(accountingService)
             }
             invoice = (await invoiceService.get(invoice.id)) as Invoice
             expect(invoice.active).toBe(false)

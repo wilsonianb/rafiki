@@ -10,7 +10,7 @@ import {
   streamReceivedKey
 } from '../../controllers/stream'
 import {
-  InvoiceAccountFactory,
+  InvoiceFactory,
   IncomingPeerFactory,
   OutgoingPeerFactory,
   IlpPrepareFactory,
@@ -34,7 +34,7 @@ describe('Stream Controller', function () {
   })
 
   test('constructs a reply for a receive account', async () => {
-    const bob = InvoiceAccountFactory.build()
+    const bob = InvoiceFactory.build()
     const {
       ilpAddress,
       sharedSecret
@@ -97,7 +97,7 @@ describe('Stream Controller', function () {
   })
 
   test("skips when the payment tag can't be decrypted", async () => {
-    const bob = InvoiceAccountFactory.build()
+    const bob = InvoiceFactory.build()
     const ctx = createILPContext({
       services,
       request: {

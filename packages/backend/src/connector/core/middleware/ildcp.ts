@@ -1,5 +1,5 @@
 import { serve as ildcpServe } from 'ilp-protocol-ildcp'
-import { ILPMiddleware, ILPContext } from '../rafiki'
+import { isPeer, ILPMiddleware, ILPContext } from '../rafiki'
 
 /**
  * Intercepts and handles peer.config messages otherwise passes the request onto next.
@@ -20,8 +20,7 @@ export function createIldcpMiddleware(serverAddress: string): ILPMiddleware {
       return
     }
 
-    const clientAddress = incoming.staticIlpAddress
-    if (!clientAddress) {
+    if (!isPeer(incoming)) {
       logger.warn(
         {
           peerId: incoming.id
@@ -30,6 +29,8 @@ export function createIldcpMiddleware(serverAddress: string): ILPMiddleware {
       )
       ctx.throw(500, 'not a peer account')
     }
+
+    const clientAddress = incoming.staticIlpAddress
 
     // TODO: Ensure we get at least length > 0
     //const serverAddress = router.getAddresses(SELF_PEER_ID)[0]

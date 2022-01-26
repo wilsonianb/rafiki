@@ -3,7 +3,7 @@ import { deserializeIldcpResponse } from 'ilp-protocol-ildcp'
 import { createILPContext } from '../../utils'
 import { ILPContext } from '../../rafiki'
 import {
-  IncomingAccountFactory,
+  PaymentFactory,
   IncomingPeerFactory,
   OutgoingPeerFactory,
   IlpPrepareFactory,
@@ -67,9 +67,8 @@ describe('ILDCP Middleware', function () {
   })
 
   test('returns an ildcp response if incoming account is not a peer', async () => {
-    const bob = await services.accounting.create(
-      IncomingAccountFactory.build({ id: 'bob' })
-    )
+    const bob = PaymentFactory.build({ id: 'bob' })
+    await services.accounting.create(bob)
     const ctx = makeContext(
       IlpPrepareFactory.build({ destination: 'peer.config' })
     )

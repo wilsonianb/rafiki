@@ -1,73 +1,84 @@
-import {
-  AccountingService,
-  IncomingAccount,
-  OutgoingAccount
-} from '../../rafiki'
+import { isPeer, AccountingService } from '../../rafiki'
 
 import { Transaction } from '../../../../accounting/service'
 import { TransferError } from '../../../../accounting/errors'
+import { Account } from '../../../../open_payments/account/model'
+import { Invoice } from '../../../../open_payments/invoice/model'
+import { OutgoingPayment } from '../../../../outgoing_payment/model'
+import { Peer } from '../../../../peer/model'
 
-interface MockAccount {
-  id: string
+export type MockAccount = Account & {
   balance: bigint
 }
 
-export type MockIncomingAccount = IncomingAccount &
-  MockAccount & {
-    http?: {
-      incoming?: {
-        authTokens: string[]
-      }
-    }
-    active?: never
-  }
+export type MockInvoice = Invoice & {
+  balance: bigint
+}
 
-export type MockOutgoingAccount = OutgoingAccount &
-  MockAccount & {
-    active?: boolean
-    staticIlpAddress?: string
-  }
+export type MockPayment = OutgoingPayment & {
+  balance: bigint
+}
+
+export type MockPeer = Peer & {
+  incomingAuthToken?: string
+  balance: bigint
+}
+
+export type MockIncomingAccount = MockPayment | MockPeer
+
+export type MockOutgoingAccount = MockAccount | MockInvoice | MockPeer
 
 type MockIlpAccount = MockIncomingAccount | MockOutgoingAccount
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types
-const isIncomingPeer = (o: any): o is MockIncomingAccount => o.http?.incoming
+const isIncomingPeer = (o: any): o is MockPeer => o.incomingAuthToken
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types
+const isInvoice = (o: any): o is Invoice => o.active !== undefined
 
 export class MockAccountingService implements AccountingService {
   private accounts: Map<string, MockIlpAccount> = new Map()
 
-  async _getInvoice(invoiceId: string): Promise<OutgoingAccount | undefined> {
-    const invoice = this.find(
-      (account) => account.id === invoiceId && account.active !== undefined
-    )
-    return invoice as OutgoingAccount
+  async _getInvoice(invoiceId: string): Promise<Invoice | undefined> {
+    return await Invoice.query()
+      .resolve(
+        this.find((account) => account.id === invoiceId && isInvoice(account))
+      )
+      .first()
   }
 
-  async _getAccount(accountId: string): Promise<OutgoingAccount | undefined> {
-    const account = this.find(
-      (account) => account.id === accountId && account.active === undefined
-    )
-    return account as OutgoingAccount
+  async _getAccount(accountId: string): Promise<Account | undefined> {
+    return await Account.query()
+      .resolve(
+        this.find((account) => account.id === accountId && !isInvoice(account))
+      )
+      .first()
   }
 
   async _getByDestinationAddress(
     destinationAddress: string
-  ): Promise<OutgoingAccount | undefined> {
-    const account = this.find((account) => {
-      if (!account.staticIlpAddress) return false
-      return destinationAddress.startsWith(account.staticIlpAddress)
-    })
-    return account as OutgoingAccount
+  ): Promise<Peer | undefined> {
+    return await Peer.query()
+      .resolve(
+        this.find((account) => {
+          return (
+            isPeer(account) &&
+            destinationAddress.startsWith(account.staticIlpAddress)
+          )
+        })
+      )
+      .first()
   }
 
-  async _getByIncomingToken(
-    token: string
-  ): Promise<IncomingAccount | undefined> {
-    return this.find(
-      (account) =>
-        isIncomingPeer(account) &&
-        !!account.http?.incoming?.authTokens.includes(token)
-    )
+  async _getByIncomingToken(token: string): Promise<Peer | undefined> {
+    return await Peer.query()
+      .resolve(
+        this.find(
+          (account) =>
+            isIncomingPeer(account) && account.incomingAuthToken === token
+        )
+      )
+      .first()
   }
 
   async getBalance(accountId: string): Promise<bigint | undefined> {
@@ -75,6 +86,10 @@ export class MockAccountingService implements AccountingService {
     if (account) {
       return account.balance
     }
+  }
+
+  async getTotalReceived(accountId: string): Promise<bigint | undefined> {
+    return await this.getBalance(accountId)
   }
 
   async create(account: MockIlpAccount): Promise<MockIlpAccount> {

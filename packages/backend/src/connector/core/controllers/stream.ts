@@ -1,5 +1,5 @@
 import { isIlpReply } from 'ilp-packet'
-import { ILPContext, ILPMiddleware } from '../rafiki'
+import { isPeer, ILPContext, ILPMiddleware } from '../rafiki'
 
 const CONNECTION_EXPIRY = 60 * 10 // seconds
 
@@ -15,10 +15,8 @@ export function createStreamController(): ILPMiddleware {
     const { logger, redis, streamServer } = ctx.services
     const { request, response } = ctx
 
-    const { stream } = ctx.accounts.outgoing
     if (
-      !stream ||
-      !stream.enabled ||
+      isPeer(ctx.accounts.outgoing) ||
       !streamServer.decodePaymentTag(request.prepare.destination) // XXX mark this earlier in the middleware pipeline
     ) {
       await next()

@@ -1,13 +1,13 @@
 import { AxiosInstance } from 'axios'
 import { Errors } from 'ilp-packet'
-import { OutgoingAccount } from '../rafiki'
+import { Peer } from '../../../peer/model'
 
 export async function sendToPeer(
   client: AxiosInstance,
-  account: OutgoingAccount,
+  peer: Peer,
   prepare: Buffer
 ): Promise<Buffer> {
-  const { http } = account
+  const { http } = peer
   if (!http) {
     throw new Errors.UnreachableError('no outgoing endpoint')
   }

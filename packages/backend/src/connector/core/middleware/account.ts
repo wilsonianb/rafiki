@@ -28,37 +28,15 @@ export function createAccountMiddleware(serverAddress: string): ILPMiddleware {
           if (!invoice.active) {
             throw new Errors.UnreachableError('destination account is disabled')
           }
-          return {
-            id: invoice.id,
-            asset: invoice.account.asset,
-            stream: {
-              enabled: true
-            },
-            invoice: true
-          }
+          return invoice
         }
         // Open Payments SPSP fallback account
-        const spspAccount = await accounts.get(ctx.state.streamDestination)
-        if (spspAccount) {
-          return {
-            id: spspAccount.id,
-            asset: spspAccount.asset,
-            stream: {
-              enabled: true
-            }
-          }
-        }
-        return undefined
+        return await accounts.get(ctx.state.streamDestination)
       }
       const address = ctx.request.prepare.destination
       const peer = await peers.getByDestinationAddress(address)
       if (peer) {
-        return {
-          ...peer,
-          stream: {
-            enabled: false
-          }
-        }
+        return peer
       }
       if (
         address.startsWith(serverAddress + '.') &&

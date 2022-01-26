@@ -38,22 +38,17 @@ describe('Token Auth Middleware', function () {
 
     test('succeeds for valid token and binds data to context', async () => {
       const accounting = new MockAccountingService()
+      const account = IncomingPeerFactory.build({
+        id: 'alice'
+      })
       const ctx = createContext<unknown, HttpContext>({
         req: {
           headers: {
             'content-type': 'application/octet-stream',
-            authorization: 'Bearer asd123'
+            authorization: `Bearer ${account.incomingAuthToken}`
           }
         },
         services: RafikiServicesFactory.build({ accounting })
-      })
-      const account = IncomingPeerFactory.build({
-        id: 'alice',
-        http: {
-          incoming: {
-            authTokens: ['asd123']
-          }
-        }
       })
       await accounting.create(account)
 

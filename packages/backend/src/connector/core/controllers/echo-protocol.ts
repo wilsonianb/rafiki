@@ -3,7 +3,8 @@ import { serializeIlpPrepare } from 'ilp-packet'
 import { Reader, Writer } from 'oer-utils'
 import { Errors } from 'ilp-packet'
 import { sendToPeer as sendToPeerDefault } from '../services'
-import { OutgoingAccount, ILPContext, ILPMiddleware } from '../rafiki'
+import { isPeer, ILPContext, ILPMiddleware } from '../rafiki'
+import { Peer } from '../../../peer/model'
 const { InvalidPacketError } = Errors
 
 const MINIMUM_ECHO_PACKET_DATA_LENGTH = 16 + 1
@@ -13,7 +14,7 @@ export interface EchoProtocolControllerOptions {
   minMessageWindow: number
   sendToPeer?: (
     client: AxiosInstance,
-    account: OutgoingAccount,
+    peer: Peer,
     prepare: Buffer
   ) => Promise<Buffer>
 }
@@ -60,8 +61,7 @@ export function createEchoProtocolController({
 
       logger.debug({ sourceAddress }, 'responding to echo packet')
 
-      const { http } = outgoing
-      if (!http) {
+      if (!isPeer(outgoing) || !outgoing.http) {
         throw new Errors.UnreachableError('no outgoing endpoint')
       }
       response.rawReply = await send(

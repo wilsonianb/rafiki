@@ -1,13 +1,14 @@
 import Axios, { AxiosInstance } from 'axios'
-import { OutgoingAccount, ILPContext, ILPMiddleware } from '../rafiki'
+import { ILPContext, ILPMiddleware } from '../rafiki'
 import { modifySerializedIlpPrepare } from '../lib'
 //import { AxiosClient } from '../services/client/axios'
 import { sendToPeer as sendToPeerDefault } from '../services/client'
+import { Peer } from '../../../peer/model'
 
 export interface ClientControllerOptions {
   sendToPeer?: (
     client: AxiosInstance,
-    account: OutgoingAccount,
+    peer: Peer,
     prepare: Buffer
   ) => Promise<Buffer>
 }
@@ -36,6 +37,6 @@ export function createClientController({
       expiresAt
     )
 
-    response.rawReply = await send(axios, outgoing, outgoingPrepare)
+    response.rawReply = await send(axios, outgoing as Peer, outgoingPrepare)
   }
 }
