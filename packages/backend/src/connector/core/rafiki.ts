@@ -36,10 +36,7 @@ export type OutgoingAccount = Account & {
       endpoint: string
     }
   }
-  stream?: {
-    enabled: boolean
-  }
-  invoice?: boolean
+  handlePayment(accountingService: AccountingService): Promise<void>
 }
 
 export interface TransferOptions {
@@ -52,6 +49,8 @@ export interface TransferOptions {
 
 export interface AccountingService {
   createTransfer(options: TransferOptions): Promise<Transaction | TransferError>
+  getBalance(id: string): Promise<bigint | undefined>
+  getTotalReceived(id: string): Promise<bigint | undefined>
 }
 
 export interface RafikiServices {
