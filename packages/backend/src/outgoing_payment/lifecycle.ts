@@ -4,7 +4,7 @@ import { LifecycleError } from './errors'
 import { OutgoingPayment, PaymentState } from './model'
 import { ServiceDependencies } from './service'
 import { IlpPlugin } from './ilp_plugin'
-import { EventType } from '../webhook/service'
+import { DepositType, WithdrawalType } from '../liquidity/service'
 
 const MAX_INT64 = BigInt('9223372036854775807')
 
@@ -142,7 +142,7 @@ export async function handleFunding(
     throw LifecycleError.QuoteExpired
   }
 
-  if (!payment.webhookId) throw LifecycleError.MissingWebhook
+  if (!payment.withdrawalId) throw LifecycleError.MissingWebhook
 
   const amountSent = await deps.accountingService.getTotalSent(payment.id)
   const balance = await deps.accountingService.getBalance(payment.id)
@@ -150,26 +150,16 @@ export async function handleFunding(
     throw LifecycleError.MissingBalance
   }
 
+  payment.amountSent = amountSent
+  payment.balance = balance
   try {
-    const { status } = await deps.webhookService.send({
-      id: payment.webhookId,
-      type: EventType.PaymentFunding,
+    await deps.liquidityService.deposit({
+      id: payment.withdrawalId,
+      type: DepositType.PaymentFunding,
       payment,
-      amountSent,
-      balance
+      amount: payment.quote.maxSourceAmount
     })
-
-    if (status === 200) {
-      const error = await deps.accountingService.createDeposit({
-        id: payment.webhookId,
-        accountId: payment.id,
-        amount: payment.quote.maxSourceAmount
-      })
-      if (error) {
-        throw new Error('Unable to fund payment. error=' + error)
-      }
-      await payment.$query(deps.knex).patch({ state: PaymentState.Sending })
-    }
+    await payment.$query(deps.knex).patch({ state: PaymentState.Sending })
   } catch (err) {
     if (err.isAxiosError && err.response.status === 403) {
       await payment.$query(deps.knex).patch({
@@ -344,56 +334,39 @@ export async function handleCancelledOrCompleted(
   deps: ServiceDependencies,
   payment: OutgoingPayment
 ): Promise<void> {
+  if (!payment.withdrawalId) throw LifecycleError.MissingWebhook
+
   const amountSent = await deps.accountingService.getTotalSent(payment.id)
   const balance = await deps.accountingService.getBalance(payment.id)
   if (amountSent === undefined || balance === undefined) {
     throw LifecycleError.MissingBalance
   }
 
-  if (!payment.webhookId) throw LifecycleError.MissingWebhook
-
-  if (balance) {
-    const error = await deps.accountingService.createWithdrawal({
-      id: payment.webhookId,
-      accountId: payment.id,
-      amount: balance,
-      timeout: BigInt(deps.webhookService.timeout) * BigInt(1e6) // ms -> ns
+  if (balance === BigInt(0)) {
+    await payment.$query(deps.knex).patch({
+      withdrawalId: null
     })
-    if (error) throw error
+    return
   }
 
-  try {
-    const { status } = await deps.webhookService.send({
-      id: payment.webhookId,
-      type:
-        payment.state === PaymentState.Cancelled
-          ? EventType.PaymentCancelled
-          : EventType.PaymentCompleted,
-      payment,
-      amountSent,
-      balance
+  payment.amountSent = amountSent
+  payment.balance = balance
+  const { status } = await deps.liquidityService.withdraw({
+    id: payment.withdrawalId,
+    type:
+      payment.state === PaymentState.Cancelled
+        ? WithdrawalType.PaymentCancelled
+        : WithdrawalType.PaymentCompleted,
+    payment,
+    amount: balance
+  })
+  if (status === 200) {
+    await payment.$query(deps.knex).patch({
+      withdrawalId: null
     })
-    if (status === 200 || status === 205) {
-      if (balance) {
-        const error = await deps.accountingService.commitWithdrawal(
-          payment.webhookId
-        )
-        if (error) throw error
-      }
-      if (status === 200) {
-        await payment.$query(deps.knex).patch({
-          webhookId: null
-        })
-      } else if (payment.state === PaymentState.Cancelled) {
-        await payment.$query(deps.knex).patch({
-          state: PaymentState.Quoting
-        })
-      }
-    }
-  } catch (error) {
-    if (balance) {
-      await deps.accountingService.rollbackWithdrawal(payment.webhookId)
-    }
-    throw error
+  } else if (status === 205 && payment.state === PaymentState.Cancelled) {
+    await payment.$query(deps.knex).patch({
+      state: PaymentState.Quoting
+    })
   }
 }

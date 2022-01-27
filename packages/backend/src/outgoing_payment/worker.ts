@@ -55,7 +55,7 @@ export async function getPendingPayment(
     .where((builder: knex.QueryBuilder) => {
       builder
         .whereIn('state', [PaymentState.Quoting, PaymentState.Sending])
-        .orWhereNotNull('webhookId')
+        .orWhereNotNull('withdrawalId')
     })
     // Back off between retries.
     .andWhere((builder: knex.QueryBuilder) => {

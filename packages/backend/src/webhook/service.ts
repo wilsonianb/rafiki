@@ -1,11 +1,10 @@
 import { createHmac } from 'crypto'
 import axios, { AxiosResponse } from 'axios'
-import { PaymentType } from '@interledger/pay'
 import { Logger } from 'pino'
 
 import { IAppConfig } from '../config/app'
-import { Invoice } from '../open_payments/invoice/model'
-import { OutgoingPayment, PaymentState } from '../outgoing_payment/model'
+import { Invoice, InvoiceBody } from '../open_payments/invoice/model'
+import { OutgoingPayment, PaymentBody } from '../outgoing_payment/model'
 
 enum InvoiceEventType {
   InvoiceExpired = 'invoice.expired',
@@ -30,9 +29,6 @@ interface InvoiceEvent {
   type: InvoiceEventType
   invoice: Invoice
   payment?: never
-  amountReceived: bigint
-  amountSent?: never
-  balance?: never
 }
 
 interface PaymentEvent {
@@ -40,64 +36,18 @@ interface PaymentEvent {
   type: PaymentEventType
   invoice?: never
   payment: OutgoingPayment
-  amountReceived?: never
-  amountSent: bigint
-  balance: bigint
 }
 
 export type EventOptions = InvoiceEvent | PaymentEvent
 
 interface InvoiceData {
-  invoice: {
-    id: string
-    accountId: string
-    active: boolean
-    description?: string
-    createdAt: string
-    expiresAt: string
-    amount: string
-    received: string
-  }
+  invoice: InvoiceBody
   payment?: never
 }
 
 interface PaymentData {
   invoice?: never
-  payment: {
-    id: string
-    accountId: string
-    createdAt: string
-    state: PaymentState
-    error?: string
-    stateAttempts: number
-    intent: {
-      paymentPointer?: string
-      invoiceUrl?: string
-      amountToSend?: string
-      autoApprove: boolean
-    }
-
-    quote?: {
-      timestamp: string
-      activationDeadline: string
-      targetType: PaymentType
-      minDeliveryAmount: string
-      maxSourceAmount: string
-      maxPacketAmount: string
-      minExchangeRate: number
-      lowExchangeRateEstimate: number
-      highExchangeRateEstimate: number
-    }
-    destinationAccount: {
-      scale: number
-      code: string
-      url?: string
-    }
-    outcome: {
-      amountSent: string
-    }
-    balance: string
-  }
+  payment: PaymentBody
 }
 
 interface WebhookEvent {
@@ -140,11 +90,14 @@ async function sendWebhook(
   const event = {
     id: options.id,
     type: options.type,
-    data: isPaymentEvent(options)
-      ? paymentToData(options.payment, options.amountSent, options.balance)
-      : invoiceToData(options.invoice, options.amountReceived)
+    data: options.invoice
+      ? {
+          invoice: options.invoice.toBody()
+        }
+      : {
+          payment: options.payment.toBody()
+        }
   }
-
   const requestHeaders = {
     'Content-Type': 'application/json'
   }
@@ -176,59 +129,4 @@ export function generateWebhookSignature(
   const digest = hmac.digest('hex')
 
   return `t=${timestamp}, v${version}=${digest}`
-}
-
-export function invoiceToData(
-  invoice: Invoice,
-  amountReceived: bigint
-): InvoiceData {
-  return {
-    invoice: {
-      id: invoice.id,
-      accountId: invoice.accountId,
-      active: invoice.active,
-      amount: invoice.amount.toString(),
-      description: invoice.description,
-      expiresAt: invoice.expiresAt.toISOString(),
-      createdAt: new Date(+invoice.createdAt).toISOString(),
-      received: amountReceived.toString()
-    }
-  }
-}
-
-export function paymentToData(
-  payment: OutgoingPayment,
-  amountSent: bigint,
-  balance: bigint
-): PaymentData {
-  return {
-    payment: {
-      id: payment.id,
-      accountId: payment.accountId,
-      state: payment.state,
-      error: payment.error || undefined,
-      stateAttempts: payment.stateAttempts,
-      intent: {
-        ...payment.intent,
-        amountToSend: payment.intent.amountToSend?.toString()
-      },
-      quote: payment.quote && {
-        ...payment.quote,
-        timestamp: payment.quote.timestamp.toISOString(),
-        activationDeadline: payment.quote.activationDeadline.toISOString(),
-        minDeliveryAmount: payment.quote.minDeliveryAmount.toString(),
-        maxSourceAmount: payment.quote.maxSourceAmount.toString(),
-        maxPacketAmount: payment.quote.maxPacketAmount.toString(),
-        minExchangeRate: payment.quote.minExchangeRate.valueOf(),
-        lowExchangeRateEstimate: payment.quote.lowExchangeRateEstimate.valueOf(),
-        highExchangeRateEstimate: payment.quote.highExchangeRateEstimate.valueOf()
-      },
-      destinationAccount: payment.destinationAccount,
-      createdAt: new Date(+payment.createdAt).toISOString(),
-      outcome: {
-        amountSent: amountSent.toString()
-      },
-      balance: balance.toString()
-    }
-  }
 }

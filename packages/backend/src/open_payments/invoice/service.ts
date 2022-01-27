@@ -2,7 +2,7 @@ import { Invoice } from './model'
 import { AccountingService } from '../../accounting/service'
 import { BaseService } from '../../shared/baseService'
 import { Pagination } from '../../shared/pagination'
-import { EventType, WebhookService } from '../../webhook/service'
+import { WithdrawalType, LiquidityService } from '../../liquidity/service'
 import assert from 'assert'
 import { Transaction } from 'knex'
 import { ForeignKeyViolationError, TransactionOrKnex } from 'objection'
@@ -33,7 +33,7 @@ export interface InvoiceService {
 interface ServiceDependencies extends BaseService {
   knex: TransactionOrKnex
   accountingService: AccountingService
-  webhookService: WebhookService
+  liquidityService: LiquidityService
 }
 
 export async function createInvoiceService(
@@ -182,47 +182,33 @@ async function handleDeactivated(
       { amountReceived },
       'withdrawing deactivated invoice balance'
     )
-    const error = await deps.accountingService.createWithdrawal({
-      id: invoice.id,
-      accountId: invoice.id,
-      amount: amountReceived,
-      timeout: BigInt(deps.webhookService.timeout) * BigInt(1e6) // ms -> ns
-    })
-    if (error) throw error
 
-    const { status } = await deps.webhookService.send({
+    invoice.received = amountReceived
+    await deps.liquidityService.withdraw({
       id: invoice.id,
       type:
         amountReceived < invoice.amount
-          ? EventType.InvoiceExpired
-          : EventType.InvoicePaid,
+          ? WithdrawalType.InvoiceExpired
+          : WithdrawalType.InvoicePaid,
       invoice,
-      amountReceived
+      amount: amountReceived
     })
-    if (status === 200 || status === 205) {
-      const error = await deps.accountingService.commitWithdrawal(invoice.id)
-      if (error) throw error
-      if (status === 200) {
-        await invoice.$query(deps.knex).patch({
-          processAt: null
-        })
-      }
-    }
+    await invoice.$query(deps.knex).patch({
+      processAt: null
+    })
   } catch (error) {
-    const webhookAttempts = invoice.webhookAttempts + 1
+    const withdrawalAttempts = invoice.withdrawalAttempts + 1
     deps.logger.warn(
-      { error, webhookAttempts },
+      { error, withdrawalAttempts },
       'webhook attempt failed; retrying'
     )
-    await deps.accountingService.rollbackWithdrawal(invoice.id)
-
     const processAt = new Date(
       invoice.processAt.getTime() +
-        Math.min(webhookAttempts, 6) * RETRY_BACKOFF_MS
+        Math.min(withdrawalAttempts, 6) * RETRY_BACKOFF_MS
     )
     await invoice.$query(deps.knex).patch({
       processAt,
-      webhookAttempts
+      withdrawalAttempts
     })
   }
 }
