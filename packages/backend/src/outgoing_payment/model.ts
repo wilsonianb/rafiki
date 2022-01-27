@@ -1,3 +1,4 @@
+import assert from 'assert'
 import { Pojo, Model, ModelOptions, QueryContext } from 'objection'
 import * as Pay from '@interledger/pay'
 import { v4 as uuid } from 'uuid'
@@ -27,8 +28,8 @@ export class OutgoingPayment extends BaseModel {
   // The "| null" is necessary so that `$beforeUpdate` can modify a patch to remove the error. If `$beforeUpdate` set `error = undefined`, the patch would ignore the modification.
   public error?: string | null
   public stateAttempts!: number
-  // The "| null" is necessary so that `$beforeUpdate` can modify a patch to remove the webhookId. If `$beforeUpdate` set `webhookId = undefined`, the patch would ignore the modification.
-  public webhookId?: string | null
+  // The "| null" is necessary so that `$beforeUpdate` can modify a patch to remove the withdrawalId. If `$beforeUpdate` set `withdrawalId = undefined`, the patch would ignore the modification.
+  public withdrawalId?: string | null
 
   public intent!: PaymentIntent
 
@@ -60,6 +61,9 @@ export class OutgoingPayment extends BaseModel {
     return this.account.asset
   }
 
+  amountSent?: bigint
+  balance?: bigint
+
   static relationMappings = {
     account: {
       relation: Model.HasOneRelation,
@@ -83,10 +87,10 @@ export class OutgoingPayment extends BaseModel {
           case PaymentState.Funding:
           case PaymentState.Cancelled:
           case PaymentState.Completed:
-            this.webhookId = uuid()
+            this.withdrawalId = uuid()
             break
           default:
-            this.webhookId = null
+            this.withdrawalId = null
         }
       }
     }
@@ -139,6 +143,38 @@ export class OutgoingPayment extends BaseModel {
     }
     return json
   }
+
+  public toBody(): PaymentBody {
+    assert.ok(this.amountSent !== undefined && this.balance !== undefined)
+    return {
+      id: this.id,
+      accountId: this.accountId,
+      state: this.state,
+      error: this.error || undefined,
+      stateAttempts: this.stateAttempts,
+      intent: {
+        ...this.intent,
+        amountToSend: this.intent.amountToSend?.toString()
+      },
+      quote: this.quote && {
+        ...this.quote,
+        timestamp: this.quote.timestamp.toISOString(),
+        activationDeadline: this.quote.activationDeadline.toISOString(),
+        minDeliveryAmount: this.quote.minDeliveryAmount.toString(),
+        maxSourceAmount: this.quote.maxSourceAmount.toString(),
+        maxPacketAmount: this.quote.maxPacketAmount.toString(),
+        minExchangeRate: this.quote.minExchangeRate.valueOf(),
+        lowExchangeRateEstimate: this.quote.lowExchangeRateEstimate.valueOf(),
+        highExchangeRateEstimate: this.quote.highExchangeRateEstimate.valueOf()
+      },
+      destinationAccount: this.destinationAccount,
+      createdAt: new Date(+this.createdAt).toISOString(),
+      outcome: {
+        amountSent: this.amountSent.toString()
+      },
+      balance: this.balance.toString()
+    }
+  }
 }
 
 export enum PaymentState {
@@ -158,4 +194,40 @@ export enum PaymentState {
   Cancelled = 'CANCELLED',
   // Successful completion.
   Completed = 'COMPLETED'
+}
+
+export interface PaymentBody {
+  id: string
+  accountId: string
+  createdAt: string
+  state: PaymentState
+  error?: string
+  stateAttempts: number
+  intent: {
+    paymentPointer?: string
+    invoiceUrl?: string
+    amountToSend?: string
+    autoApprove: boolean
+  }
+
+  quote?: {
+    timestamp: string
+    activationDeadline: string
+    targetType: Pay.PaymentType
+    minDeliveryAmount: string
+    maxSourceAmount: string
+    maxPacketAmount: string
+    minExchangeRate: number
+    lowExchangeRateEstimate: number
+    highExchangeRateEstimate: number
+  }
+  destinationAccount: {
+    scale: number
+    code: string
+    url?: string
+  }
+  outcome: {
+    amountSent: string
+  }
+  balance: string
 }

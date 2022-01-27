@@ -30,7 +30,7 @@ import { InvoiceRoutes } from './open_payments/invoice/routes'
 import { AccountRoutes } from './open_payments/account/routes'
 import { InvoiceService } from './open_payments/invoice/service'
 import { StreamServer } from '@interledger/stream-receiver'
-import { WebhookService } from './webhook/service'
+import { LiquidityService } from './liquidity/service'
 import { OutgoingPaymentService } from './outgoing_payment/service'
 import { IlpPlugin, IlpPluginOptions } from './outgoing_payment/ilp_plugin'
 import { ApiKeyService } from './apiKey/service'
@@ -72,7 +72,7 @@ export interface AppServices {
   accountRoutes: Promise<AccountRoutes>
   invoiceService: Promise<InvoiceService>
   streamServer: Promise<StreamServer>
-  webhookService: Promise<WebhookService>
+  liquidityService: Promise<LiquidityService>
   outgoingPaymentService: Promise<OutgoingPaymentService>
   makeIlpPlugin: Promise<(options: IlpPluginOptions) => IlpPlugin>
   ratesService: Promise<RatesService>

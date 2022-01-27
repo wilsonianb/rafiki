@@ -30,7 +30,9 @@ export class Invoice extends BaseAccountModel {
 
   public processAt!: Date | null
 
-  public webhookAttempts!: number
+  public withdrawalAttempts!: number
+
+  received?: bigint
 
   public get asset(): Asset {
     return this.account.asset
@@ -51,4 +53,29 @@ export class Invoice extends BaseAccountModel {
       })
     }
   }
+
+  public toBody(): InvoiceBody {
+    assert.ok(this.received)
+    return {
+      id: this.id,
+      accountId: this.accountId,
+      active: this.active,
+      amount: this.amount.toString(),
+      description: this.description,
+      expiresAt: this.expiresAt.toISOString(),
+      createdAt: new Date(+this.createdAt).toISOString(),
+      received: this.received.toString()
+    }
+  }
+}
+
+export interface InvoiceBody {
+  id: string
+  accountId: string
+  active: boolean
+  description?: string
+  createdAt: string
+  expiresAt: string
+  amount: string
+  received: string
 }
