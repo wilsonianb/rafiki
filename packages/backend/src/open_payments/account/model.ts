@@ -23,19 +23,21 @@ export class Account extends BaseAccountModel {
   public readonly assetId!: string
   public asset!: Asset
 
+  public withdrawalThreshold?: bigint
+
   public processAt!: Date | null
   public webhookAttempts!: number
 
   public async handlePayment(
     accountingService: AccountingService
   ): Promise<void> {
-    if (this.processAt === null) {
+    if (this.withdrawalThreshold && this.processAt === null) {
       const balance = await accountingService.getBalance(this.id)
 
       // This should be both defined and >0
       assert.ok(balance)
 
-      if (this.asset.minAccountWithdrawalAmount <= balance) {
+      if (this.withdrawalThreshold <= balance) {
         await this.$query().patch({
           processAt: new Date()
         })

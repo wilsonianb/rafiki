@@ -4,6 +4,8 @@ exports.up = function (knex) {
     table.uuid('assetId').notNullable()
     table.foreign('assetId').references('assets.id')
 
+    table.bigInteger('withdrawalThreshold').nullable()
+
     table.timestamp('processAt').nullable()
     table.integer('webhookAttempts').notNullable().defaultTo(0)
 

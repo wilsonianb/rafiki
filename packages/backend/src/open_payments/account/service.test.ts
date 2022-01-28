@@ -88,29 +88,24 @@ describe('Open Payments Account Service', (): void => {
 
   describe('handlePayment', (): void => {
     let account: Account
-    const minAccountWithdrawalAmount = BigInt(10)
 
     beforeEach(
       async (): Promise<void> => {
-        const assetService = await deps.use('assetService')
-        const asset = randomAsset()
-        await assetService.getOrCreate({
-          ...asset,
-          minAccountWithdrawalAmount
-        })
         account = await accountService.create({
-          asset
+          asset: randomAsset(),
+          withdrawalThreshold: BigInt(10)
         })
         await expect(account.processAt).toEqual(null)
       }
     )
 
     test('Schedules account withdrawal', async (): Promise<void> => {
+      assert.ok(account.withdrawalThreshold)
       await expect(
         accountingService.createDeposit({
           id: uuid(),
           accountId: account.id,
-          amount: minAccountWithdrawalAmount
+          amount: account.withdrawalThreshold
         })
       ).resolves.toBeUndefined()
 
@@ -122,11 +117,12 @@ describe('Open Payments Account Service', (): void => {
     })
 
     test('Ignores account already scheduled for withdrawal', async (): Promise<void> => {
+      assert.ok(account.withdrawalThreshold)
       await expect(
         accountingService.createDeposit({
           id: uuid(),
           accountId: account.id,
-          amount: minAccountWithdrawalAmount
+          amount: account.withdrawalThreshold
         })
       ).resolves.toBeUndefined()
 
@@ -139,11 +135,12 @@ describe('Open Payments Account Service', (): void => {
     })
 
     test('Ignores account with insufficient balance for withdrawal', async (): Promise<void> => {
+      assert.ok(account.withdrawalThreshold)
       await expect(
         accountingService.createDeposit({
           id: uuid(),
           accountId: account.id,
-          amount: minAccountWithdrawalAmount - BigInt(1)
+          amount: account.withdrawalThreshold - BigInt(1)
         })
       ).resolves.toBeUndefined()
 

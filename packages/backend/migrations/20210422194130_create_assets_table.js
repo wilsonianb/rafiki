@@ -7,8 +7,6 @@ exports.up = function (knex) {
     table.string('code').notNullable()
     table.integer('scale').notNullable()
 
-    table.bigInteger('minAccountWithdrawalAmount').notNullable().defaultTo(1)
-
     table.timestamp('createdAt').defaultTo(knex.fn.now())
     table.timestamp('updatedAt').defaultTo(knex.fn.now())
 

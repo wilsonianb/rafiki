@@ -15,6 +15,7 @@ export const RETRY_BACKOFF_MS = 10_000
 
 export interface CreateOptions {
   asset: AssetOptions
+  withdrawalThreshold?: bigint
 }
 
 export interface AccountService {
@@ -55,7 +56,8 @@ async function createAccount(
   return await Account.transaction(deps.knex, async (trx) => {
     const account = await Account.query(trx)
       .insertAndFetch({
-        assetId: asset.id
+        assetId: asset.id,
+        withdrawalThreshold: options.withdrawalThreshold
       })
       .withGraphFetched('asset')
 
