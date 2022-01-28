@@ -93,19 +93,19 @@ describe('Open Payments Account Service', (): void => {
       async (): Promise<void> => {
         account = await accountService.create({
           asset: randomAsset(),
-          withdrawalThreshold: BigInt(10)
+          balanceWithdrawalThreshold: BigInt(10)
         })
         await expect(account.processAt).toEqual(null)
       }
     )
 
     test('Schedules account withdrawal', async (): Promise<void> => {
-      assert.ok(account.withdrawalThreshold)
+      assert.ok(account.balanceWithdrawalThreshold)
       await expect(
         accountingService.createDeposit({
           id: uuid(),
           accountId: account.id,
-          amount: account.withdrawalThreshold
+          amount: account.balanceWithdrawalThreshold
         })
       ).resolves.toBeUndefined()
 
@@ -117,12 +117,12 @@ describe('Open Payments Account Service', (): void => {
     })
 
     test('Ignores account already scheduled for withdrawal', async (): Promise<void> => {
-      assert.ok(account.withdrawalThreshold)
+      assert.ok(account.balanceWithdrawalThreshold)
       await expect(
         accountingService.createDeposit({
           id: uuid(),
           accountId: account.id,
-          amount: account.withdrawalThreshold
+          amount: account.balanceWithdrawalThreshold
         })
       ).resolves.toBeUndefined()
 
@@ -135,12 +135,12 @@ describe('Open Payments Account Service', (): void => {
     })
 
     test('Ignores account with insufficient balance for withdrawal', async (): Promise<void> => {
-      assert.ok(account.withdrawalThreshold)
+      assert.ok(account.balanceWithdrawalThreshold)
       await expect(
         accountingService.createDeposit({
           id: uuid(),
           accountId: account.id,
-          amount: account.withdrawalThreshold - BigInt(1)
+          amount: account.balanceWithdrawalThreshold - BigInt(1)
         })
       ).resolves.toBeUndefined()
 
@@ -200,7 +200,7 @@ describe('Open Payments Account Service', (): void => {
       expect(scope.isDone()).toBe(true)
       await expect(accountService.get(account.id)).resolves.toMatchObject({
         processAt: null,
-        webhookAttempts: 0
+        withdrawal: null
       })
       await expect(accountingService.getBalance(account.id)).resolves.toEqual(
         BigInt(0)
@@ -214,7 +214,10 @@ describe('Open Payments Account Service', (): void => {
       expect(scope.isDone()).toBe(true)
       await expect(accountService.get(account.id)).resolves.toMatchObject({
         processAt: new Date(account.processAt.getTime() + 10_000),
-        webhookAttempts: 1
+        withdrawal: {
+          amount: startingBalance,
+          attempts: 1
+        }
       })
       await expect(accountingService.getBalance(account.id)).resolves.toEqual(
         startingBalance
@@ -231,7 +234,10 @@ describe('Open Payments Account Service', (): void => {
       expect(scope.isDone()).toBe(true)
       await expect(accountService.get(account.id)).resolves.toMatchObject({
         processAt: new Date(account.processAt.getTime() + 10_000),
-        webhookAttempts: 1
+        withdrawal: {
+          amount: startingBalance,
+          attempts: 1
+        }
       })
       await expect(accountingService.getBalance(account.id)).resolves.toEqual(
         startingBalance
