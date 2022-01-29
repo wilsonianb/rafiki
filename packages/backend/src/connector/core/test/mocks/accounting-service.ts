@@ -77,6 +77,10 @@ export class MockAccountingService implements AccountingService {
     }
   }
 
+  async getTotalReceived(accountId: string): Promise<bigint | undefined> {
+    return await this.getBalance(accountId)
+  }
+
   async create(account: MockIlpAccount): Promise<MockIlpAccount> {
     if (!account.id) throw new Error('unexpected asset account')
     this.accounts.set(account.id, account)

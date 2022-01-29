@@ -1,8 +1,10 @@
+import assert from 'assert'
 import { Model } from 'objection'
 import { Account } from '../account/model'
-import { BaseModel } from '../../shared/baseModel'
+import { Asset } from '../../asset/model'
+import { AccountingService, BaseAccountModel } from '../../shared/baseModel'
 
-export class Invoice extends BaseModel {
+export class Invoice extends BaseAccountModel {
   public static get tableName(): string {
     return 'invoices'
   }
@@ -29,4 +31,24 @@ export class Invoice extends BaseModel {
   public processAt!: Date | null
 
   public webhookAttempts!: number
+
+  public get asset(): Asset {
+    return this.account.asset
+  }
+
+  public async handlePayment(
+    accountingService: AccountingService
+  ): Promise<void> {
+    const amountReceived = await accountingService.getTotalReceived(this.id)
+
+    // This should be both defined and >0
+    assert.ok(amountReceived)
+
+    if (this.amount <= amountReceived) {
+      await this.$query().patch({
+        active: false,
+        processAt: new Date()
+      })
+    }
+  }
 }

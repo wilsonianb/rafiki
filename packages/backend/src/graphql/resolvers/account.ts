@@ -1,4 +1,5 @@
 import {
+  AccountResolvers,
   QueryResolvers,
   ResolversTypes,
   MutationResolvers
@@ -18,6 +19,20 @@ export const getAccount: QueryResolvers<ApolloContext>['account'] = async (
   return account
 }
 
+export const getAccountBalance: AccountResolvers<ApolloContext>['balance'] = async (
+  parent,
+  args,
+  ctx
+): ResolversTypes['UInt64'] => {
+  if (!parent.id) throw new Error('missing account id')
+  const accountingService = await ctx.container.use('accountingService')
+  const balance = await accountingService.getBalance(parent.id)
+  if (balance === undefined) {
+    throw new Error('No account balances')
+  }
+  return balance
+}
+
 export const createAccount: MutationResolvers<ApolloContext>['createAccount'] = async (
   parent,
   args,
@@ -30,7 +45,10 @@ export const createAccount: MutationResolvers<ApolloContext>['createAccount'] = 
       code: '200',
       success: true,
       message: 'Created Account',
-      account
+      account: {
+        ...account,
+        balance: BigInt(0)
+      }
     }
   } catch (error) {
     ctx.logger.error(

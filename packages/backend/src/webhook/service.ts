@@ -4,8 +4,13 @@ import { PaymentType } from '@interledger/pay'
 import { Logger } from 'pino'
 
 import { IAppConfig } from '../config/app'
+import { Account } from '../open_payments/account/model'
 import { Invoice } from '../open_payments/invoice/model'
 import { OutgoingPayment, PaymentState } from '../outgoing_payment/model'
+
+enum AccountEventType {
+  AccountWebMonetization = 'account.web_monetization'
+}
 
 enum InvoiceEventType {
   InvoiceExpired = 'invoice.expired',
@@ -18,16 +23,36 @@ enum PaymentEventType {
   PaymentCompleted = 'outgoing_payment.completed'
 }
 
-export const EventType = { ...InvoiceEventType, ...PaymentEventType }
-export type EventType = InvoiceEventType | PaymentEventType
+export const EventType = {
+  ...AccountEventType,
+  ...InvoiceEventType,
+  ...PaymentEventType
+}
+export type EventType = AccountEventType | InvoiceEventType | PaymentEventType
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types
+export const isInvoiceEventType = (type: any): type is InvoiceEventType =>
+  Object.values(InvoiceEventType).includes(type)
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types
 export const isPaymentEventType = (type: any): type is PaymentEventType =>
   Object.values(PaymentEventType).includes(type)
 
+interface AccountEvent {
+  id: string
+  type: AccountEventType
+  account: Account
+  invoice?: never
+  payment?: never
+  amountReceived?: never
+  amountSent?: never
+  balance: bigint
+}
+
 interface InvoiceEvent {
   id: string
   type: InvoiceEventType
+  account?: never
   invoice: Invoice
   payment?: never
   amountReceived: bigint
@@ -38,6 +63,7 @@ interface InvoiceEvent {
 interface PaymentEvent {
   id: string
   type: PaymentEventType
+  account?: never
   invoice?: never
   payment: OutgoingPayment
   amountReceived?: never
@@ -45,9 +71,20 @@ interface PaymentEvent {
   balance: bigint
 }
 
-export type EventOptions = InvoiceEvent | PaymentEvent
+export type EventOptions = AccountEvent | InvoiceEvent | PaymentEvent
+
+interface AccountData {
+  account: {
+    id: string
+    assetId: string
+    balance: string
+  }
+  invoice?: never
+  payment?: never
+}
 
 interface InvoiceData {
+  account?: never
   invoice: {
     id: string
     accountId: string
@@ -62,6 +99,7 @@ interface InvoiceData {
 }
 
 interface PaymentData {
+  account?: never
   invoice?: never
   payment: {
     id: string
@@ -100,15 +138,13 @@ interface PaymentData {
   }
 }
 
+type EventData = AccountData | InvoiceData | PaymentData
+
 interface WebhookEvent {
   id: string
   type: EventType
-  data: InvoiceData | PaymentData
+  data: EventData
 }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types
-export const isPaymentEvent = (event: any): event is PaymentEvent =>
-  Object.values(PaymentEventType).includes(event.type)
 
 export interface WebhookService {
   send(options: EventOptions): Promise<AxiosResponse>
@@ -140,9 +176,7 @@ async function sendWebhook(
   const event = {
     id: options.id,
     type: options.type,
-    data: isPaymentEvent(options)
-      ? paymentToData(options.payment, options.amountSent, options.balance)
-      : invoiceToData(options.invoice, options.amountReceived)
+    data: getEventData(options)
   }
 
   const requestHeaders = {
@@ -176,6 +210,26 @@ export function generateWebhookSignature(
   const digest = hmac.digest('hex')
 
   return `t=${timestamp}, v${version}=${digest}`
+}
+
+function getEventData(options: EventOptions): EventData {
+  if (options.account) {
+    return accountToData(options.account, options.balance)
+  } else if (options.invoice) {
+    return invoiceToData(options.invoice, options.amountReceived)
+  } else {
+    return paymentToData(options.payment, options.amountSent, options.balance)
+  }
+}
+
+export function accountToData(account: Account, balance: bigint): AccountData {
+  return {
+    account: {
+      id: account.id,
+      assetId: account.assetId,
+      balance: balance.toString()
+    }
+  }
 }
 
 export function invoiceToData(

@@ -160,10 +160,9 @@ describe('Invoice Service', (): void => {
         })
       ).resolves.toBeUndefined()
 
-      await invoiceService.handlePayment(invoice.id)
-      await expect(invoiceService.get(invoice.id)).resolves.toMatchObject({
-        active: true
-      })
+      await invoice.handlePayment(accountingService)
+      await expect(invoice.active).toEqual(true)
+      await expect(invoiceService.get(invoice.id)).resolves.toEqual(invoice)
     })
 
     test('Deactivates fully paid invoice', async (): Promise<void> => {
@@ -178,11 +177,12 @@ describe('Invoice Service', (): void => {
       const now = new Date()
       jest.useFakeTimers('modern')
       jest.setSystemTime(now)
-      await invoiceService.handlePayment(invoice.id)
-      await expect(invoiceService.get(invoice.id)).resolves.toMatchObject({
+      await invoice.handlePayment(accountingService)
+      await expect(invoice).toMatchObject({
         active: false,
         processAt: now
       })
+      await expect(invoiceService.get(invoice.id)).resolves.toEqual(invoice)
     })
   })
 
@@ -267,7 +267,7 @@ describe('Invoice Service', (): void => {
                 invoice.id
               )
             } else {
-              await invoiceService.handlePayment(invoice.id)
+              await invoice.handlePayment(accountingService)
             }
             invoice = (await invoiceService.get(invoice.id)) as Invoice
             expect(invoice.active).toBe(false)

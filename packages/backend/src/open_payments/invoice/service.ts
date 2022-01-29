@@ -27,7 +27,6 @@ export interface InvoiceService {
     accountId: string,
     pagination?: Pagination
   ): Promise<Invoice[]>
-  handlePayment(invoiceId: string): Promise<void>
   processNext(): Promise<string | undefined>
 }
 
@@ -52,7 +51,6 @@ export async function createInvoiceService(
     create: (options, trx) => createInvoice(deps, options, trx),
     getAccountInvoicesPage: (accountId, pagination) =>
       getAccountInvoicesPage(deps, accountId, pagination),
-    handlePayment: (invoiceId) => handleInvoicePayment(deps, invoiceId),
     processNext: () => processNextInvoice(deps)
   }
 }
@@ -106,25 +104,6 @@ async function createInvoice(
   }
 }
 
-async function handleInvoicePayment(
-  deps: ServiceDependencies,
-  invoiceId: string
-): Promise<void> {
-  const amountReceived = await deps.accountingService.getTotalReceived(
-    invoiceId
-  )
-  if (!amountReceived) {
-    return
-  }
-  await Invoice.query(deps.knex)
-    .patch({
-      active: false,
-      processAt: new Date()
-    })
-    .where('id', invoiceId)
-    .andWhere('amount', '<=', amountReceived.toString())
-}
-
 // Fetch (and lock) an invoice for work.
 // Returns the id of the processed invoice (if any).
 async function processNextInvoice(
@@ -138,7 +117,7 @@ async function processNextInvoice(
       .forUpdate()
       // If an invoice is locked, don't wait — just come back for it later.
       .skipLocked()
-      .where('processAt', '<', now)
+      .where('processAt', '<=', now)
 
     const invoice = invoices[0]
     if (!invoice) return
@@ -220,14 +199,12 @@ async function handleDeactivated(
       invoice,
       amountReceived
     })
-    if (status === 200 || status === 205) {
-      const error = await deps.accountingService.commitWithdrawal(invoice.id)
-      if (error) throw error
-      if (status === 200) {
-        await invoice.$query(deps.knex).patch({
-          processAt: null
-        })
-      }
+    const err = await deps.accountingService.commitWithdrawal(invoice.id)
+    if (err) throw err
+    if (status === 200) {
+      await invoice.$query(deps.knex).patch({
+        processAt: null
+      })
     }
   } catch (error) {
     const webhookAttempts = invoice.webhookAttempts + 1
