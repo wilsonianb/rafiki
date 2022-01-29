@@ -1,5 +1,6 @@
 import assert from 'assert'
 import { Model, Pojo } from 'objection'
+import { v4 as uuid } from 'uuid'
 
 import { Asset } from '../../asset/model'
 import { AccountingService, BaseAccountModel } from '../../shared/baseModel'
@@ -32,12 +33,13 @@ export class Account extends BaseAccountModel {
     id: string
     amount: bigint
     attempts: number
+    transferId: string
   } | null
 
   public async handlePayment(
     accountingService: AccountingService
   ): Promise<void> {
-    if (this.balanceWithdrawalThreshold && this.processAt === null) {
+    if (this.balanceWithdrawalThreshold && this.withdrawal === null) {
       const balance = await accountingService.getBalance(this.id)
 
       // This should be both defined and >0
@@ -45,7 +47,13 @@ export class Account extends BaseAccountModel {
 
       if (this.balanceWithdrawalThreshold <= balance) {
         await this.$query().patch({
-          processAt: new Date()
+          processAt: new Date(),
+          withdrawal: {
+            id: uuid(),
+            amount: balance,
+            attempts: 0,
+            transferId: uuid()
+          }
         })
       }
     }

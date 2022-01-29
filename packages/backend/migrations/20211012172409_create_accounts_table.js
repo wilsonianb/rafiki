@@ -7,9 +7,10 @@ exports.up = function (knex) {
     table.bigInteger('balanceWithdrawalThreshold').nullable()
 
     table.timestamp('processAt').nullable()
-    table.string('withdrawalId').nullable()
+    table.uuid('withdrawalId').nullable()
     table.integer('withdrawalAttempts').nullable()
     table.bigInteger('withdrawalAmount').nullable()
+    table.uuid('withdrawalTransferId').nullable()
 
     table.timestamp('createdAt').defaultTo(knex.fn.now())
     table.timestamp('updatedAt').defaultTo(knex.fn.now())

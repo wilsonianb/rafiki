@@ -1,4 +1,5 @@
 import assert from 'assert'
+import { AxiosResponse } from 'axios'
 import Knex from 'knex'
 import { WorkerUtils, makeWorkerUtils } from 'graphile-worker'
 import nock from 'nock'
@@ -16,7 +17,7 @@ import { Config } from '../../config/app'
 import { IocContract } from '@adonisjs/fold'
 import { initIocContainer } from '../../'
 import { AppServices } from '../../app'
-import { EventType } from '../../webhook/service'
+import { EventType, WebhookService } from '../../webhook/service'
 
 describe('Open Payments Account Service', (): void => {
   let deps: IocContract<AppServices>
@@ -24,6 +25,7 @@ describe('Open Payments Account Service', (): void => {
   let workerUtils: WorkerUtils
   let accountService: AccountService
   let accountingService: AccountingService
+  let webhookService: WebhookService
   let knex: Knex
   const messageProducer = new GraphileProducer()
   const mockMessageProducer = {
@@ -44,11 +46,13 @@ describe('Open Payments Account Service', (): void => {
       knex = await deps.use('knex')
       accountService = await deps.use('accountService')
       accountingService = await deps.use('accountingService')
+      webhookService = await deps.use('webhookService')
     }
   )
 
   afterEach(
     async (): Promise<void> => {
+      jest.restoreAllMocks()
       jest.useRealTimers()
       await truncateTables(knex)
     }
@@ -126,9 +130,15 @@ describe('Open Payments Account Service', (): void => {
         })
       ).resolves.toBeUndefined()
 
-      const processAt = new Date()
+      const processAt = new Date(Date.now() - 10_000)
       await account.$query(knex).patch({
-        processAt
+        processAt,
+        withdrawal: {
+          id: uuid(),
+          amount: BigInt(5),
+          attempts: 0,
+          transferId: uuid()
+        }
       })
       await account.handlePayment(accountingService)
       await expect(account.processAt).toEqual(processAt)
@@ -167,7 +177,13 @@ describe('Open Payments Account Service', (): void => {
           })
         ).resolves.toBeUndefined()
         await account.$query(knex).patch({
-          processAt: new Date()
+          processAt: new Date(),
+          withdrawal: {
+            id: uuid(),
+            amount: BigInt(5),
+            attempts: 0,
+            transferId: uuid()
+          }
         })
       }
     )
@@ -175,9 +191,17 @@ describe('Open Payments Account Service', (): void => {
     function mockWebhookServer(status = 200): nock.Scope {
       return nock(webhookUrl.origin)
         .post(webhookUrl.pathname, (body): boolean => {
-          expect(body.type).toEqual(EventType.AccountWebMonetization)
-          expect(body.data.account.id).toEqual(account.id)
-          expect(body.data.account.balance).toEqual(startingBalance.toString())
+          assert.ok(account.withdrawal)
+          expect(body).toMatchObject({
+            id: account.withdrawal.id,
+            type: EventType.AccountWebMonetization,
+            data: {
+              account: {
+                id: account.id,
+                balance: account.withdrawal.amount.toString()
+              }
+            }
+          })
           return true
         })
         .reply(status)
@@ -188,6 +212,11 @@ describe('Open Payments Account Service', (): void => {
         processAt: new Date(Date.now() + 10_000)
       })
       await expect(accountService.processNext()).resolves.toBeUndefined()
+      await account.$query(knex).patch({
+        processAt: new Date(),
+        withdrawal: null
+      })
+      await expect(accountService.processNext()).resolves.toBeUndefined()
       await expect(accountService.get(account.id)).resolves.toEqual(account)
       await expect(accountingService.getBalance(account.id)).resolves.toEqual(
         startingBalance
@@ -195,6 +224,7 @@ describe('Open Payments Account Service', (): void => {
     })
 
     test('Withdraws account liquidity', async (): Promise<void> => {
+      assert.ok(account.withdrawal)
       const scope = mockWebhookServer()
       await expect(accountService.processNext()).resolves.toBe(account.id)
       expect(scope.isDone()).toBe(true)
@@ -203,19 +233,54 @@ describe('Open Payments Account Service', (): void => {
         withdrawal: null
       })
       await expect(accountingService.getBalance(account.id)).resolves.toEqual(
-        BigInt(0)
+        startingBalance - account.withdrawal.amount
+      )
+    })
+
+    test('Schedules next withdrawal if remaining balance already exceeds threshold', async (): Promise<void> => {
+      assert.ok(account.processAt && account.withdrawal)
+      await account.$query(knex).patch({
+        balanceWithdrawalThreshold: BigInt(5)
+      })
+      expect(account.balanceWithdrawalThreshold).toBeGreaterThanOrEqual(
+        startingBalance - account.withdrawal.amount
+      )
+
+      // nock doesn't work with 'modern' fake timers
+      // https://github.com/nock/nock/issues/2200
+      // const scope = mockWebhookServer()
+      jest
+        .spyOn(webhookService, 'send')
+        .mockResolvedValueOnce({ status: 200 } as AxiosResponse)
+
+      const now = new Date()
+      jest.useFakeTimers('modern')
+      jest.setSystemTime(now)
+      expect(account.processAt.getTime()).toBeLessThan(now.getTime())
+
+      await expect(accountService.processNext()).resolves.toBe(account.id)
+      await expect(accountService.get(account.id)).resolves.toMatchObject({
+        processAt: now,
+        withdrawal: {
+          amount: startingBalance - account.withdrawal.amount,
+          attempts: 0
+        }
+      })
+      await expect(accountingService.getBalance(account.id)).resolves.toEqual(
+        startingBalance - account.withdrawal.amount
       )
     })
 
     test("Doesn't withdraw on webhook error", async (): Promise<void> => {
-      assert.ok(account.processAt)
+      assert.ok(account.processAt && account.withdrawal)
       const scope = mockWebhookServer(504)
       await expect(accountService.processNext()).resolves.toBe(account.id)
       expect(scope.isDone()).toBe(true)
       await expect(accountService.get(account.id)).resolves.toMatchObject({
         processAt: new Date(account.processAt.getTime() + 10_000),
         withdrawal: {
-          amount: startingBalance,
+          id: account.withdrawal.id,
+          amount: account.withdrawal.amount,
           attempts: 1
         }
       })
@@ -225,7 +290,7 @@ describe('Open Payments Account Service', (): void => {
     })
 
     test("Doesn't withdraw on webhook timeout", async (): Promise<void> => {
-      assert.ok(account.processAt)
+      assert.ok(account.processAt && account.withdrawal)
       const scope = nock(webhookUrl.origin)
         .post(webhookUrl.pathname)
         .delayConnection(Config.webhookTimeout + 1)
@@ -235,12 +300,31 @@ describe('Open Payments Account Service', (): void => {
       await expect(accountService.get(account.id)).resolves.toMatchObject({
         processAt: new Date(account.processAt.getTime() + 10_000),
         withdrawal: {
-          amount: startingBalance,
+          id: account.withdrawal.id,
+          amount: account.withdrawal.amount,
           attempts: 1
         }
       })
       await expect(accountingService.getBalance(account.id)).resolves.toEqual(
         startingBalance
+      )
+    })
+
+    test('Retries withdrawal with same amount', async (): Promise<void> => {
+      assert.ok(account.processAt && account.withdrawal)
+      let scope = mockWebhookServer(504)
+      await expect(accountService.processNext()).resolves.toBe(account.id)
+      expect(scope.isDone()).toBe(true)
+
+      scope = mockWebhookServer()
+      await expect(accountService.processNext()).resolves.toBe(account.id)
+      expect(scope.isDone()).toBe(true)
+      await expect(accountService.get(account.id)).resolves.toMatchObject({
+        processAt: null,
+        withdrawal: null
+      })
+      await expect(accountingService.getBalance(account.id)).resolves.toEqual(
+        startingBalance - account.withdrawal.amount
       )
     })
   })

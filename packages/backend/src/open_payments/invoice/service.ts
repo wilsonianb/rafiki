@@ -117,7 +117,7 @@ async function processNextInvoice(
       .forUpdate()
       // If an invoice is locked, don't wait — just come back for it later.
       .skipLocked()
-      .where('processAt', '<', now)
+      .where('processAt', '<=', now)
 
     const invoice = invoices[0]
     if (!invoice) return

@@ -91,7 +91,7 @@ async function processNextAccount(
       .forUpdate()
       // If an invoice is locked, don't wait — just come back for it later.
       .skipLocked()
-      .where('processAt', '<', now)
+      .where('processAt', '<=', now)
 
     const account = accounts[0]
     if (!account) return
@@ -105,54 +105,71 @@ async function processNextAccount(
       })
     }
 
-    const withdrawalId = account.withdrawal?.id || uuid()
-    const amount =
-      account.withdrawal?.amount ||
-      (await deps.accountingService.getBalance(account.id))
-    if (!amount) {
-      deps.logger.warn({ amount }, 'account with processAt and empty balance')
+    if (!account.withdrawal) {
+      deps.logger.warn(
+        { withdrawal: account.withdrawal },
+        'account with processAt and no withdrawal'
+      )
       await account.$query(deps.knex).patch({ processAt: null })
       return
     }
 
     try {
-      deps.logger.trace({ amount }, 'withdrawing account balance')
+      deps.logger.trace(
+        { amount: account.withdrawal.amount },
+        'withdrawing account balance'
+      )
       const error = await deps.accountingService.createWithdrawal({
-        id: withdrawalId,
+        id: account.withdrawal.transferId,
         accountId: account.id,
-        amount,
+        amount: account.withdrawal.amount,
         timeout: BigInt(deps.webhookService.timeout) * BigInt(1e6) // ms -> ns
       })
       if (error) throw error
 
       const { status } = await deps.webhookService.send({
-        id: withdrawalId,
+        id: account.withdrawal.id,
         type: EventType.AccountWebMonetization,
         account,
-        balance: amount
+        balance: account.withdrawal.amount
       })
-      const err = await deps.accountingService.commitWithdrawal(withdrawalId)
+      const err = await deps.accountingService.commitWithdrawal(
+        account.withdrawal.transferId
+      )
       if (err) throw err
       if (status === 200) {
         // Check if balance already exceeds withdrawal threshold
         const balance = await deps.accountingService.getBalance(account.id)
         assert.ok(balance !== undefined)
-        await account.$query(deps.knex).patch({
-          processAt:
-            account.balanceWithdrawalThreshold &&
-            account.balanceWithdrawalThreshold <= balance
-              ? new Date()
-              : null,
-          withdrawal: null
-        })
+        if (
+          account.balanceWithdrawalThreshold &&
+          account.balanceWithdrawalThreshold <= balance
+        ) {
+          await account.$query(deps.knex).patch({
+            processAt: new Date(),
+            withdrawal: {
+              id: uuid(),
+              amount: balance,
+              attempts: 0,
+              transferId: uuid()
+            }
+          })
+        } else {
+          await account.$query(deps.knex).patch({
+            processAt: null,
+            withdrawal: null
+          })
+        }
       }
     } catch (error) {
-      const attempts = (account.withdrawal?.attempts || 0) + 1
+      const attempts = account.withdrawal?.attempts + 1
       deps.logger.warn(
         { error, attempts },
         'withdrawal attempt failed; retrying'
       )
-      await deps.accountingService.rollbackWithdrawal(withdrawalId)
+      await deps.accountingService.rollbackWithdrawal(
+        account.withdrawal.transferId
+      )
 
       const processAt = new Date(
         account.processAt.getTime() + Math.min(attempts, 6) * RETRY_BACKOFF_MS
@@ -160,9 +177,9 @@ async function processNextAccount(
       await account.$query(deps.knex).patch({
         processAt,
         withdrawal: {
-          id: withdrawalId,
-          amount,
-          attempts
+          ...account.withdrawal,
+          attempts,
+          transferId: uuid()
         }
       })
     }
