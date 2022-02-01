@@ -135,14 +135,17 @@ export function initIocContainer(
       accountingService: await deps.use('accountingService')
     })
   })
+  container.singleton('webhookService', async (deps) => {
+    return createWebhookService({
+      config: await deps.use('config'),
+      logger: await deps.use('logger')
+    })
+  })
   container.singleton('accountingService', async (deps) => {
-    const logger = await deps.use('logger')
-    const knex = await deps.use('knex')
-    const tigerbeetle = await deps.use('tigerbeetle')
     return await createAccountingService({
-      logger: logger,
-      knex: knex,
-      tigerbeetle
+      logger: await deps.use('logger'),
+      tigerbeetle: await deps.use('tigerbeetle'),
+      webhookService: await deps.use('webhookService')
     })
   })
   container.singleton('peerService', async (deps) => {
@@ -172,12 +175,6 @@ export function initIocContainer(
       logger: logger,
       accountService: accountService,
       streamServer: streamServer
-    })
-  })
-  container.singleton('webhookService', async (deps) => {
-    return createWebhookService({
-      config: await deps.use('config'),
-      logger: await deps.use('logger')
     })
   })
   container.singleton('invoiceService', async (deps) => {

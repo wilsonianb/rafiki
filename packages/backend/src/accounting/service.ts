@@ -1,3 +1,5 @@
+import assert from 'assert'
+import { Logger } from 'pino'
 import {
   Client,
   CreateAccountError as CreateAccountErrorCode
@@ -22,8 +24,16 @@ import {
   commitTransfers,
   rollbackTransfers
 } from './transfers'
-import { BaseService } from '../shared/baseService'
 import { validateId } from '../shared/utils'
+import { EventType, Webhook } from '../webhook/model'
+import { WebhookService } from '../webhook/service'
+
+export interface BalanceOptions {
+  // id?
+  threshold: bigint
+  eventType: EventType
+  targetBalance: bigint
+}
 
 // Model classes that have a corresponding Tigerbeetle liquidity
 // account SHOULD implement this LiquidityAccount interface and call
@@ -43,6 +53,8 @@ export interface LiquidityAccount {
     id: string
     unit: number
   }
+  deposit?: BalanceOptions
+  withdrawal?: BalanceOptions
 }
 
 export interface Deposit {
@@ -55,9 +67,15 @@ export interface Withdrawal extends Deposit {
   timeout: bigint
 }
 
+export interface TransferAccount extends LiquidityAccount {
+  asset: Account['asset'] & {
+    asset: Account['asset']
+  }
+}
+
 export interface TransferOptions {
-  sourceAccount: LiquidityAccount
-  destinationAccount: LiquidityAccount
+  sourceAccount: TransferAccount
+  destinationAccount: TransferAccount
   sourceAmount: bigint
   destinationAmount?: bigint
   timeout: bigint // nano-seconds
@@ -80,24 +98,21 @@ export interface AccountingService {
   createWithdrawal(withdrawal: Withdrawal): Promise<void | TransferError>
   commitWithdrawal(id: string): Promise<void | TransferError>
   rollbackWithdrawal(id: string): Promise<void | TransferError>
+  handlePayment(account: Account): Promise<void | Webhook>
 }
 
-export interface ServiceDependencies extends BaseService {
+export interface ServiceDependencies {
   tigerbeetle: Client
+  logger: Logger
+  webhookService: WebhookService
 }
 
-export function createAccountingService({
-  logger,
-  knex,
-  tigerbeetle
-}: ServiceDependencies): AccountingService {
-  const log = logger.child({
-    service: 'AccountingService'
-  })
-  const deps: ServiceDependencies = {
-    logger: log,
-    knex: knex,
-    tigerbeetle
+export function createAccountingService(
+  deps_: ServiceDependencies
+): AccountingService {
+  const deps = {
+    ...deps_,
+    logger: deps_.logger.child({ service: 'AccountingService' })
   }
   return {
     createLiquidityAccount: (options) => createLiquidityAccount(deps, options),
@@ -107,10 +122,11 @@ export function createAccountingService({
     getTotalReceived: (id) => getAccountTotalReceived(deps, id),
     getSettlementBalance: (unit) => getSettlementBalance(deps, unit),
     createTransfer: (options) => createTransfer(deps, options),
-    createDeposit: (transfer) => createAccountDeposit(deps, transfer),
-    createWithdrawal: (transfer) => createAccountWithdrawal(deps, transfer),
+    createDeposit: (deposit) => createAccountDeposit(deps, deposit),
+    createWithdrawal: (withdrawal) => createAccountWithdrawal(deps, withdrawal),
     commitWithdrawal: (options) => commitAccountWithdrawal(deps, options),
-    rollbackWithdrawal: (options) => rollbackAccountWithdrawal(deps, options)
+    rollbackWithdrawal: (options) => rollbackAccountWithdrawal(deps, options),
+    handlePayment: (account) => handleAccountPayment(deps, account)
   }
 }
 
@@ -218,38 +234,52 @@ export async function createTransfer(
     return TransferError.InvalidDestinationAmount
   }
   const transfers: Required<CreateTransferOptions>[] = []
+  const accounts: Account[] = []
 
-  // Same asset
-  if (sourceAccount.asset.unit === destinationAccount.asset.unit) {
+  const addTransfer = ({
+    sourceAccount,
+    destinationAccount,
+    amount
+  }: {
+    sourceAccount: Account
+    destinationAccount: Account
+    amount: bigint
+  }) => {
     transfers.push({
       id: uuid(),
       sourceAccountId: sourceAccount.id,
       destinationAccountId: destinationAccount.id,
+      amount,
+      timeout
+    })
+    accounts.push(sourceAccount, destinationAccount)
+  }
+
+  // Same asset
+  if (sourceAccount.asset.unit === destinationAccount.asset.unit) {
+    addTransfer({
+      sourceAccount,
+      destinationAccount,
       amount:
         destinationAmount && destinationAmount < sourceAmount
           ? destinationAmount
-          : sourceAmount,
-      timeout
+          : sourceAmount
     })
     // Same asset, different amounts
     if (destinationAmount && sourceAmount !== destinationAmount) {
       // Send excess source amount to liquidity account
       if (destinationAmount < sourceAmount) {
-        transfers.push({
-          id: uuid(),
-          sourceAccountId: sourceAccount.id,
-          destinationAccountId: sourceAccount.asset.id,
-          amount: sourceAmount - destinationAmount,
-          timeout
+        addTransfer({
+          sourceAccount,
+          destinationAccount: sourceAccount.asset,
+          amount: sourceAmount - destinationAmount
         })
         // Deliver excess destination amount from liquidity account
       } else {
-        transfers.push({
-          id: uuid(),
-          sourceAccountId: destinationAccount.asset.id,
-          destinationAccountId: destinationAccount.id,
-          amount: destinationAmount - sourceAmount,
-          timeout
+        addTransfer({
+          sourceAccount: destinationAccount.asset,
+          destinationAccount,
+          amount: destinationAmount - sourceAmount
         })
       }
     }
@@ -261,22 +291,16 @@ export async function createTransfer(
     }
     // Send to source liquidity account
     // Deliver from destination liquidity account
-    transfers.push(
-      {
-        id: uuid(),
-        sourceAccountId: sourceAccount.id,
-        destinationAccountId: sourceAccount.asset.id,
-        amount: sourceAmount,
-        timeout
-      },
-      {
-        id: uuid(),
-        sourceAccountId: destinationAccount.asset.id,
-        destinationAccountId: destinationAccount.id,
-        amount: destinationAmount,
-        timeout
-      }
-    )
+    addTransfer({
+      sourceAccount,
+      destinationAccount: sourceAccount.asset,
+      amount: sourceAmount
+    })
+    addTransfer({
+      sourceAccount: destinationAccount.asset,
+      destinationAccount,
+      amount: destinationAmount
+    })
   }
   const error = await createTransfers(deps, transfers)
   if (error) {
@@ -307,6 +331,9 @@ export async function createTransfer(
       )
       if (error) {
         return error.error
+      }
+      for (const account of accounts) {
+        await handleAccountPayment(deps, account)
       }
     },
     rollback: async (): Promise<void | TransferError> => {
@@ -386,5 +413,30 @@ async function commitAccountWithdrawal(
   const error = await commitTransfers(deps, [withdrawalId])
   if (error) {
     return error.error
+  }
+}
+
+async function handleAccountPayment(
+  deps: ServiceDependencies,
+  account: Account
+): Promise<void> {
+  if (account.deposit || account.withdrawal) {
+    const balance = await getAccountBalance(deps, account.id)
+    assert.ok(balance !== undefined)
+    if (account.deposit && balance <= account.deposit.threshold) {
+      await deps.webhookService.create({})
+      await createAccountDeposit(deps, {
+        id: uuid(),
+        account,
+        amount: account.deposit.targetBalance - balance
+      })
+    } else if (account.withdrawal && account.withdrawal.threshold <= balance) {
+      // const withdrawal = await createAccountWithdrawal({
+      //   account,
+      //   amount: account.balance - account.withdrawal.targetBalance
+      // })
+      // const webhook = await deps.webhookService.create({
+      // })
+    }
   }
 }

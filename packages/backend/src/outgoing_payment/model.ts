@@ -1,12 +1,14 @@
+import assert from 'assert'
 import { Pojo, Model, ModelOptions, QueryContext } from 'objection'
 import * as Pay from '@interledger/pay'
 import { v4 as uuid } from 'uuid'
 
-import { LiquidityAccount } from '../accounting/service'
+import { LiquidityAccount, BalanceOptions } from '../accounting/service'
 import { Asset } from '../asset/model'
 import { ConnectorAccount } from '../connector/core/rafiki'
 import { Account } from '../open_payments/account/model'
 import { BaseModel } from '../shared/baseModel'
+import { EventType } from '../webhook/model'
 
 const fieldPrefixes = ['intent', 'quote', 'destinationAccount', 'outcome']
 
@@ -63,6 +65,21 @@ export class OutgoingPayment
 
   public get asset(): Asset {
     return this.account.asset
+  }
+
+  public get withdrawal(): BalanceOptions {
+    assert.ok(
+      this.state === PaymentState.Completed ||
+        this.state === PaymentState.Cancelled
+    )
+    return {
+      threshold: BigInt(1),
+      eventType:
+        this.state === PaymentState.Completed
+          ? EventType.PaymentCompleted
+          : EventType.PaymentCancelled,
+      targetBalance: BigInt(0)
+    }
   }
 
   static relationMappings = {
@@ -144,6 +161,38 @@ export class OutgoingPayment
     }
     return json
   }
+
+  public toBody(): PaymentBody {
+    assert.ok(this.amountSent !== undefined && this.balance !== undefined)
+    return {
+      id: this.id,
+      accountId: this.accountId,
+      state: this.state,
+      error: this.error || undefined,
+      stateAttempts: this.stateAttempts,
+      intent: {
+        ...this.intent,
+        amountToSend: this.intent.amountToSend?.toString()
+      },
+      quote: this.quote && {
+        ...this.quote,
+        timestamp: this.quote.timestamp.toISOString(),
+        activationDeadline: this.quote.activationDeadline.toISOString(),
+        minDeliveryAmount: this.quote.minDeliveryAmount.toString(),
+        maxSourceAmount: this.quote.maxSourceAmount.toString(),
+        maxPacketAmount: this.quote.maxPacketAmount.toString(),
+        minExchangeRate: this.quote.minExchangeRate.valueOf(),
+        lowExchangeRateEstimate: this.quote.lowExchangeRateEstimate.valueOf(),
+        highExchangeRateEstimate: this.quote.highExchangeRateEstimate.valueOf()
+      },
+      destinationAccount: this.destinationAccount,
+      createdAt: new Date(+this.createdAt).toISOString(),
+      outcome: {
+        amountSent: this.amountSent.toString()
+      },
+      balance: this.balance.toString()
+    }
+  }
 }
 
 export enum PaymentState {
@@ -163,4 +212,40 @@ export enum PaymentState {
   Cancelled = 'CANCELLED',
   // Successful completion.
   Completed = 'COMPLETED'
+}
+
+export interface PaymentBody {
+  id: string
+  accountId: string
+  createdAt: string
+  state: PaymentState
+  error?: string
+  stateAttempts: number
+  intent: {
+    paymentPointer?: string
+    invoiceUrl?: string
+    amountToSend?: string
+    autoApprove: boolean
+  }
+
+  quote?: {
+    timestamp: string
+    activationDeadline: string
+    targetType: Pay.PaymentType
+    minDeliveryAmount: string
+    maxSourceAmount: string
+    maxPacketAmount: string
+    minExchangeRate: number
+    lowExchangeRateEstimate: number
+    highExchangeRateEstimate: number
+  }
+  destinationAccount: {
+    scale: number
+    code: string
+    url?: string
+  }
+  outcome: {
+    amountSent: string
+  }
+  balance: string
 }
