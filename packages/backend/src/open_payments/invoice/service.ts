@@ -190,7 +190,7 @@ async function handleDeactivated(
     })
     if (error) throw error
 
-    const { status } = await deps.webhookService.send({
+    const { status } = await deps.webhookService.create({
       id: invoice.id,
       type:
         amountReceived < invoice.amount

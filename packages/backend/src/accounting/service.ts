@@ -85,6 +85,7 @@ export interface AccountingService {
   createWithdrawal(withdrawal: Withdrawal): Promise<void | TransferError>
   commitWithdrawal(id: string): Promise<void | TransferError>
   rollbackWithdrawal(id: string): Promise<void | TransferError>
+  handlePayment(account: Account): Promise<void> // | webhook
 }
 
 export interface ServiceDependencies extends BaseService {
@@ -114,10 +115,11 @@ export function createAccountingService({
     getAssetLiquidityBalance: (unit) => getAssetLiquidityBalance(deps, unit),
     getAssetSettlementBalance: (unit) => getAssetSettlementBalance(deps, unit),
     createTransfer: (options) => createTransfer(deps, options),
-    createDeposit: (transfer) => createAccountDeposit(deps, transfer),
-    createWithdrawal: (transfer) => createAccountWithdrawal(deps, transfer),
+    createDeposit: (deposit) => createAccountDeposit(deps, deposit),
+    createWithdrawal: (withdrawal) => createAccountWithdrawal(deps, withdrawal),
     commitWithdrawal: (options) => commitAccountWithdrawal(deps, options),
-    rollbackWithdrawal: (options) => rollbackAccountWithdrawal(deps, options)
+    rollbackWithdrawal: (options) => rollbackAccountWithdrawal(deps, options),
+    handlePayment: (account) => handleAccountPayment(deps, account)
   }
 }
 
@@ -391,6 +393,10 @@ export async function createTransfer(
       if (error) {
         return error.error
       }
+      for (const transfer of transfers) {
+        await handleAccountPayment(deps, transfer.sourceAccount)
+        await handleAccountPayment(deps, transfer.destinationAccount)
+      }
     },
     rollback: async (): Promise<void | TransferError> => {
       const error = await rollbackTransfers(
@@ -517,5 +523,28 @@ async function commitAccountWithdrawal(
   const error = await commitTransfers(deps, [withdrawalId])
   if (error) {
     return error.error
+  }
+}
+
+async function handleAccountPayment(
+  deps: ServiceDependencies,
+  account: Account
+): Promise<Webhook> {
+  if (account.deposit || account.withdrawal) {
+    const balance = await getAccountBalance(account.id)
+    if (account.deposit && balance <= account.deposit.threshold) {
+      await deps.webhookService.create({})
+      await createAccountDeposit({
+        account,
+        amount: account.deposit.targetBalance - account.balance
+      })
+    } else if (account.withdrawal && account.withdrawal.threshold <= balance) {
+      // const withdrawal = await createAccountWithdrawal({
+      //   account,
+      //   amount: account.balance - account.withdrawal.targetBalance
+      // })
+      // const webhook = await deps.webhookService.create({
+      // })
+    }
   }
 }
