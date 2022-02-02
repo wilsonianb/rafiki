@@ -138,6 +138,7 @@ export function initIocContainer(
   container.singleton('webhookService', async (deps) => {
     return createWebhookService({
       config: await deps.use('config'),
+      knex: await deps.use('knex'),
       logger: await deps.use('logger')
     })
   })
