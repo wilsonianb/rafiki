@@ -2,7 +2,8 @@ import { Invoice } from './model'
 import { AccountingService } from '../../accounting/service'
 import { BaseService } from '../../shared/baseService'
 import { Pagination } from '../../shared/pagination'
-import { EventType, WebhookService } from '../../webhook/service'
+import { EventType } from '../../webhook/model'
+import { WebhookService } from '../../webhook/service'
 import assert from 'assert'
 import { Transaction } from 'knex'
 import { ForeignKeyViolationError, TransactionOrKnex } from 'objection'
@@ -209,7 +210,7 @@ async function handleDeactivated(
     })
     if (error) throw error
 
-    const { status } = await deps.webhookService.send({
+    const { status } = await deps.webhookService.create({
       id: invoice.id,
       type:
         amountReceived < invoice.amount
