@@ -1,6 +1,6 @@
 import { Asset } from './model'
 import { BaseService } from '../shared/baseService'
-import { Transaction } from 'knex'
+import { Knex } from 'knex'
 import { AccountingService } from '../accounting/service'
 
 export interface AssetOptions {
@@ -9,9 +9,9 @@ export interface AssetOptions {
 }
 
 export interface AssetService {
-  get(asset: AssetOptions, trx?: Transaction): Promise<void | Asset>
+  get(asset: AssetOptions, trx?: Knex.Transaction): Promise<void | Asset>
   getOrCreate(asset: AssetOptions): Promise<Asset>
-  getById(id: string, trx?: Transaction): Promise<void | Asset>
+  getById(id: string, trx?: Knex.Transaction): Promise<void | Asset>
 }
 
 interface ServiceDependencies extends BaseService {
@@ -41,7 +41,7 @@ export async function createAssetService({
 async function getAsset(
   deps: ServiceDependencies,
   { code, scale }: AssetOptions,
-  trx?: Transaction
+  trx?: Knex.Transaction
 ): Promise<void | Asset> {
   return await Asset.query(trx || deps.knex).findOne({ code, scale })
 }
@@ -76,7 +76,7 @@ async function getOrCreateAsset(
 async function getAssetById(
   deps: ServiceDependencies,
   id: string,
-  trx?: Transaction
+  trx?: Knex.Transaction
 ): Promise<void | Asset> {
   return await Asset.query(trx || deps.knex).findById(id)
 }

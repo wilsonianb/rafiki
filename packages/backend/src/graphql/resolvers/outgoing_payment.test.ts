@@ -1,6 +1,6 @@
 import nock from 'nock'
 import { gql } from 'apollo-server-koa'
-import Knex from 'knex'
+import { Knex } from 'knex'
 import { StreamServer } from '@interledger/stream-receiver'
 import { PaymentError, PaymentType } from '@interledger/pay'
 import { v4 as uuid } from 'uuid'

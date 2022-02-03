@@ -1,4 +1,4 @@
-import * as knex from 'knex'
+import { Knex } from 'knex'
 
 import { ServiceDependencies } from './service'
 import { OutgoingPayment, PaymentState } from './model'
@@ -43,7 +43,7 @@ export async function processPendingPayment(
 // Fetch (and lock) a payment for work.
 // Exported for testing.
 export async function getPendingPayment(
-  trx: knex.Transaction
+  trx: Knex.Transaction
 ): Promise<OutgoingPayment | undefined> {
   const now = new Date(Date.now()).toISOString()
   const payments = await OutgoingPayment.query(trx)
@@ -52,13 +52,13 @@ export async function getPendingPayment(
     .forUpdate()
     // Don't wait for a payment that is already being processed.
     .skipLocked()
-    .where((builder: knex.QueryBuilder) => {
+    .where((builder: Knex.QueryBuilder) => {
       builder
         .whereIn('state', [PaymentState.Quoting, PaymentState.Sending])
         .orWhereNotNull('webhookId')
     })
     // Back off between retries.
-    .andWhere((builder: knex.QueryBuilder) => {
+    .andWhere((builder: Knex.QueryBuilder) => {
       builder
         .where('stateAttempts', 0)
         .orWhereRaw(
@@ -66,7 +66,7 @@ export async function getPendingPayment(
           [RETRY_BACKOFF_SECONDS, now]
         )
     })
-    .orWhere((builder: knex.QueryBuilder) => {
+    .orWhere((builder: Knex.QueryBuilder) => {
       builder
         .where('state', PaymentState.Funding)
         .andWhere('quoteActivationDeadline', '<', now)

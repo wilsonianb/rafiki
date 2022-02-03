@@ -3,7 +3,7 @@ import { Server } from 'http'
 import { EventEmitter } from 'events'
 
 import { IocContract } from '@adonisjs/fold'
-import Knex from 'knex'
+import { Knex } from 'knex'
 import Koa, { DefaultState } from 'koa'
 import bodyParser from 'koa-bodyparser'
 import { Logger } from 'pino'

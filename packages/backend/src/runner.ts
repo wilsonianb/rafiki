@@ -1,6 +1,6 @@
 import { run, RunnerOptions } from 'graphile-worker'
 import { Runner } from 'graphile-worker/dist'
-import Knex from 'knex'
+import { knex } from 'knex'
 import { Model } from 'objection'
 
 import { Config } from './config/app'
@@ -32,7 +32,7 @@ export async function createWorker(): Promise<Runner> {
 
 // Run if being called directly
 if (require.main === module) {
-  const knex = Knex({
+  const kn = knex({
     client: 'postgresql',
     connection: DATABASE_URL,
     pool: {
@@ -44,13 +44,13 @@ if (require.main === module) {
     }
   })
   // node pg defaults to returning bigint as string. This ensures it parses to bigint
-  knex.client.driver.types.setTypeParser(
-    knex.client.driver.types.builtins.INT8,
+  kn.client.driver.types.setTypeParser(
+    kn.client.driver.types.builtins.INT8,
     'text',
     BigInt
   )
 
-  Model.knex(knex)
+  Model.knex(kn)
   createWorker().catch((err): void => {
     console.error(err)
     process.exit(1)

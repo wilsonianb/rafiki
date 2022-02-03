@@ -4,7 +4,7 @@ import { BaseService } from '../../shared/baseService'
 import { Pagination } from '../../shared/pagination'
 import { EventType, WebhookService } from '../../webhook/service'
 import assert from 'assert'
-import { Transaction } from 'knex'
+import { Knex } from 'knex'
 import { ForeignKeyViolationError, TransactionOrKnex } from 'objection'
 
 export const POSITIVE_SLIPPAGE = BigInt(1)
@@ -22,7 +22,7 @@ interface CreateOptions {
 
 export interface InvoiceService {
   get(id: string): Promise<Invoice | undefined>
-  create(options: CreateOptions, trx?: Transaction): Promise<Invoice>
+  create(options: CreateOptions, trx?: Knex.Transaction): Promise<Invoice>
   getAccountInvoicesPage(
     accountId: string,
     pagination?: Pagination
@@ -67,7 +67,7 @@ async function getInvoice(
 async function createInvoice(
   deps: ServiceDependencies,
   { accountId, description, expiresAt, amount }: CreateOptions,
-  trx?: Transaction
+  trx?: Knex.Transaction
 ): Promise<Invoice> {
   const invTrx = trx || (await Invoice.startTransaction(deps.knex))
 
