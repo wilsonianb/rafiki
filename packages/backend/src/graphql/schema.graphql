@@ -77,6 +77,12 @@ type Mutation {
     withdrawalId: String!
   ): LiquidityMutationResponse
 
+  "Deposit liquidity"
+  depositLiquidity(id: String!): LiquidityMutationResponse
+
+  "Withdraw liquidity"
+  withdrawLiquidity(id: String!): LiquidityMutationResponse
+
   "Create API Key"
   createApiKey(input: CreateApiKeyInput!): CreateApiKeyMutationResponse
 
