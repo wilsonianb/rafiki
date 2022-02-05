@@ -6,6 +6,7 @@ import { Asset } from '../asset/model'
 import { ConnectorAccount } from '../connector/core/rafiki'
 import { Account } from '../open_payments/account/model'
 import { BaseModel } from '../shared/baseModel'
+import { WebhookEvent } from '../webhook/model'
 
 const fieldPrefixes = ['intent', 'quote', 'destinationAccount', 'outcome']
 
@@ -151,4 +152,122 @@ export enum PaymentState {
   Cancelled = 'CANCELLED',
   // Successful completion.
   Completed = 'COMPLETED'
+}
+
+export enum PaymentDepositType {
+  PaymentFunding = 'outgoing_payment.funding'
+}
+
+export enum PaymentWithdrawType {
+  PaymentCancelled = 'outgoing_payment.cancelled',
+  PaymentCompleted = 'outgoing_payment.completed'
+}
+
+export const PaymentEventType = {
+  ...PaymentDepositType,
+  ...PaymentWithdrawType
+}
+export type PaymentEventType = PaymentDepositType | PaymentWithdrawType
+
+export type PaymentData = {
+  invoice?: never
+  payment: {
+    id: string
+    accountId: string
+    createdAt: string
+    state: PaymentState
+    error?: string
+    stateAttempts: number
+    intent: {
+      paymentPointer?: string
+      invoiceUrl?: string
+      amountToSend?: string
+      autoApprove: boolean
+    }
+    quote?: {
+      timestamp: string
+      activationDeadline: string
+      targetType: Pay.PaymentType
+      minDeliveryAmount: string
+      maxSourceAmount: string
+      maxPacketAmount: string
+      minExchangeRate: number
+      lowExchangeRateEstimate: number
+      highExchangeRateEstimate: number
+      amountSent: string
+    }
+    destinationAccount: {
+      scale: number
+      code: string
+      url?: string
+    }
+    outcome: {
+      amountSent: string
+    }
+    balance: string
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types
+export const isPaymentEventType = (o: any): o is PaymentEventType =>
+  Object.values(PaymentEventType).includes(o)
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types
+export const isPaymentEvent = (o: any): o is PaymentEvent =>
+  o instanceof WebhookEvent && isPaymentEventType(o.type)
+
+export class PaymentEvent extends WebhookEvent {
+  public type!: PaymentEventType
+  public data!: PaymentData
+}
+
+export function paymentToData(
+  payment: OutgoingPayment,
+  amountSent: bigint,
+  balance: bigint
+): PaymentData {
+  const data: PaymentData = {
+    payment: {
+      id: payment.id,
+      accountId: payment.accountId,
+      state: payment.state,
+      stateAttempts: payment.stateAttempts,
+      intent: {
+        autoApprove: payment.intent.autoApprove
+      },
+      destinationAccount: payment.destinationAccount,
+      createdAt: new Date(+payment.createdAt).toISOString(),
+      outcome: {
+        amountSent: amountSent.toString()
+      },
+      balance: balance.toString()
+    }
+  }
+  if (payment.intent.paymentPointer) {
+    data.payment.intent.paymentPointer = payment.intent.paymentPointer
+  }
+  if (payment.intent.invoiceUrl) {
+    data.payment.intent.invoiceUrl = payment.intent.invoiceUrl
+  }
+  if (payment.intent.amountToSend) {
+    data.payment.intent.amountToSend = payment.intent.amountToSend.toString()
+  }
+  if (payment.error) {
+    data.payment.error = payment.error
+  }
+  if (payment.quote) {
+    data.payment.quote = {
+      ...payment.quote,
+      timestamp: payment.quote.timestamp.toISOString(),
+      activationDeadline: payment.quote.activationDeadline.toISOString(),
+      minDeliveryAmount: payment.quote.minDeliveryAmount.toString(),
+      maxSourceAmount: payment.quote.maxSourceAmount.toString(),
+      maxPacketAmount: payment.quote.maxPacketAmount.toString(),
+      minExchangeRate: payment.quote.minExchangeRate.valueOf(),
+      lowExchangeRateEstimate: payment.quote.lowExchangeRateEstimate.valueOf(),
+      highExchangeRateEstimate: payment.quote.highExchangeRateEstimate.valueOf(),
+      amountSent: payment.quote.amountSent.toString()
+    }
+  }
+  return data
 }
