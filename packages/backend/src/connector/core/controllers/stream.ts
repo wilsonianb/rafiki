@@ -1,5 +1,7 @@
-import { isIlpReply } from 'ilp-packet'
+import { isIlpReply, isReject, isCanonicalIlpRejectCode } from 'ilp-packet'
+import { sha256 } from '../lib/crypto'
 import { ILPContext, ILPMiddleware } from '../rafiki'
+import { Invoice } from '../../../open_payments/invoice/model'
 
 const CONNECTION_EXPIRY = 60 * 10 // seconds
 
@@ -12,7 +14,7 @@ export function createStreamController(): ILPMiddleware {
     ctx: ILPContext,
     next: () => Promise<void>
   ): Promise<void> {
-    const { logger, redis, streamServer } = ctx.services
+    const { invoices, logger, redis, streamServer } = ctx.services
     const { request, response } = ctx
 
     if (
@@ -25,6 +27,23 @@ export function createStreamController(): ILPMiddleware {
 
     const moneyOrReply = streamServer.createReply(request.prepare)
     if (isIlpReply(moneyOrReply)) {
+      if (
+        isReject(moneyOrReply) &&
+        isCanonicalIlpRejectCode(moneyOrReply.code) &&
+        moneyOrReply.code[0] === 'F'
+      ) {
+        const connectionId = sha256(
+          Buffer.from(request.prepare.destination, 'ascii')
+        ).toString('hex')
+        const totalReceived = await redis.get(streamReceivedKey(connectionId))
+        if (totalReceived) {
+          if (ctx.accounts.outgoing instanceof Invoice) {
+            await invoices.handlePayment(ctx.accounts.outgoing.id)
+            // } else {
+            //   await accounts.handlePayment(ctx.accounts.outgoing.id)
+          }
+        }
+      }
       response.reply = moneyOrReply
       return
     }
@@ -42,6 +61,7 @@ export function createStreamController(): ILPMiddleware {
       .expire(connectionKey, CONNECTION_EXPIRY)
       .exec()
     if (typeof totalReceived === 'string' && !err && !err2) {
+      // check if totalReceived exceeds invoice amount
       moneyOrReply.setTotalReceived(totalReceived)
     } else {
       logger.warn(
