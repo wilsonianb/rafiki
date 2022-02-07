@@ -134,6 +134,28 @@ export class OutgoingPayment
     return json
   }
 
+  $formatJson(json: Pojo): Pojo {
+    json = super.$formatJson(json)
+    if (json.intent) {
+      json.intent.amountToSend = json.intent.amountToSend?.toString()
+    }
+    if (json.quote) {
+      json.quote = {
+        ...json.quote,
+        timestamp: json.quote.timestamp?.toISOString(),
+        activationDeadline: json.quote.activationDeadline.toISOString(),
+        minDeliveryAmount: json.quote.minDeliveryAmount.toString(),
+        maxSourceAmount: json.quote.maxSourceAmount.toString(),
+        maxPacketAmount: json.quote.maxPacketAmount.toString(),
+        minExchangeRate: json.quote.minExchangeRate.valueOf(),
+        lowExchangeRateEstimate: json.quote.lowExchangeRateEstimate.valueOf(),
+        highExchangeRateEstimate: json.quote.highExchangeRateEstimate.valueOf(),
+        amountSent: json.quote.amountSent.toString()
+      }
+    }
+    return json
+  }
+
   public toData({
     amountSent,
     balance
@@ -141,49 +163,15 @@ export class OutgoingPayment
     amountSent: bigint
     balance: bigint
   }): PaymentData {
-    const data: PaymentData = {
+    const data: PaymentData = ({
       payment: {
-        id: this.id,
-        accountId: this.accountId,
-        state: this.state,
-        stateAttempts: this.stateAttempts,
-        intent: {
-          autoApprove: this.intent.autoApprove
-        },
-        destinationAccount: this.destinationAccount,
-        createdAt: new Date(+this.createdAt).toISOString(),
+        ...this.toJSON(),
         outcome: {
           amountSent: amountSent.toString()
         },
         balance: balance.toString()
       }
-    }
-    if (this.intent.paymentPointer) {
-      data.payment.intent.paymentPointer = this.intent.paymentPointer
-    }
-    if (this.intent.invoiceUrl) {
-      data.payment.intent.invoiceUrl = this.intent.invoiceUrl
-    }
-    if (this.intent.amountToSend) {
-      data.payment.intent.amountToSend = this.intent.amountToSend.toString()
-    }
-    if (this.error) {
-      data.payment.error = this.error
-    }
-    if (this.quote) {
-      data.payment.quote = {
-        ...this.quote,
-        timestamp: this.quote.timestamp.toISOString(),
-        activationDeadline: this.quote.activationDeadline.toISOString(),
-        minDeliveryAmount: this.quote.minDeliveryAmount.toString(),
-        maxSourceAmount: this.quote.maxSourceAmount.toString(),
-        maxPacketAmount: this.quote.maxPacketAmount.toString(),
-        minExchangeRate: this.quote.minExchangeRate.valueOf(),
-        lowExchangeRateEstimate: this.quote.lowExchangeRateEstimate.valueOf(),
-        highExchangeRateEstimate: this.quote.highExchangeRateEstimate.valueOf(),
-        amountSent: this.quote.amountSent.toString()
-      }
-    }
+    } as unknown) as PaymentData
     return data
   }
 }

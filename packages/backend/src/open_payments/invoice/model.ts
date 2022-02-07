@@ -1,4 +1,4 @@
-import { Model } from 'objection'
+import { Model, Pojo } from 'objection'
 import { Account } from '../account/model'
 import { Asset } from '../../asset/model'
 import { LiquidityAccount, onCreditOptions } from '../../accounting/service'
@@ -66,19 +66,20 @@ export class Invoice
     }
   }
 
+  $formatJson(json: Pojo): Pojo {
+    json = super.$formatJson(json)
+    json.amount = json.amount.toString()
+    json.expiresAt = json.expiresAt.toISOString()
+    return json
+  }
+
   public toData(amountReceived: bigint): InvoiceData {
-    return {
+    return ({
       invoice: {
-        id: this.id,
-        accountId: this.accountId,
-        active: this.active,
-        amount: this.amount.toString(),
-        description: this.description,
-        expiresAt: this.expiresAt.toISOString(),
-        createdAt: new Date(+this.createdAt).toISOString(),
+        ...this.toJSON(),
         received: amountReceived.toString()
       }
-    }
+    } as unknown) as InvoiceData
   }
 }
 
