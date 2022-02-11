@@ -64,6 +64,7 @@ export class Invoice
   public readonly amount!: bigint
   public eventId?: string
   public event?: InvoiceEvent
+  public hasLiquidity!: boolean
 
   public processAt!: Date | null
 
@@ -72,6 +73,9 @@ export class Invoice
   }
 
   public async onCredit(balance: bigint): Promise<Invoice> {
+    await this.$query().patch({
+      hasLiquidity: true
+    })
     if (this.active && balance < this.amount) {
       return this
     }

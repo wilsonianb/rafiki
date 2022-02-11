@@ -5,7 +5,11 @@ import { Pagination } from '../../shared/pagination'
 import { RETRY_LIMIT_MS } from '../../webhook/service'
 import assert from 'assert'
 import { Transaction } from 'knex'
-import { ForeignKeyViolationError, TransactionOrKnex } from 'objection'
+import {
+  ForeignKeyViolationError,
+  PartialModelObject,
+  TransactionOrKnex
+} from 'objection'
 
 export const POSITIVE_SLIPPAGE = BigInt(1)
 // First retry waits 10 seconds
@@ -27,6 +31,7 @@ export interface InvoiceService {
     accountId: string,
     pagination?: Pagination
   ): Promise<Invoice[]>
+  getEventInvoicesPage(pagination?: Pagination): Promise<Invoice[]>
   processNext(): Promise<string | undefined>
 }
 
@@ -50,6 +55,8 @@ export async function createInvoiceService(
     create: (options, trx) => createInvoice(deps, options, trx),
     getAccountInvoicesPage: (accountId, pagination) =>
       getAccountInvoicesPage(deps, accountId, pagination),
+    getEventInvoicesPage: (pagination) =>
+      getEventInvoicesPage(deps, pagination),
     processNext: () => processNextInvoice(deps)
   }
 }
@@ -186,6 +193,33 @@ async function getAccountInvoicesPage(
   accountId: string,
   pagination?: Pagination
 ): Promise<Invoice[]> {
+  return await getInvoicesPage(
+    deps,
+    {
+      accountId
+    },
+    pagination
+  )
+}
+
+async function getEventInvoicesPage(
+  deps: ServiceDependencies,
+  pagination?: Pagination
+): Promise<Invoice[]> {
+  return await getInvoicesPage(
+    deps,
+    {
+      hasLiquidity: true
+    },
+    pagination
+  )
+}
+
+async function getInvoicesPage(
+  deps: ServiceDependencies,
+  options: PartialModelObject<Invoice>,
+  pagination?: Pagination
+): Promise<Invoice[]> {
   assert.ok(deps.knex, 'Knex undefined')
 
   if (
@@ -204,9 +238,7 @@ async function getAccountInvoicesPage(
    */
   if (typeof pagination?.after === 'string') {
     return Invoice.query(deps.knex)
-      .where({
-        accountId: accountId
-      })
+      .where(options)
       .andWhereRaw(
         '("createdAt", "id") > (select "createdAt" :: TIMESTAMP, "id" from "invoices" where "id" = ?)',
         [pagination.after]
@@ -223,9 +255,7 @@ async function getAccountInvoicesPage(
    */
   if (typeof pagination?.before === 'string') {
     return Invoice.query(deps.knex)
-      .where({
-        accountId: accountId
-      })
+      .where(options)
       .andWhereRaw(
         '("createdAt", "id") < (select "createdAt" :: TIMESTAMP, "id" from "invoices" where "id" = ?)',
         [pagination.before]
@@ -241,9 +271,7 @@ async function getAccountInvoicesPage(
   }
 
   return Invoice.query(deps.knex)
-    .where({
-      accountId: accountId
-    })
+    .where(options)
     .orderBy([
       { column: 'createdAt', order: 'asc' },
       { column: 'id', order: 'asc' }
