@@ -9,15 +9,13 @@ exports.up = function (knex) {
     table.string('description').nullable()
     table.timestamp('expiresAt').notNullable()
     table.bigInteger('amount').notNullable()
-    table.uuid('eventId').nullable()
-    table.foreign('eventId').references('webhookEvents.id')
-    table.boolean('hasLiquidity').notNullable().defaultTo(false)
+    table.string('event').nullable()
 
     table.timestamp('createdAt').defaultTo(knex.fn.now())
     table.timestamp('updatedAt').defaultTo(knex.fn.now())
 
     table.index(['accountId', 'createdAt', 'id'])
-    table.index(['hasLiquidity', 'createdAt', 'id'])
+    table.index(['event', 'createdAt', 'id'])
 
     table.index(['active', 'expiresAt'])
     /*

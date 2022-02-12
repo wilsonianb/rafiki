@@ -1,4 +1,3 @@
-import assert from 'assert'
 import Knex from 'knex'
 import { WorkerUtils, makeWorkerUtils } from 'graphile-worker'
 import { v4 as uuid } from 'uuid'
@@ -7,13 +6,14 @@ import { InvoiceService } from './service'
 import { AccountService } from '../account/service'
 import { AccountingService } from '../../accounting/service'
 import { createTestApp, TestContainer } from '../../tests/app'
-import { Invoice, InvoiceEvent, InvoiceEventType } from './model'
+import { Invoice, InvoiceEventType } from './model'
 import { resetGraphileDb } from '../../tests/graphileDb'
 import { GraphileProducer } from '../../messaging/graphileProducer'
 import { Config } from '../../config/app'
 import { IocContract } from '@adonisjs/fold'
 import { initIocContainer } from '../../'
 import { AppServices } from '../../app'
+import { Pagination } from '../../shared/pagination'
 import { randomAsset } from '../../tests/asset'
 import { truncateTables } from '../../tests/tableManager'
 
@@ -135,113 +135,44 @@ describe('Invoice Service', (): void => {
         await expect(
           invoice.onCredit(invoice.amount - BigInt(1))
         ).resolves.toEqual(invoice)
-        await expect(invoiceService.get(invoice.id)).resolves.toMatchObject({
-          active: true
-        })
+        await expect(invoiceService.get(invoice.id)).resolves.toEqual(invoice)
       })
 
       test('Deactivates fully paid invoice', async (): Promise<void> => {
         await expect(invoice.onCredit(invoice.amount)).resolves.toMatchObject({
-          id: invoice.id,
-          active: false
+          active: false,
+          event: InvoiceEventType.InvoicePaid
         })
         await expect(invoiceService.get(invoice.id)).resolves.toMatchObject({
-          active: false
+          active: false,
+          event: InvoiceEventType.InvoicePaid
         })
       })
-
-      test('Creates invoice.paid webhook event', async (): Promise<void> => {
-        jest.useFakeTimers('modern')
-        const now = Date.now()
-        jest.setSystemTime(new Date(now))
-        expect(invoice.eventId).toBeNull()
-        await expect(invoice.onCredit(invoice.amount)).resolves.toMatchObject({
-          event: {
-            type: InvoiceEventType.InvoicePaid,
-            data: invoice.toData(invoice.amount),
-            processAt: new Date(now + 30_000),
-            withdrawal: {
-              accountId: invoice.id,
-              assetId: invoice.account.assetId,
-              amount: invoice.amount
-            }
-          }
-        })
-      })
-
-      test('Updates invoice.paid webhook event withdrawal amount', async (): Promise<void> => {
-        const { eventId } = await invoice.onCredit(invoice.amount)
-        const amount = invoice.amount + BigInt(2)
-        jest.useFakeTimers('modern')
-        const now = Date.now()
-        jest.setSystemTime(new Date(now))
-        await expect(invoice.onCredit(amount)).resolves.toMatchObject({
-          event: {
-            id: eventId,
-            type: InvoiceEventType.InvoicePaid,
-            data: invoice.toData(amount),
-            processAt: new Date(now + 30_000),
-            withdrawal: {
-              accountId: invoice.id,
-              assetId: invoice.account.assetId,
-              amount
-            }
-          }
-        })
-      })
-
-      test.each`
-        attempts | processAt
-        ${1}     | ${undefined}
-        ${0}     | ${new Date()}
-      `(
-        'Creates subsequent invoice.paid webhook event for leftover amount',
-        async ({ attempts, processAt }): Promise<void> => {
-          invoice = await invoice.onCredit(invoice.amount)
-          assert.ok(invoice.event)
-          await invoice.event.$query(knex).patch({
-            attempts,
-            processAt
-          })
-          const amount = BigInt(1)
-          jest.useFakeTimers('modern')
-          const now = Date.now()
-          jest.setSystemTime(new Date(now))
-          await expect(invoice.onCredit(amount)).resolves.toMatchObject({
-            event: {
-              type: InvoiceEventType.InvoicePaid,
-              data: invoice.toData(amount),
-              processAt: new Date(now + 30_000),
-              withdrawal: {
-                accountId: invoice.id,
-                assetId: invoice.account.assetId,
-                amount
-              }
-            }
-          })
-        }
-      )
     })
 
     describe('processNext', (): void => {
+      let invoice: Invoice
+
+      beforeEach(
+        async (): Promise<void> => {
+          invoice = await invoiceService.create({
+            accountId,
+            amount: BigInt(123),
+            description: 'Test invoice',
+            expiresAt: new Date(Date.now() + 30_000)
+          })
+        }
+      )
+
       test('Does not process not-expired active invoice', async (): Promise<void> => {
-        const { id: invoiceId } = await invoiceService.create({
-          accountId,
-          amount: BigInt(123),
-          description: 'Test invoice',
-          expiresAt: new Date(Date.now() + 30_000)
-        })
         await expect(invoiceService.processNext()).resolves.toBeUndefined()
-        await expect(invoiceService.get(invoiceId)).resolves.toMatchObject({
+        await expect(invoiceService.get(invoice.id)).resolves.toMatchObject({
           active: true
         })
       })
 
       test('Does not process inactive, expired invoice', async (): Promise<void> => {
-        const invoice = await invoiceService.create({
-          accountId,
-          amount: BigInt(123),
-          description: 'Test invoice',
+        await invoice.$query(knex).patch({
           expiresAt: new Date(Date.now() - 40_000)
         })
         await invoice.$query(knex).patch({ active: false })
@@ -249,13 +180,15 @@ describe('Invoice Service', (): void => {
       })
 
       describe('handleExpired', (): void => {
-        test('Deactivates an expired invoice with received money, creates withdrawal & webhook event', async (): Promise<void> => {
-          const invoice = await invoiceService.create({
-            accountId,
-            amount: BigInt(123),
-            description: 'Test invoice',
-            expiresAt: new Date(Date.now() - 40_000)
-          })
+        beforeEach(
+          async (): Promise<void> => {
+            await invoice.$query(knex).patch({
+              expiresAt: new Date(Date.now() - 40_000)
+            })
+          }
+        )
+
+        test('Deactivates an expired invoice with received money', async (): Promise<void> => {
           await expect(
             accountingService.createDeposit({
               id: uuid(),
@@ -263,38 +196,15 @@ describe('Invoice Service', (): void => {
               amount: BigInt(1)
             })
           ).resolves.toBeUndefined()
-          await expect(
-            InvoiceEvent.query(knex).where({
-              type: InvoiceEventType.InvoiceExpired
-            })
-          ).resolves.toHaveLength(0)
 
           await expect(invoiceService.processNext()).resolves.toBe(invoice.id)
           await expect(invoiceService.get(invoice.id)).resolves.toMatchObject({
-            active: false
+            active: false,
+            event: InvoiceEventType.InvoiceExpired
           })
-
-          await expect(
-            InvoiceEvent.query(knex)
-              .whereJsonSupersetOf('data:invoice', {
-                id: invoice.id
-              })
-              .where({
-                type: InvoiceEventType.InvoiceExpired
-              })
-          ).resolves.toHaveLength(1)
-          await expect(
-            accountingService.getBalance(invoice.id)
-          ).resolves.toEqual(BigInt(0))
         })
 
         test('Deletes an expired invoice (and account) with no money', async (): Promise<void> => {
-          const invoice = await invoiceService.create({
-            accountId,
-            amount: BigInt(123),
-            description: 'Test invoice',
-            expiresAt: new Date(Date.now() - 40_000)
-          })
           await expect(invoiceService.processNext()).resolves.toBe(invoice.id)
           expect(await invoiceService.get(invoice.id)).toBeUndefined()
         })
@@ -303,16 +213,16 @@ describe('Invoice Service', (): void => {
   })
 
   describe.each`
-    hasLiquidity | description
+    event        | description
     ${undefined} | ${'getAccountInvoicesPage'}
-    ${true}      | ${'getEventInvoicesPage'}
-  `('$description', ({ hasLiquidity }): void => {
+    ${true}      | ${'getInvoiceEventsPage'}
+  `('$description', ({ event }): void => {
     let invoicesCreated: Invoice[]
 
     beforeAll(
       async (): Promise<void> => {
         accountId = (await accountService.create({ asset })).id
-        if (hasLiquidity) {
+        if (event) {
           // Create invoice without liquidity that won't be fetched
           await invoiceService.create({
             accountId,
@@ -337,9 +247,9 @@ describe('Invoice Service', (): void => {
             expiresAt: new Date(Date.now() + 30_000),
             description: `Invoice ${i}`
           })
-          if (hasLiquidity) {
+          if (event) {
             await invoice.$query(knex).patch({
-              hasLiquidity: true
+              event: InvoiceEventType.InvoicePaid
             })
             accountId = (await accountService.create({ asset })).id
           }
@@ -348,10 +258,14 @@ describe('Invoice Service', (): void => {
       }
     )
 
+    async function getInvoices(pagination?: Pagination): Promise<Invoice[]> {
+      return event
+        ? await invoiceService.getInvoiceEventsPage(pagination)
+        : await invoiceService.getAccountInvoicesPage(accountId, pagination)
+    }
+
     test('Defaults to fetching first 20 items', async (): Promise<void> => {
-      const invoices = hasLiquidity
-        ? await invoiceService.getEventInvoicesPage()
-        : await invoiceService.getAccountInvoicesPage(accountId)
+      const invoices = await getInvoices()
       expect(invoices).toHaveLength(20)
       expect(invoices[0].id).toEqual(invoicesCreated[0].id)
       expect(invoices[19].id).toEqual(invoicesCreated[19].id)
@@ -362,9 +276,7 @@ describe('Invoice Service', (): void => {
       const pagination = {
         first: 10
       }
-      const invoices = hasLiquidity
-        ? await invoiceService.getEventInvoicesPage(pagination)
-        : await invoiceService.getAccountInvoicesPage(accountId, pagination)
+      const invoices = await getInvoices(pagination)
       expect(invoices).toHaveLength(10)
       expect(invoices[0].id).toEqual(invoicesCreated[0].id)
       expect(invoices[9].id).toEqual(invoicesCreated[9].id)
@@ -375,9 +287,7 @@ describe('Invoice Service', (): void => {
       const pagination = {
         after: invoicesCreated[19].id
       }
-      const invoices = hasLiquidity
-        ? await invoiceService.getEventInvoicesPage(pagination)
-        : await invoiceService.getAccountInvoicesPage(accountId, pagination)
+      const invoices = await getInvoices(pagination)
       expect(invoices).toHaveLength(20)
       expect(invoices[0].id).toEqual(invoicesCreated[20].id)
       expect(invoices[19].id).toEqual(invoicesCreated[39].id)
@@ -389,9 +299,7 @@ describe('Invoice Service', (): void => {
         first: 10,
         after: invoicesCreated[9].id
       }
-      const invoices = hasLiquidity
-        ? await invoiceService.getEventInvoicesPage(pagination)
-        : await invoiceService.getAccountInvoicesPage(accountId, pagination)
+      const invoices = await getInvoices(pagination)
       expect(invoices).toHaveLength(10)
       expect(invoices[0].id).toEqual(invoicesCreated[10].id)
       expect(invoices[9].id).toEqual(invoicesCreated[19].id)
@@ -402,9 +310,7 @@ describe('Invoice Service', (): void => {
       const pagination = {
         last: 10
       }
-      const invoices = hasLiquidity
-        ? invoiceService.getEventInvoicesPage(pagination)
-        : invoiceService.getAccountInvoicesPage(accountId, pagination)
+      const invoices = getInvoices(pagination)
       await expect(invoices).rejects.toThrow(
         "Can't paginate backwards from the start."
       )
@@ -414,9 +320,7 @@ describe('Invoice Service', (): void => {
       const pagination = {
         before: invoicesCreated[20].id
       }
-      const invoices = hasLiquidity
-        ? await invoiceService.getEventInvoicesPage(pagination)
-        : await invoiceService.getAccountInvoicesPage(accountId, pagination)
+      const invoices = await getInvoices(pagination)
       expect(invoices).toHaveLength(20)
       expect(invoices[0].id).toEqual(invoicesCreated[0].id)
       expect(invoices[19].id).toEqual(invoicesCreated[19].id)
@@ -428,9 +332,7 @@ describe('Invoice Service', (): void => {
         last: 5,
         before: invoicesCreated[10].id
       }
-      const invoices = hasLiquidity
-        ? await invoiceService.getEventInvoicesPage(pagination)
-        : await invoiceService.getAccountInvoicesPage(accountId, pagination)
+      const invoices = await getInvoices(pagination)
       expect(invoices).toHaveLength(5)
       expect(invoices[0].id).toEqual(invoicesCreated[5].id)
       expect(invoices[4].id).toEqual(invoicesCreated[9].id)
@@ -441,22 +343,12 @@ describe('Invoice Service', (): void => {
       const paginationForwards = {
         first: 10
       }
-      const invoicesForwards = hasLiquidity
-        ? await invoiceService.getEventInvoicesPage(paginationForwards)
-        : await invoiceService.getAccountInvoicesPage(
-            accountId,
-            paginationForwards
-          )
+      const invoicesForwards = await getInvoices(paginationForwards)
       const paginationBackwards = {
         last: 10,
         before: invoicesCreated[10].id
       }
-      const invoicesBackwards = hasLiquidity
-        ? await invoiceService.getEventInvoicesPage(paginationBackwards)
-        : await invoiceService.getAccountInvoicesPage(
-            accountId,
-            paginationBackwards
-          )
+      const invoicesBackwards = await getInvoices(paginationBackwards)
       expect(invoicesForwards).toHaveLength(10)
       expect(invoicesBackwards).toHaveLength(10)
       expect(invoicesForwards).toEqual(invoicesBackwards)
@@ -467,9 +359,7 @@ describe('Invoice Service', (): void => {
         after: invoicesCreated[19].id,
         before: invoicesCreated[19].id
       }
-      const invoices = hasLiquidity
-        ? await invoiceService.getEventInvoicesPage(pagination)
-        : await invoiceService.getAccountInvoicesPage(accountId, pagination)
+      const invoices = await getInvoices(pagination)
       expect(invoices).toHaveLength(20)
       expect(invoices[0].id).toEqual(invoicesCreated[20].id)
       expect(invoices[19].id).toEqual(invoicesCreated[39].id)
@@ -480,9 +370,7 @@ describe('Invoice Service', (): void => {
       const pagination = {
         first: -1
       }
-      const invoices = hasLiquidity
-        ? invoiceService.getEventInvoicesPage(pagination)
-        : invoiceService.getAccountInvoicesPage(accountId, pagination)
+      const invoices = getInvoices(pagination)
       await expect(invoices).rejects.toThrow('Pagination index error')
     })
 
@@ -490,9 +378,7 @@ describe('Invoice Service', (): void => {
       const pagination = {
         first: 101
       }
-      const invoices = hasLiquidity
-        ? invoiceService.getEventInvoicesPage(pagination)
-        : invoiceService.getAccountInvoicesPage(accountId, pagination)
+      const invoices = getInvoices(pagination)
       await expect(invoices).rejects.toThrow('Pagination index error')
     })
   })

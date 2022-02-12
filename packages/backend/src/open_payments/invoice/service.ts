@@ -1,15 +1,10 @@
-import { Invoice, InvoiceEvent, InvoiceEventType } from './model'
+import { Invoice, InvoiceEventType } from './model'
 import { AccountingService } from '../../accounting/service'
 import { BaseService } from '../../shared/baseService'
 import { Pagination } from '../../shared/pagination'
-import { RETRY_LIMIT_MS } from '../../webhook/service'
 import assert from 'assert'
 import { Transaction } from 'knex'
-import {
-  ForeignKeyViolationError,
-  PartialModelObject,
-  TransactionOrKnex
-} from 'objection'
+import { ForeignKeyViolationError, TransactionOrKnex } from 'objection'
 
 export const POSITIVE_SLIPPAGE = BigInt(1)
 // First retry waits 10 seconds
@@ -31,7 +26,7 @@ export interface InvoiceService {
     accountId: string,
     pagination?: Pagination
   ): Promise<Invoice[]>
-  getEventInvoicesPage(pagination?: Pagination): Promise<Invoice[]>
+  getInvoiceEventsPage(pagination?: Pagination): Promise<Invoice[]>
   processNext(): Promise<string | undefined>
 }
 
@@ -55,8 +50,8 @@ export async function createInvoiceService(
     create: (options, trx) => createInvoice(deps, options, trx),
     getAccountInvoicesPage: (accountId, pagination) =>
       getAccountInvoicesPage(deps, accountId, pagination),
-    getEventInvoicesPage: (pagination) =>
-      getEventInvoicesPage(deps, pagination),
+    getInvoiceEventsPage: (pagination) =>
+      getInvoiceEventsPage(deps, pagination),
     processNext: () => processNextInvoice(deps)
   }
 }
@@ -151,23 +146,9 @@ async function handleExpired(
   if (amountReceived) {
     deps.logger.trace({ amountReceived }, 'deactivating expired invoice')
     await invoice.$query(deps.knex).patch({
-      active: false
+      active: false,
+      event: InvoiceEventType.InvoiceExpired
     })
-
-    deps.logger.trace({ amountReceived }, 'withdrawing expired invoice balance')
-
-    const event = await InvoiceEvent.query(deps.knex).insertAndFetch({
-      type: InvoiceEventType.InvoiceExpired,
-      data: invoice.toData(amountReceived),
-      processAt: new Date()
-    })
-    const error = await deps.accountingService.createWithdrawal({
-      id: event.id,
-      account: invoice,
-      amount: amountReceived,
-      timeout: BigInt(RETRY_LIMIT_MS) * BigInt(1e6) // ms -> ns
-    })
-    if (error) throw new Error(error)
   } else {
     deps.logger.debug({ amountReceived }, 'deleting expired invoice')
     await invoice.$query(deps.knex).delete()
@@ -193,31 +174,20 @@ async function getAccountInvoicesPage(
   accountId: string,
   pagination?: Pagination
 ): Promise<Invoice[]> {
-  return await getInvoicesPage(
-    deps,
-    {
-      accountId
-    },
-    pagination
-  )
+  return await getInvoicesPage(deps, 'whereAccount', [accountId], pagination)
 }
 
-async function getEventInvoicesPage(
+async function getInvoiceEventsPage(
   deps: ServiceDependencies,
   pagination?: Pagination
 ): Promise<Invoice[]> {
-  return await getInvoicesPage(
-    deps,
-    {
-      hasLiquidity: true
-    },
-    pagination
-  )
+  return await getInvoicesPage(deps, 'whereEvent', [], pagination)
 }
 
 async function getInvoicesPage(
   deps: ServiceDependencies,
-  options: PartialModelObject<Invoice>,
+  modifier: string,
+  modifierArgs: string[],
   pagination?: Pagination
 ): Promise<Invoice[]> {
   assert.ok(deps.knex, 'Knex undefined')
@@ -238,7 +208,7 @@ async function getInvoicesPage(
    */
   if (typeof pagination?.after === 'string') {
     return Invoice.query(deps.knex)
-      .where(options)
+      .modify(modifier, ...modifierArgs)
       .andWhereRaw(
         '("createdAt", "id") > (select "createdAt" :: TIMESTAMP, "id" from "invoices" where "id" = ?)',
         [pagination.after]
@@ -255,7 +225,7 @@ async function getInvoicesPage(
    */
   if (typeof pagination?.before === 'string') {
     return Invoice.query(deps.knex)
-      .where(options)
+      .modify(modifier, ...modifierArgs)
       .andWhereRaw(
         '("createdAt", "id") < (select "createdAt" :: TIMESTAMP, "id" from "invoices" where "id" = ?)',
         [pagination.before]
@@ -271,7 +241,7 @@ async function getInvoicesPage(
   }
 
   return Invoice.query(deps.knex)
-    .where(options)
+    .modify(modifier, ...modifierArgs)
     .orderBy([
       { column: 'createdAt', order: 'asc' },
       { column: 'id', order: 'asc' }

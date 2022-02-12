@@ -1771,7 +1771,17 @@ describe('Liquidity Resolvers', (): void => {
                 })
               } else {
                 account = invoice
-                data = invoice.toData(amount)
+                data = {
+                  invoice: {
+                    id: invoice.id,
+                    accountId: invoice.accountId,
+                    amount: invoice.amount.toString(),
+                    description: invoice.description,
+                    expiresAt: invoice.expiresAt.toISOString(),
+                    createdAt: new Date(+invoice.createdAt).toISOString(),
+                    received: amount.toString()
+                  }
+                }
               }
               await WebhookEvent.query(knex).insertAndFetch({
                 id: eventId,

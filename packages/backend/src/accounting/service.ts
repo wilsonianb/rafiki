@@ -44,7 +44,7 @@ export interface LiquidityAccount {
     id: string
     unit: number
   }
-  hasLiquidity?: boolean
+  event?: string
   onCredit?: (balance: bigint) => Promise<LiquidityAccount>
 }
 
