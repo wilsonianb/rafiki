@@ -1,5 +1,10 @@
 import { Resolvers } from '../generated/graphql'
 import { getAccount, createAccount } from './account'
+import {
+  eventResolveType,
+  getEvents,
+  getEventsConnectionPageInfo
+} from './event'
 import { getAccountInvoices, getPageInfo } from './invoice'
 import {
   getOutgoingPayment,
@@ -24,7 +29,9 @@ import {
   createPeerLiquidityWithdrawal,
   createAccountWithdrawal,
   finalizeLiquidityWithdrawal,
-  rollbackLiquidityWithdrawal
+  rollbackLiquidityWithdrawal,
+  depositEventLiquidity,
+  withdrawEventLiquidity
 } from './liquidity'
 import { GraphQLBigInt } from '../scalars'
 import { refreshSession, revokeSession } from './session'
@@ -33,6 +40,7 @@ export const resolvers: Resolvers = {
   UInt64: GraphQLBigInt,
   Query: {
     account: getAccount,
+    events: getEvents,
     outgoingPayment: getOutgoingPayment,
     peer: getPeer,
     peers: getPeers
@@ -40,6 +48,12 @@ export const resolvers: Resolvers = {
   Account: {
     invoices: getAccountInvoices,
     outgoingPayments: getAccountOutgoingPayments
+  },
+  Event: {
+    __resolveType: eventResolveType
+  },
+  EventsConnection: {
+    pageInfo: getEventsConnectionPageInfo
   },
   InvoiceConnection: {
     pageInfo: getPageInfo
@@ -70,6 +84,8 @@ export const resolvers: Resolvers = {
     createPeerLiquidityWithdrawal: createPeerLiquidityWithdrawal,
     createAccountWithdrawal,
     finalizeLiquidityWithdrawal: finalizeLiquidityWithdrawal,
-    rollbackLiquidityWithdrawal: rollbackLiquidityWithdrawal
+    rollbackLiquidityWithdrawal: rollbackLiquidityWithdrawal,
+    depositEventLiquidity,
+    withdrawEventLiquidity
   }
 }

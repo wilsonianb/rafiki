@@ -3,6 +3,18 @@ type Query {
 
   account(id: String!): Account
 
+  "Fetch a page of events."
+  events(
+    "Paginating forwards: the cursor before the the requested page."
+    after: String
+    "Paginating backwards: the cursor after the the requested page."
+    before: String
+    "Paginating forwards: The first **n** elements from the page."
+    first: Int
+    "Paginating backwards: The last **n** elements from the page."
+    last: Int
+  ): EventsConnection!
+
   peer(id: String!): Peer
 
   "Fetch a page of peers."
@@ -77,6 +89,12 @@ type Mutation {
     withdrawalId: String!
   ): LiquidityMutationResponse
 
+  "Deposit webhook event liquidity"
+  depositEventLiquidity(eventId: String!): LiquidityMutationResponse
+
+  "Withdraw webhook event liquidity"
+  withdrawEventLiquidity(eventId: String!): LiquidityMutationResponse
+
   "Create API Key"
   createApiKey(input: CreateApiKeyInput!): CreateApiKeyMutationResponse
 
@@ -105,6 +123,24 @@ type PageInfo {
   "Paginating backwards: the cursor to continue."
   startCursor: String
 }
+
+type EventsConnection {
+  pageInfo: PageInfo!
+  edges: [EventEdge!]!
+}
+
+type EventEdge {
+  node: Event!
+  cursor: String!
+}
+
+union Event = Invoice | OutgoingPayment
+
+# type Event {
+#   type: String!
+#   invoice: Invoice
+#   payment: Payment
+# }
 
 type PeersConnection {
   pageInfo: PageInfo!
