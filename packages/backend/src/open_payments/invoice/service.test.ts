@@ -213,9 +213,9 @@ describe('Invoice Service', (): void => {
   })
 
   describe.each`
-    event        | description
-    ${undefined} | ${'getAccountInvoicesPage'}
-    ${true}      | ${'getInvoiceEventsPage'}
+    event                           | description
+    ${undefined}                    | ${'getAccountInvoicesPage'}
+    ${InvoiceEventType.InvoicePaid} | ${'getInvoiceEventsPage'}
   `('$description', ({ event }): void => {
     let invoicesCreated: Invoice[]
 
@@ -249,7 +249,7 @@ describe('Invoice Service', (): void => {
           })
           if (event) {
             await invoice.$query(knex).patch({
-              event: InvoiceEventType.InvoicePaid
+              event
             })
             accountId = (await accountService.create({ asset })).id
           }
