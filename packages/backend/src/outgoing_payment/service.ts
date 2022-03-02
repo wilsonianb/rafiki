@@ -4,7 +4,13 @@ import * as Pay from '@interledger/pay'
 import { Pagination } from '../shared/baseModel'
 import { BaseService } from '../shared/baseService'
 import { FundingError, LifecycleError } from './errors'
-import { OutgoingPayment, PaymentIntent, PaymentState } from './model'
+import {
+  OutgoingPayment,
+  PaymentIntent,
+  PaymentState,
+  PaymentEvent,
+  PaymentEventType
+} from './model'
 import { AccountingService } from '../accounting/service'
 import { AccountService } from '../open_payments/account/service'
 import { RatesService } from '../rates/service'
@@ -14,6 +20,7 @@ import * as worker from './worker'
 export interface OutgoingPaymentService {
   get(id: string): Promise<OutgoingPayment | undefined>
   create(options: CreateOutgoingPaymentOptions): Promise<OutgoingPayment>
+  authorize(id: string): Promise<OutgoingPayment>
   fund(
     options: FundOutgoingPaymentOptions
   ): Promise<OutgoingPayment | FundingError>
@@ -50,6 +57,7 @@ export async function createOutgoingPaymentService(
     get: (id) => getOutgoingPayment(deps, id),
     create: (options: CreateOutgoingPaymentOptions) =>
       createOutgoingPayment(deps, options),
+    authorize: (id) => authorizePayment(deps, id),
     fund: (options) => fundPayment(deps, options),
     processNext: () => worker.processPendingPayment(deps),
     getAccountPage: (accountId, pagination) =>
@@ -76,7 +84,7 @@ async function createOutgoingPayment(
   options: CreateOutgoingPaymentOptions
 ): Promise<OutgoingPayment> {
   if (
-    options.invoiceUrl &&
+    options.incomingPaymentUrl &&
     (options.paymentPointer || options.amountToSend !== undefined)
   ) {
     deps.logger.warn(
@@ -86,7 +94,7 @@ async function createOutgoingPayment(
       'createOutgoingPayment invalid parameters'
     )
     throw new Error(
-      'invoiceUrl and (paymentPointer,amountToSend) are mutually exclusive'
+      'incomingPaymentUrl and (paymentPointer,amountToSend) are mutually exclusive'
     )
   }
 
@@ -97,7 +105,7 @@ async function createOutgoingPayment(
           state: PaymentState.Quoting,
           intent: {
             paymentPointer: options.paymentPointer,
-            invoiceUrl: options.invoiceUrl,
+            incomingPaymentUrl: options.incomingPaymentUrl,
             amountToSend: options.amountToSend,
             autoApprove: options.autoApprove
           },
@@ -114,7 +122,7 @@ async function createOutgoingPayment(
       const destination = await Pay.setupPayment({
         plugin,
         paymentPointer: options.paymentPointer,
-        invoiceUrl: options.invoiceUrl
+        invoiceUrl: options.incomingPaymentUrl
       }).finally(() => {
         plugin.disconnect().catch((err) => {
           deps.logger.warn({ error: err.message }, 'error disconnecting plugin')
@@ -144,6 +152,32 @@ async function createOutgoingPayment(
   }
 }
 
+async function authorizePayment(
+  deps: ServiceDependencies,
+  id: string
+): Promise<OutgoingPayment> {
+  // TODO: introspect access token
+  return deps.knex.transaction(async (trx) => {
+    const payment = await OutgoingPayment.query(trx)
+      .findById(id)
+      .forUpdate()
+      .withGraphFetched('account.asset')
+    if (!payment) throw new Error('payment does not exist')
+    if (payment.state !== PaymentState.Pending) {
+      throw new Error(`Cannot authorize; payment is in state=${payment.state}`)
+    }
+    await payment.$query(trx).patch({ state: PaymentState.Authorized })
+    await PaymentEvent.query(trx).insertAndFetch({
+      type: PaymentEventType.PaymentAuthorized,
+      data: payment.toData({
+        amountSent: BigInt(0),
+        balance: BigInt(0)
+      })
+    })
+    return payment
+  })
+}
+
 export interface FundOutgoingPaymentOptions {
   id: string
   amount: bigint
@@ -160,7 +194,7 @@ async function fundPayment(
       .forUpdate()
       .withGraphFetched('account.asset')
     if (!payment) return FundingError.UnknownPayment
-    if (payment.state !== PaymentState.Funding) {
+    if (payment.state !== PaymentState.Authorized) {
       return FundingError.WrongState
     }
     if (!payment.quote) throw LifecycleError.MissingQuote
@@ -174,7 +208,6 @@ async function fundPayment(
     if (error) {
       return error
     }
-    await payment.$query(trx).patch({ state: PaymentState.Sending })
     return payment
   })
 }

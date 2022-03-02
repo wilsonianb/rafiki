@@ -11,9 +11,10 @@ export const RETRY_BACKOFF_SECONDS = 10
 
 const maxStateAttempts: { [key in PaymentState]: number } = {
   QUOTING: 5, // quoting
-  FUNDING: Infinity, // waiting for activation
-  SENDING: 5, // send money
-  CANCELLED: Infinity,
+  PENDING: Infinity, // waiting for authorization
+  AUTHORIZED: 5, // send money
+  EXPIRED: Infinity,
+  FAILED: Infinity,
   COMPLETED: Infinity
 }
 
@@ -52,7 +53,7 @@ export async function getPendingPayment(
     .forUpdate()
     // Don't wait for a payment that is already being processed.
     .skipLocked()
-    .whereIn('state', [PaymentState.Quoting, PaymentState.Sending])
+    .whereIn('state', [PaymentState.Quoting, PaymentState.Authorized])
     // Back off between retries.
     .andWhere((builder: knex.QueryBuilder) => {
       builder
@@ -64,7 +65,7 @@ export async function getPendingPayment(
     })
     .orWhere((builder: knex.QueryBuilder) => {
       builder
-        .where('state', PaymentState.Funding)
+        .where('state', PaymentState.Pending)
         .andWhere('quoteActivationDeadline', '<', now)
     })
     .withGraphFetched('account.asset')
@@ -81,7 +82,8 @@ export async function handlePaymentLifecycle(
     const stateAttempts = payment.stateAttempts + 1
 
     if (
-      payment.state === PaymentState.Cancelled ||
+      payment.state === PaymentState.Expired ||
+      payment.state === PaymentState.Failed ||
       payment.state === PaymentState.Completed ||
       (stateAttempts < maxStateAttempts[payment.state] && canRetryError(err))
     ) {
@@ -96,7 +98,7 @@ export async function handlePaymentLifecycle(
         { state: payment.state, error, stateAttempts },
         'payment lifecycle failed; cancelling'
       )
-      await lifecycle.handleCancelled(deps, payment, error)
+      await lifecycle.handleFailed(deps, payment, error)
     }
   }
 
@@ -120,15 +122,15 @@ export async function handlePaymentLifecycle(
             )
           })
         })
-    case PaymentState.Funding:
-      return lifecycle.handleFunding(deps, payment).catch(onError)
-    case PaymentState.Sending:
+    case PaymentState.Pending:
+      return lifecycle.handlePending(deps, payment).catch(onError)
+    case PaymentState.Authorized:
       plugin = deps.makeIlpPlugin({
         sourceAccount: payment
       })
       return plugin
         .connect()
-        .then(() => lifecycle.handleSending(deps, payment, plugin))
+        .then(() => lifecycle.handleAuthorized(deps, payment, plugin))
         .catch(onError)
         .finally(() => {
           return plugin.disconnect().catch((err: Error) => {

@@ -18,7 +18,6 @@ export const isFundingError = (o: any): o is FundingError =>
 export type PaymentError = LifecycleError | Pay.PaymentError
 
 export enum LifecycleError {
-  QuoteExpired = 'QuoteExpired',
   // Rate fetch failed.
   PricesUnavailable = 'PricesUnavailable',
   // Edge error due to retries, partial payment, and database write errors.
@@ -27,13 +26,15 @@ export enum LifecycleError {
   // These errors shouldn't ever trigger (impossible states), but they exist to satisfy types:
   MissingBalance = 'MissingBalance',
   MissingQuote = 'MissingQuote',
-  MissingInvoice = 'MissingInvoice',
-  InvalidRatio = 'InvalidRatio'
+  MissingIncomingPayment = 'MissingIncomingPayment',
+  InvalidRatio = 'InvalidRatio',
+  Unfunded = 'Unfunded'
 }
 
 const retryablePaymentErrors: { [paymentError in PaymentError]?: boolean } = {
   // Lifecycle errors
   PricesUnavailable: true,
+  Unfunded: true,
   // From @interledger/pay's PaymentError:
   QueryFailed: true,
   ConnectorError: true,

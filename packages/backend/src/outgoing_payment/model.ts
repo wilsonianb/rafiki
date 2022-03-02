@@ -18,7 +18,7 @@ const ratioFields = [
 
 export type PaymentIntent = {
   paymentPointer?: string
-  invoiceUrl?: string
+  incomingPaymentUrl?: string
   amountToSend?: bigint
   autoApprove: boolean
 }
@@ -77,7 +77,7 @@ export class OutgoingPayment
   $beforeUpdate(opts: ModelOptions, queryContext: QueryContext): void {
     super.$beforeUpdate(opts, queryContext)
     if (opts.old && this.state) {
-      if (opts.old['error'] && this.state !== PaymentState.Cancelled) {
+      if (opts.old['error'] && this.state !== PaymentState.Failed) {
         this.error = null
       }
       if (opts.old['state'] !== this.state) {
@@ -161,8 +161,8 @@ export class OutgoingPayment
     if (this.intent.paymentPointer) {
       data.payment.intent.paymentPointer = this.intent.paymentPointer
     }
-    if (this.intent.invoiceUrl) {
-      data.payment.intent.invoiceUrl = this.intent.invoiceUrl
+    if (this.intent.incomingPaymentUrl) {
+      data.payment.intent.incomingPaymentUrl = this.intent.incomingPaymentUrl
     }
     if (this.intent.amountToSend) {
       data.payment.intent.amountToSend = this.intent.amountToSend.toString()
@@ -189,30 +189,32 @@ export class OutgoingPayment
 }
 
 export enum PaymentState {
-  // Initial state. In this state, an empty trustline account is generated, and the payment is automatically resolved & quoted.
-  // On success, transition to `FUNDING` or `SENDING` if already funded.
-  // On failure, transition to `CANCELLED`.
+  // Initial state. In this state, an empty account is generated, and the payment is automatically resolved & quoted.
+  // On success, transition to `PENDING`.
+  // On failure, transition to `FAILED`.
   Quoting = 'QUOTING',
-  // Awaiting money from the user's wallet account to be deposited to the payment account to reserve it for the payment.
-  // On success, transition to `SENDING`.
-  Funding = 'FUNDING',
-  // Pay from the trustline account to the destination.
+  // On authorization, transition to `AUTHORIZED`.
+  Pending = 'PENDING',
+  // Await money from the user's wallet account to be deposited to the payment account to reserve it for the payment.
+  // Then pay from the account to the destination.
   // On success, transition to `COMPLETED`.
-  Sending = 'SENDING',
+  Authorized = 'AUTHORIZED',
 
-  // The payment failed. (Though some money may have been delivered).
+  // The payment quote expired.
   // Requoting transitions to `QUOTING`.
-  Cancelled = 'CANCELLED',
+  Expired = 'EXPIRED',
+  // The payment failed. (Though some money may have been delivered).
+  Failed = 'FAILED',
   // Successful completion.
   Completed = 'COMPLETED'
 }
 
 export enum PaymentDepositType {
-  PaymentFunding = 'outgoing_payment.funding'
+  PaymentAuthorized = 'outgoing_payment.authorized'
 }
 
 export enum PaymentWithdrawType {
-  PaymentCancelled = 'outgoing_payment.cancelled',
+  PaymentFailed = 'outgoing_payment.failed',
   PaymentCompleted = 'outgoing_payment.completed'
 }
 
@@ -232,7 +234,7 @@ export type PaymentData = {
     stateAttempts: number
     intent: {
       paymentPointer?: string
-      invoiceUrl?: string
+      incomingPaymentUrl?: string
       amountToSend?: string
       autoApprove: boolean
     }
