@@ -1610,7 +1610,7 @@ describe('Liquidity Resolvers', (): void => {
           autoApprove: false
         })
         await payment.$query(knex).patch({
-          state: PaymentState.Funding,
+          state: PaymentState.Authorized,
           quote: {
             timestamp: new Date(),
             activationDeadline: new Date(Date.now() + 1000),

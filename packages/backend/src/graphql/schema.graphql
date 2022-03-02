@@ -387,16 +387,18 @@ type PaymentIntent {
 }
 
 enum PaymentState {
-  "Will transition to FUNDING or SENDING (if already funded) when quote is complete"
+  "Will transition to PENDING when quote is complete"
   QUOTING
-  "Will transition to SENDING once payment funds are reserved"
-  FUNDING
-  "Paying, will transition to COMPLETED on success"
-  SENDING
-  "Payment aborted; can be requoted to QUOTING"
-  CANCELLED
-  "Successfuly completion"
+  "Will transition to AUTHORIZED on authorization"
+  PENDING
+  "Reserves and sends funds, will transition to COMPLETED on success"
+  AUTHORIZED
+  "Successful completion"
   COMPLETED
+  "Payment quote expired; can be requoted to QUOTING"
+  EXPIRED
+  "Payment failed"
+  FAILED
 }
 
 enum PaymentType {

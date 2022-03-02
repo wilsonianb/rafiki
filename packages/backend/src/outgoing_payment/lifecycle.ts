@@ -95,7 +95,7 @@ export async function handleQuoting(
       if (err === Pay.PaymentError.InvoiceAlreadyPaid) return null
       throw err
     })
-  // InvoiceAlreadyPaid: the incoming payment was already paid, either by this payment (which retried due to a failed SENDING→COMPLETED transition commit) or another payment entirely.
+  // InvoiceAlreadyPaid: the incoming payment was already paid, either by this payment (which retried due to a failed AUTHORIZED→COMPLETED transition commit) or another payment entirely.
   if (quote === null) {
     deps.logger.warn('quote incoming payment already paid')
     await handleCompleted(deps, payment)
@@ -107,13 +107,8 @@ export async function handleQuoting(
     throw LifecycleError.MissingBalance
   }
 
-  const state =
-    balance < quote.maxSourceAmount
-      ? PaymentState.Funding
-      : PaymentState.Sending
-
   await payment.$query(deps.knex).patch({
-    state,
+    state: PaymentState.Pending,
     quote: {
       timestamp: new Date(),
       activationDeadline: new Date(Date.now() + deps.quoteLifespan),
@@ -129,21 +124,19 @@ export async function handleQuoting(
       amountSent
     }
   })
-
-  if (state === PaymentState.Funding) {
-    await sendWebhookEvent(deps, payment, PaymentEventType.PaymentFunding)
-  }
 }
 
 // "payment" is locked by the "deps.knex" transaction.
-export async function handleFunding(
+export async function handlePending(
   deps: ServiceDependencies,
   payment: OutgoingPayment
 ): Promise<void> {
   if (!payment.quote) throw LifecycleError.MissingQuote
   const now = new Date()
   if (payment.quote.activationDeadline < now) {
-    throw LifecycleError.QuoteExpired
+    await payment.$query(deps.knex).patch({
+      state: PaymentState.Expired
+    })
   }
 
   deps.logger.error(
@@ -151,12 +144,12 @@ export async function handleFunding(
       activationDeadline: payment.quote.activationDeadline.getTime(),
       now: now.getTime()
     },
-    "handleFunding for payment quote that isn't expired"
+    "handlePending for payment quote that isn't expired"
   )
 }
 
 // "payment" is locked by the "deps.knex" transaction.
-export async function handleSending(
+export async function handleAuthorized(
   deps: ServiceDependencies,
   payment: OutgoingPayment,
   plugin: IlpPlugin
@@ -189,10 +182,18 @@ export async function handleSending(
     throw LifecycleError.MissingBalance
   }
 
-  // Due to SENDING→SENDING retries, the quote's amount parameters may need adjusting.
+  // Due to AUTHORIZED→AUTHORIZED retries, the quote's amount parameters may need adjusting.
   const amountSentSinceQuote = amountSent - payment.quote.amountSent
   const newMaxSourceAmount =
     payment.quote.maxSourceAmount - amountSentSinceQuote
+
+  const balance = await deps.accountingService.getBalance(payment.id)
+  if (balance === undefined) {
+    throw LifecycleError.MissingBalance
+  }
+  if (balance < newMaxSourceAmount) {
+    throw LifecycleError.Unfunded
+  }
 
   let newMinDeliveryAmount
   switch (payment.quote.targetType) {
@@ -231,7 +232,7 @@ export async function handleSending(
         amountSentSinceQuote,
         incomingPayment: destination.invoice
       },
-      'handleSending payment was already paid'
+      'handleAuthorized payment was already paid'
     )
     await handleCompleted(deps, payment)
     return
@@ -247,7 +248,7 @@ export async function handleSending(
         newMinDeliveryAmount,
         paymentType: payment.quote.targetType
       },
-      'handleSending bad retry state'
+      'handleAuthorized bad retry state'
     )
     throw LifecycleError.BadState
   }
@@ -309,16 +310,16 @@ export async function handleSending(
   await handleCompleted(deps, payment)
 }
 
-export async function handleCancelled(
+export async function handleFailed(
   deps: ServiceDependencies,
   payment: OutgoingPayment,
   error: string
 ): Promise<void> {
   await payment.$query(deps.knex).patch({
-    state: PaymentState.Cancelled,
+    state: PaymentState.Failed,
     error
   })
-  await sendWebhookEvent(deps, payment, PaymentEventType.PaymentCancelled)
+  await sendWebhookEvent(deps, payment, PaymentEventType.PaymentFailed)
 }
 
 const handleCompleted = async (

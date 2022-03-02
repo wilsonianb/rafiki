@@ -3958,31 +3958,37 @@
         "enumValues": [
           {
             "name": "QUOTING",
-            "description": "Will transition to FUNDING or SENDING (if already funded) when quote is complete",
+            "description": "Will transition to PENDING when quote is complete",
             "isDeprecated": false,
             "deprecationReason": null
           },
           {
-            "name": "FUNDING",
-            "description": "Will transition to SENDING once payment funds are reserved",
+            "name": "PENDING",
+            "description": "Will transition to AUTHORIZED on authorization",
             "isDeprecated": false,
             "deprecationReason": null
           },
           {
-            "name": "SENDING",
-            "description": "Paying, will transition to COMPLETED on success",
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
-            "name": "CANCELLED",
-            "description": "Payment aborted; can be requoted to QUOTING",
+            "name": "AUTHORIZED",
+            "description": "Reserves and sends funds, will transition to COMPLETED on success",
             "isDeprecated": false,
             "deprecationReason": null
           },
           {
             "name": "COMPLETED",
-            "description": "Successfuly completion",
+            "description": "Successful completion",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "EXPIRED",
+            "description": "Payment quote expired; can be requoted to QUOTING",
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "FAILED",
+            "description": "Payment failed",
             "isDeprecated": false,
             "deprecationReason": null
           }
