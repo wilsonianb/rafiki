@@ -251,235 +251,261 @@ describe('OutgoingPaymentService', (): void => {
     })
   })
 
-  describe('create', (): void => {
-    it('creates an OutgoingPayment (FixedSend)', async () => {
-      const payment = await outgoingPaymentService.create({
-        accountId,
-        paymentPointer,
-        amountToSend: BigInt(123),
-        autoApprove: false
-      })
-      expect(payment.state).toEqual(PaymentState.Quoting)
-      expect(payment.intent).toEqual({
-        paymentPointer,
-        amountToSend: BigInt(123),
-        autoApprove: false
-      })
-      expect(payment.accountId).toBe(accountId)
-      await expectOutcome(payment, { accountBalance: BigInt(0) })
-      expect(payment.account.asset.code).toBe('USD')
-      expect(payment.account.asset.scale).toBe(9)
-
-      const payment2 = await outgoingPaymentService.get(payment.id)
-      if (!payment2) throw 'no payment'
-      expect(payment2.id).toEqual(payment.id)
-    })
-
-    it('creates an OutgoingPayment (FixedDelivery)', async () => {
-      const payment = await outgoingPaymentService.create({
-        accountId,
-        incomingPaymentUrl,
-        autoApprove: false
-      })
-      expect(payment.state).toEqual(PaymentState.Quoting)
-      expect(payment.intent).toEqual({
-        incomingPaymentUrl,
-        autoApprove: false
-      })
-      expect(payment.accountId).toBe(accountId)
-      await expectOutcome(payment, { accountBalance: BigInt(0) })
-      expect(payment.account.asset.code).toBe('USD')
-      expect(payment.account.asset.scale).toBe(9)
-
-      const payment2 = await outgoingPaymentService.get(payment.id)
-      if (!payment2) throw 'no payment'
-      expect(payment2.id).toEqual(payment.id)
-    })
-
-    it('fails to create with both incomingPayment and paymentPointer', async () => {
-      await expect(
-        outgoingPaymentService.create({
+  describe.each`
+    authorized   | expectedAuthorized
+    ${true}      | ${true}
+    ${undefined} | ${false}
+  `(
+    'create (authorized: $authorized)',
+    ({ authorized, expectedAuthorized }): void => {
+      it('creates an OutgoingPayment (FixedSend)', async () => {
+        const payment = await outgoingPaymentService.create({
           accountId,
-          incomingPaymentUrl,
           paymentPointer,
-          autoApprove: false
-        })
-      ).rejects.toThrow(
-        'incomingPaymentUrl and (paymentPointer,amountToSend) are mutually exclusive'
-      )
-    })
-
-    it('fails to create with both incomingPayment and amountToSend', async () => {
-      await expect(
-        outgoingPaymentService.create({
-          accountId,
-          incomingPaymentUrl,
           amountToSend: BigInt(123),
-          autoApprove: false
+          autoApprove: false,
+          authorized
         })
-      ).rejects.toThrow(
-        'incomingPaymentUrl and (paymentPointer,amountToSend) are mutually exclusive'
-      )
-    })
-
-    it('fails to create with nonexistent account', async () => {
-      await expect(
-        outgoingPaymentService.create({
-          accountId: uuid(),
+        expect(payment.state).toEqual(PaymentState.Quoting)
+        expect(payment.authorized).toEqual(expectedAuthorized)
+        expect(payment.intent).toEqual({
           paymentPointer,
           amountToSend: BigInt(123),
           autoApprove: false
         })
-      ).rejects.toThrow('outgoing payment account does not exist')
-    })
-  })
+        expect(payment.accountId).toBe(accountId)
+        await expectOutcome(payment, { accountBalance: BigInt(0) })
+        expect(payment.account.asset.code).toBe('USD')
+        expect(payment.account.asset.scale).toBe(9)
+
+        const payment2 = await outgoingPaymentService.get(payment.id)
+        if (!payment2) throw 'no payment'
+        expect(payment2.id).toEqual(payment.id)
+      })
+
+      it('creates an OutgoingPayment (FixedDelivery)', async () => {
+        const payment = await outgoingPaymentService.create({
+          accountId,
+          incomingPaymentUrl,
+          autoApprove: false,
+          authorized
+        })
+        expect(payment.state).toEqual(PaymentState.Quoting)
+        expect(payment.authorized).toEqual(expectedAuthorized)
+        expect(payment.intent).toEqual({
+          incomingPaymentUrl,
+          autoApprove: false
+        })
+        expect(payment.accountId).toBe(accountId)
+        await expectOutcome(payment, { accountBalance: BigInt(0) })
+        expect(payment.account.asset.code).toBe('USD')
+        expect(payment.account.asset.scale).toBe(9)
+
+        const payment2 = await outgoingPaymentService.get(payment.id)
+        if (!payment2) throw 'no payment'
+        expect(payment2.id).toEqual(payment.id)
+      })
+
+      it('fails to create with both incomingPayment and paymentPointer', async () => {
+        await expect(
+          outgoingPaymentService.create({
+            accountId,
+            incomingPaymentUrl,
+            paymentPointer,
+            autoApprove: false,
+            authorized
+          })
+        ).rejects.toThrow(
+          'incomingPaymentUrl and (paymentPointer,amountToSend) are mutually exclusive'
+        )
+      })
+
+      it('fails to create with both incomingPayment and amountToSend', async () => {
+        await expect(
+          outgoingPaymentService.create({
+            accountId,
+            incomingPaymentUrl,
+            amountToSend: BigInt(123),
+            autoApprove: false,
+            authorized
+          })
+        ).rejects.toThrow(
+          'incomingPaymentUrl and (paymentPointer,amountToSend) are mutually exclusive'
+        )
+      })
+
+      it('fails to create with nonexistent account', async () => {
+        await expect(
+          outgoingPaymentService.create({
+            accountId: uuid(),
+            paymentPointer,
+            amountToSend: BigInt(123),
+            autoApprove: false,
+            authorized
+          })
+        ).rejects.toThrow('outgoing payment account does not exist')
+      })
+    }
+  )
 
   describe('processNext', (): void => {
-    describe('QUOTING→', (): void => {
-      it('AUTHORIZING (FixedSend)', async (): Promise<void> => {
-        const paymentId = (
-          await outgoingPaymentService.create({
+    describe.each`
+      authorized | nextState
+      ${true}    | ${PaymentState.Funding}
+      ${false}   | ${PaymentState.Authorizing}
+    `(
+      'QUOTING (authorized: $authorized)→',
+      ({ authorized, nextState }): void => {
+        it(`${nextState} (FixedSend)`, async (): Promise<void> => {
+          const paymentId = (
+            await outgoingPaymentService.create({
+              accountId,
+              paymentPointer,
+              amountToSend: BigInt(123),
+              autoApprove: false,
+              authorized
+            })
+          ).id
+          const payment = await processNext(paymentId, nextState)
+          expect(payment.destinationAccount).toEqual({
+            scale: 9,
+            code: 'XRP',
+            url: accountUrl
+          })
+          if (!payment.quote) throw 'no quote'
+
+          expect(payment.quote.timestamp).toBeInstanceOf(Date)
+          expect(
+            payment.quote.activationDeadline.getTime() - Date.now()
+          ).toBeGreaterThan(0)
+          expect(
+            payment.quote.activationDeadline.getTime() - Date.now()
+          ).toBeLessThanOrEqual(config.quoteLifespan)
+          expect(payment.quote.targetType).toBe(Pay.PaymentType.FixedSend)
+          expect(payment.quote.minDeliveryAmount).toBe(
+            BigInt(Math.ceil(123 * payment.quote.minExchangeRate.valueOf()))
+          )
+          expect(payment.quote.maxSourceAmount).toBe(BigInt(123))
+          expect(payment.quote.maxPacketAmount).toBe(
+            BigInt('9223372036854775807')
+          )
+          expect(payment.quote.minExchangeRate.valueOf()).toBe(
+            0.5 * (1 - config.slippage)
+          )
+          expect(payment.quote.lowExchangeRateEstimate.valueOf()).toBe(0.5)
+          expect(payment.quote.highExchangeRateEstimate.valueOf()).toBe(
+            0.500000000001
+          )
+        })
+
+        it(`${nextState} (FixedDelivery)`, async (): Promise<void> => {
+          const paymentId = (
+            await outgoingPaymentService.create({
+              accountId,
+              incomingPaymentUrl: incomingPaymentUrl,
+              autoApprove: false,
+              authorized
+            })
+          ).id
+          const payment = await processNext(paymentId, nextState)
+          expect(payment.destinationAccount).toEqual({
+            scale: incomingPayment.account.asset.scale,
+            code: incomingPayment.account.asset.code,
+            url: accountUrl
+          })
+          if (!payment.quote) throw 'no quote'
+
+          expect(payment.quote.targetType).toBe(Pay.PaymentType.FixedDelivery)
+          expect(payment.quote.minDeliveryAmount).toBe(BigInt(56))
+          expect(payment.quote.maxSourceAmount).toBe(
+            BigInt(Math.ceil(56 * 2 * (1 + config.slippage)))
+          )
+          expect(payment.quote.minExchangeRate.valueOf()).toBe(
+            0.5 * (1 - config.slippage)
+          )
+          expect(payment.quote.lowExchangeRateEstimate.valueOf()).toBe(0.5)
+          expect(payment.quote.highExchangeRateEstimate.valueOf()).toBe(
+            0.500000000001
+          )
+        })
+
+        it('QUOTING (rate service error)', async (): Promise<void> => {
+          const mockFn = jest
+            .spyOn(ratesService, 'prices')
+            .mockImplementation(() => Promise.reject(new Error('fail')))
+          const paymentId = (
+            await outgoingPaymentService.create({
+              accountId,
+              paymentPointer,
+              amountToSend: BigInt(123),
+              autoApprove: false
+            })
+          ).id
+          const payment = await processNext(paymentId, PaymentState.Quoting)
+
+          expect(payment.stateAttempts).toBe(1)
+          expect(payment.quote).toBeUndefined()
+
+          mockFn.mockRestore()
+          // Fast forward to next attempt.
+          // Only mock the time once (for getPendingPayment) since otherwise ilp/pay's startQuote will get confused.
+          jest
+            .spyOn(Date, 'now')
+            .mockReturnValueOnce(Date.now() + 1 * RETRY_BACKOFF_SECONDS * 1000)
+
+          const payment2 = await processNext(
+            paymentId,
+            PaymentState.Authorizing
+          )
+          expect(payment2.quote?.maxSourceAmount).toBe(BigInt(123))
+        })
+
+        // Maybe another person or payment paid the incoming payment already.
+        it('FAILED (FixedDelivery, incoming payment was already full paid)', async (): Promise<void> => {
+          const paymentId = (
+            await outgoingPaymentService.create({
+              accountId,
+              incomingPaymentUrl: incomingPaymentUrl,
+              autoApprove: false
+            })
+          ).id
+          await payIncomingPayment(incomingPayment.amount)
+          await processNext(
+            paymentId,
+            PaymentState.Failed,
+            Pay.PaymentError.InvoiceAlreadyPaid
+          )
+        })
+
+        it('FAILED (destination asset changed)', async (): Promise<void> => {
+          const originalPayment = await outgoingPaymentService.create({
             accountId,
             paymentPointer,
             amountToSend: BigInt(123),
             autoApprove: false
           })
-        ).id
-        const payment = await processNext(paymentId, PaymentState.Authorizing)
-        expect(payment.destinationAccount).toEqual({
-          scale: 9,
-          code: 'XRP',
-          url: accountUrl
+          const paymentId = originalPayment.id
+          // Pretend that the destination asset was initially different.
+          await OutgoingPayment.query(knex)
+            .findById(paymentId)
+            .patch({
+              destinationAccount: Object.assign(
+                {},
+                originalPayment.destinationAccount,
+                {
+                  scale: 55
+                }
+              )
+            })
+
+          await processNext(
+            paymentId,
+            PaymentState.Failed,
+            Pay.PaymentError.DestinationAssetConflict
+          )
         })
-        if (!payment.quote) throw 'no quote'
-
-        expect(payment.quote.timestamp).toBeInstanceOf(Date)
-        expect(
-          payment.quote.activationDeadline.getTime() - Date.now()
-        ).toBeGreaterThan(0)
-        expect(
-          payment.quote.activationDeadline.getTime() - Date.now()
-        ).toBeLessThanOrEqual(config.quoteLifespan)
-        expect(payment.quote.targetType).toBe(Pay.PaymentType.FixedSend)
-        expect(payment.quote.minDeliveryAmount).toBe(
-          BigInt(Math.ceil(123 * payment.quote.minExchangeRate.valueOf()))
-        )
-        expect(payment.quote.maxSourceAmount).toBe(BigInt(123))
-        expect(payment.quote.maxPacketAmount).toBe(
-          BigInt('9223372036854775807')
-        )
-        expect(payment.quote.minExchangeRate.valueOf()).toBe(
-          0.5 * (1 - config.slippage)
-        )
-        expect(payment.quote.lowExchangeRateEstimate.valueOf()).toBe(0.5)
-        expect(payment.quote.highExchangeRateEstimate.valueOf()).toBe(
-          0.500000000001
-        )
-      })
-
-      it('AUTHORIZING (FixedDelivery)', async (): Promise<void> => {
-        const paymentId = (
-          await outgoingPaymentService.create({
-            accountId,
-            incomingPaymentUrl: incomingPaymentUrl,
-            autoApprove: false
-          })
-        ).id
-        const payment = await processNext(paymentId, PaymentState.Authorizing)
-        expect(payment.destinationAccount).toEqual({
-          scale: incomingPayment.account.asset.scale,
-          code: incomingPayment.account.asset.code,
-          url: accountUrl
-        })
-        if (!payment.quote) throw 'no quote'
-
-        expect(payment.quote.targetType).toBe(Pay.PaymentType.FixedDelivery)
-        expect(payment.quote.minDeliveryAmount).toBe(BigInt(56))
-        expect(payment.quote.maxSourceAmount).toBe(
-          BigInt(Math.ceil(56 * 2 * (1 + config.slippage)))
-        )
-        expect(payment.quote.minExchangeRate.valueOf()).toBe(
-          0.5 * (1 - config.slippage)
-        )
-        expect(payment.quote.lowExchangeRateEstimate.valueOf()).toBe(0.5)
-        expect(payment.quote.highExchangeRateEstimate.valueOf()).toBe(
-          0.500000000001
-        )
-      })
-
-      it('QUOTING (rate service error)', async (): Promise<void> => {
-        const mockFn = jest
-          .spyOn(ratesService, 'prices')
-          .mockImplementation(() => Promise.reject(new Error('fail')))
-        const paymentId = (
-          await outgoingPaymentService.create({
-            accountId,
-            paymentPointer,
-            amountToSend: BigInt(123),
-            autoApprove: false
-          })
-        ).id
-        const payment = await processNext(paymentId, PaymentState.Quoting)
-
-        expect(payment.stateAttempts).toBe(1)
-        expect(payment.quote).toBeUndefined()
-
-        mockFn.mockRestore()
-        // Fast forward to next attempt.
-        // Only mock the time once (for getPendingPayment) since otherwise ilp/pay's startQuote will get confused.
-        jest
-          .spyOn(Date, 'now')
-          .mockReturnValueOnce(Date.now() + 1 * RETRY_BACKOFF_SECONDS * 1000)
-
-        const payment2 = await processNext(paymentId, PaymentState.Authorizing)
-        expect(payment2.quote?.maxSourceAmount).toBe(BigInt(123))
-      })
-
-      // Maybe another person or payment paid the incoming payment already.
-      it('FAILED (FixedDelivery, incoming payment was already full paid)', async (): Promise<void> => {
-        const paymentId = (
-          await outgoingPaymentService.create({
-            accountId,
-            incomingPaymentUrl: incomingPaymentUrl,
-            autoApprove: false
-          })
-        ).id
-        await payIncomingPayment(incomingPayment.amount)
-        await processNext(
-          paymentId,
-          PaymentState.Failed,
-          Pay.PaymentError.InvoiceAlreadyPaid
-        )
-      })
-
-      it('FAILED (destination asset changed)', async (): Promise<void> => {
-        const originalPayment = await outgoingPaymentService.create({
-          accountId,
-          paymentPointer,
-          amountToSend: BigInt(123),
-          autoApprove: false
-        })
-        const paymentId = originalPayment.id
-        // Pretend that the destination asset was initially different.
-        await OutgoingPayment.query(knex)
-          .findById(paymentId)
-          .patch({
-            destinationAccount: Object.assign(
-              {},
-              originalPayment.destinationAccount,
-              {
-                scale: 55
-              }
-            )
-          })
-
-        await processNext(
-          paymentId,
-          PaymentState.Failed,
-          Pay.PaymentError.DestinationAssetConflict
-        )
-      })
-    })
+      }
+    )
 
     describe('AUTHORIZING→', (): void => {
       let payment: OutgoingPayment
