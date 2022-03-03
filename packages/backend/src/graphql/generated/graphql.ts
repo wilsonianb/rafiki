@@ -469,6 +469,7 @@ export type OutgoingPayment = Model & {
   id: Scalars['ID'];
   accountId: Scalars['ID'];
   state: PaymentState;
+  authorized: Scalars['Boolean'];
   error?: Maybe<Scalars['String']>;
   stateAttempts: Scalars['Int'];
   intent?: Maybe<PaymentIntent>;
@@ -544,16 +545,22 @@ export type PaymentQuote = {
 };
 
 export enum PaymentState {
-  /** Will transition to FUNDING or SENDING (if already funded) when quote is complete */
+  /** Will transition to AUTHORIZING or FUNDING (if already authorized) when quote is complete */
   Quoting = 'QUOTING',
+  /** With transition to FUNDING once authorized */
+  Authorizing = 'AUTHORIZING',
   /** Will transition to SENDING once payment funds are reserved */
   Funding = 'FUNDING',
   /** Paying, will transition to COMPLETED on success */
   Sending = 'SENDING',
-  /** Payment aborted; can be requoted to QUOTING */
-  Cancelled = 'CANCELLED',
-  /** Successfuly completion */
-  Completed = 'COMPLETED'
+  /** Successful completion */
+  Completed = 'COMPLETED',
+  /** Payment quote expired; can be requoted to QUOTING */
+  Expired = 'EXPIRED',
+  /** Payment rejected by ASPSP */
+  Rejected = 'REJECTED',
+  /** Payment failed */
+  Failed = 'FAILED'
 }
 
 export enum PaymentType {
@@ -1129,6 +1136,7 @@ export type OutgoingPaymentResolvers<ContextType = any, ParentType extends Resol
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   accountId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   state?: Resolver<ResolversTypes['PaymentState'], ParentType, ContextType>;
+  authorized?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   error?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   stateAttempts?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   intent?: Resolver<Maybe<ResolversTypes['PaymentIntent']>, ParentType, ContextType>;

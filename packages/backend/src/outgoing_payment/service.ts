@@ -2,8 +2,14 @@ import { ForeignKeyViolationError, TransactionOrKnex } from 'objection'
 
 import { Pagination } from '../shared/baseModel'
 import { BaseService } from '../shared/baseService'
-import { FundingError, LifecycleError } from './errors'
-import { OutgoingPayment, PaymentIntent, PaymentState } from './model'
+import { FundingError, LifecycleError, OutgoingPaymentError } from './errors'
+import { sendWebhookEvent } from './lifecycle'
+import {
+  OutgoingPayment,
+  PaymentIntent,
+  PaymentState,
+  PaymentEventType
+} from './model'
 import { AccountingService } from '../accounting/service'
 import { AccountService } from '../open_payments/account/service'
 import { RatesService } from '../rates/service'
@@ -13,6 +19,7 @@ import * as worker from './worker'
 export interface OutgoingPaymentService {
   get(id: string): Promise<OutgoingPayment | undefined>
   create(options: CreateOutgoingPaymentOptions): Promise<OutgoingPayment>
+  authorize(id: string): Promise<OutgoingPayment | OutgoingPaymentError>
   fund(
     options: FundOutgoingPaymentOptions
   ): Promise<OutgoingPayment | FundingError>
@@ -44,6 +51,7 @@ export async function createOutgoingPaymentService(
     get: (id) => getOutgoingPayment(deps, id),
     create: (options: CreateOutgoingPaymentOptions) =>
       createOutgoingPayment(deps, options),
+    authorize: (id) => authorizePayment(deps, id),
     fund: (options) => fundPayment(deps, options),
     processNext: () => worker.processPendingPayment(deps),
     getAccountPage: (accountId, pagination) =>
@@ -62,6 +70,7 @@ async function getOutgoingPayment(
 
 type CreateOutgoingPaymentOptions = PaymentIntent & {
   accountId: string
+  authorized?: boolean
 }
 
 // TODO ensure this is idempotent/safe for autoApprove:true payments
@@ -95,7 +104,8 @@ async function createOutgoingPayment(
             amountToSend: options.amountToSend,
             autoApprove: options.autoApprove
           },
-          accountId: options.accountId
+          accountId: options.accountId,
+          authorized: options.authorized
         })
         .withGraphFetched('account.asset')
 
@@ -112,6 +122,32 @@ async function createOutgoingPayment(
     }
     throw err
   }
+}
+
+async function authorizePayment(
+  deps: ServiceDependencies,
+  id: string
+): Promise<OutgoingPayment | OutgoingPaymentError> {
+  // TODO: introspect access token
+  return deps.knex.transaction(async (trx) => {
+    const payment = await OutgoingPayment.query(trx)
+      .findById(id)
+      .forUpdate()
+      .withGraphFetched('account.asset')
+    if (!payment) return OutgoingPaymentError.UnknownPayment
+    if (payment.state === PaymentState.Authorizing) {
+      await payment.$query(trx).patch({
+        authorized: true,
+        state: PaymentState.Funding
+      })
+      await sendWebhookEvent(deps, payment, PaymentEventType.PaymentFunding)
+    } else if (payment.state === PaymentState.Quoting && !payment.authorized) {
+      await payment.$query(trx).patch({ authorized: true })
+    } else {
+      return OutgoingPaymentError.WrongState
+    }
+    return payment
+  })
 }
 
 export interface FundOutgoingPaymentOptions {

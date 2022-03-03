@@ -161,6 +161,7 @@ describe('OutgoingPayment Resolvers', (): void => {
                   id
                   accountId
                   state
+                  authorized
                   error
                   stateAttempts
                   intent {
@@ -201,6 +202,7 @@ describe('OutgoingPayment Resolvers', (): void => {
         expect(query.id).toEqual(payment.id)
         expect(query.accountId).toEqual(payment.accountId)
         expect(query.state).toEqual(state)
+        expect(query.authorized).toEqual(payment.authorized)
         expect(query.error).toEqual(error)
         expect(query.stateAttempts).toBe(0)
         expect(query.intent).toEqual({

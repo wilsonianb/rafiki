@@ -7,7 +7,8 @@ import {
   AccountResolvers,
   PaymentType as SchemaPaymentType,
   QueryResolvers,
-  ResolversTypes
+  ResolversTypes,
+  PaymentState
 } from '../generated/graphql'
 import { OutgoingPayment } from '../../outgoing_payment/model'
 import { ApolloContext } from '../../app'
@@ -178,7 +179,8 @@ export function paymentToGraphql(
   return {
     id: payment.id,
     accountId: payment.accountId,
-    state: payment.state,
+    state: (payment.state as unknown) as PaymentState,
+    authorized: payment.authorized,
     error: payment.error ?? undefined,
     stateAttempts: payment.stateAttempts,
     intent: payment.intent,

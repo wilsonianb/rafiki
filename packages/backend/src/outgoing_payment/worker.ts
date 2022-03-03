@@ -1,7 +1,7 @@
 import * as knex from 'knex'
 
 import { ServiceDependencies } from './service'
-import { OutgoingPayment, PaymentState } from './model'
+import { OutgoingPayment, PaymentState, PendingState } from './model'
 import { canRetryError, PaymentError } from './errors'
 import * as lifecycle from './lifecycle'
 import { IlpPlugin } from './ilp_plugin'
@@ -9,12 +9,11 @@ import { IlpPlugin } from './ilp_plugin'
 // First retry waits 10 seconds, second retry waits 20 (more) seconds, etc.
 export const RETRY_BACKOFF_SECONDS = 10
 
-const maxStateAttempts: { [key in PaymentState]: number } = {
+const maxStateAttempts: { [key in PendingState]: number } = {
   QUOTING: 5, // quoting
-  FUNDING: Infinity, // waiting for activation
-  SENDING: 5, // send money
-  CANCELLED: Infinity,
-  COMPLETED: Infinity
+  AUTHORIZING: Infinity, // waiting for authorization
+  FUNDING: Infinity, // waiting for funds
+  SENDING: 5 // send money
 }
 
 // Returns the id of the processed payment (if any).
@@ -64,7 +63,7 @@ export async function getPendingPayment(
     })
     .orWhere((builder: knex.QueryBuilder) => {
       builder
-        .where('state', PaymentState.Funding)
+        .where('state', PaymentState.Authorizing)
         .andWhere('quoteActivationDeadline', '<', now)
     })
     .withGraphFetched('account.asset')
@@ -80,23 +79,19 @@ export async function handlePaymentLifecycle(
     const error = typeof err === 'string' ? err : err.message
     const stateAttempts = payment.stateAttempts + 1
 
-    if (
-      payment.state === PaymentState.Cancelled ||
-      payment.state === PaymentState.Completed ||
-      (stateAttempts < maxStateAttempts[payment.state] && canRetryError(err))
-    ) {
+    if (stateAttempts < maxStateAttempts[payment.state] && canRetryError(err)) {
       deps.logger.warn(
         { state: payment.state, error, stateAttempts },
         'payment lifecycle failed; retrying'
       )
       await payment.$query(deps.knex).patch({ stateAttempts })
     } else {
-      // Too many attempts or non-retryable error; cancel payment.
+      // Too many attempts or non-retryable error; fail payment.
       deps.logger.warn(
         { state: payment.state, error, stateAttempts },
-        'payment lifecycle failed; cancelling'
+        'payment lifecycle failed'
       )
-      await lifecycle.handleCancelled(deps, payment, error)
+      await lifecycle.handleFailed(deps, payment, error)
     }
   }
 
@@ -120,8 +115,8 @@ export async function handlePaymentLifecycle(
             )
           })
         })
-    case PaymentState.Funding:
-      return lifecycle.handleFunding(deps, payment).catch(onError)
+    case PaymentState.Authorizing:
+      return lifecycle.handleAuthorizing(deps, payment).catch(onError)
     case PaymentState.Sending:
       plugin = deps.makeIlpPlugin({
         sourceAccount: payment
