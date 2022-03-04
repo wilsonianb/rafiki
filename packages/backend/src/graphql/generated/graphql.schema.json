@@ -3969,13 +3969,13 @@
         "interfaces": null,
         "enumValues": [
           {
-            "name": "QUOTING",
-            "description": "Will transition to AUTHORIZING or FUNDING (if already authorized) when quote is complete",
+            "name": "PENDING",
+            "description": "Will transition to PREPARED or FUNDING (if already authorized) when quote is complete",
             "isDeprecated": false,
             "deprecationReason": null
           },
           {
-            "name": "AUTHORIZING",
+            "name": "PREPARED",
             "description": "With transition to FUNDING once authorized",
             "isDeprecated": false,
             "deprecationReason": null
@@ -4000,7 +4000,7 @@
           },
           {
             "name": "EXPIRED",
-            "description": "Payment quote expired; can be requoted to QUOTING",
+            "description": "Payment quote expired; can be requoted to PENDING",
             "isDeprecated": false,
             "deprecationReason": null
           },

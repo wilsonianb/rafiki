@@ -14,7 +14,7 @@ const MAX_INT64 = BigInt('9223372036854775807')
 
 // Acquire a quote for the user to approve.
 // "payment" is locked by the "deps.knex" transaction.
-export async function handleQuoting(
+export async function handlePending(
   deps: ServiceDependencies,
   payment: OutgoingPayment,
   plugin: IlpPlugin
@@ -108,7 +108,7 @@ export async function handleQuoting(
 
   const state = payment.authorized
     ? PaymentState.Funding
-    : PaymentState.Authorizing
+    : PaymentState.Prepared
 
   await payment.$query(deps.knex).patch({
     state,
@@ -134,7 +134,7 @@ export async function handleQuoting(
 }
 
 // "payment" is locked by the "deps.knex" transaction.
-export async function handleAuthorizing(
+export async function handlePrepared(
   deps: ServiceDependencies,
   payment: OutgoingPayment
 ): Promise<void> {
@@ -149,7 +149,7 @@ export async function handleAuthorizing(
       activationDeadline: payment.quote.activationDeadline.getTime(),
       now: now.getTime()
     },
-    "handleAuthorizing for payment quote that isn't expired"
+    "handlePrepared for payment quote that isn't expired"
   )
 }
 

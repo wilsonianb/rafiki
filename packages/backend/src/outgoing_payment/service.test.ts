@@ -47,8 +47,8 @@ describe('OutgoingPaymentService', (): void => {
   const webhookTypes: {
     [key in PaymentState]: PaymentEventType | undefined
   } = {
-    [PaymentState.Quoting]: undefined,
-    [PaymentState.Authorizing]: undefined,
+    [PaymentState.Pending]: undefined,
+    [PaymentState.Prepared]: undefined,
     [PaymentState.Funding]: PaymentEventType.PaymentFunding,
     [PaymentState.Sending]: undefined,
     [PaymentState.Expired]: undefined,
@@ -266,7 +266,7 @@ describe('OutgoingPaymentService', (): void => {
           autoApprove: false,
           authorized
         })
-        expect(payment.state).toEqual(PaymentState.Quoting)
+        expect(payment.state).toEqual(PaymentState.Pending)
         expect(payment.authorized).toEqual(expectedAuthorized)
         expect(payment.intent).toEqual({
           paymentPointer,
@@ -290,7 +290,7 @@ describe('OutgoingPaymentService', (): void => {
           autoApprove: false,
           authorized
         })
-        expect(payment.state).toEqual(PaymentState.Quoting)
+        expect(payment.state).toEqual(PaymentState.Pending)
         expect(payment.authorized).toEqual(expectedAuthorized)
         expect(payment.intent).toEqual({
           incomingPaymentUrl,
@@ -352,9 +352,9 @@ describe('OutgoingPaymentService', (): void => {
     describe.each`
       authorized | nextState
       ${true}    | ${PaymentState.Funding}
-      ${false}   | ${PaymentState.Authorizing}
+      ${false}   | ${PaymentState.Prepared}
     `(
-      'QUOTING (authorized: $authorized)→',
+      'PENDING (authorized: $authorized)→',
       ({ authorized, nextState }): void => {
         it(`${nextState} (FixedSend)`, async (): Promise<void> => {
           const paymentId = (
@@ -429,7 +429,7 @@ describe('OutgoingPaymentService', (): void => {
           )
         })
 
-        it('QUOTING (rate service error)', async (): Promise<void> => {
+        it('PENDING (rate service error)', async (): Promise<void> => {
           const mockFn = jest
             .spyOn(ratesService, 'prices')
             .mockImplementation(() => Promise.reject(new Error('fail')))
@@ -441,7 +441,7 @@ describe('OutgoingPaymentService', (): void => {
               autoApprove: false
             })
           ).id
-          const payment = await processNext(paymentId, PaymentState.Quoting)
+          const payment = await processNext(paymentId, PaymentState.Pending)
 
           expect(payment.stateAttempts).toBe(1)
           expect(payment.quote).toBeUndefined()
@@ -453,10 +453,7 @@ describe('OutgoingPaymentService', (): void => {
             .spyOn(Date, 'now')
             .mockReturnValueOnce(Date.now() + 1 * RETRY_BACKOFF_SECONDS * 1000)
 
-          const payment2 = await processNext(
-            paymentId,
-            PaymentState.Authorizing
-          )
+          const payment2 = await processNext(paymentId, PaymentState.Prepared)
           expect(payment2.quote?.maxSourceAmount).toBe(BigInt(123))
         })
 
@@ -507,7 +504,7 @@ describe('OutgoingPaymentService', (): void => {
       }
     )
 
-    describe('AUTHORIZING→', (): void => {
+    describe('PREPARED→', (): void => {
       let payment: OutgoingPayment
 
       beforeEach(
@@ -518,7 +515,7 @@ describe('OutgoingPaymentService', (): void => {
             amountToSend: BigInt(123),
             autoApprove: true
           })
-          payment = await processNext(paymentId, PaymentState.Authorizing)
+          payment = await processNext(paymentId, PaymentState.Prepared)
         }
       )
 
@@ -801,25 +798,25 @@ describe('OutgoingPaymentService', (): void => {
       )
     })
 
-    it('authorizes a Quoting payment', async (): Promise<void> => {
+    it('authorizes a Pending payment', async (): Promise<void> => {
       await expect(
         outgoingPaymentService.authorize(paymentId)
       ).resolves.toMatchObject({
         id: paymentId,
         authorized: true,
-        state: PaymentState.Quoting
+        state: PaymentState.Pending
       })
 
       await expect(
         outgoingPaymentService.get(paymentId)
       ).resolves.toMatchObject({
         authorized: true,
-        state: PaymentState.Quoting
+        state: PaymentState.Pending
       })
     })
 
-    it('transitions an Authorizing payment to Funding state', async (): Promise<void> => {
-      await processNext(paymentId, PaymentState.Authorizing)
+    it('transitions a Prepared payment to Funding state', async (): Promise<void> => {
+      await processNext(paymentId, PaymentState.Prepared)
       await expect(
         outgoingPaymentService.authorize(paymentId)
       ).resolves.toMatchObject({
@@ -837,9 +834,9 @@ describe('OutgoingPaymentService', (): void => {
     })
 
     Object.values(PaymentState).forEach((state) => {
-      if (state === PaymentState.Authorizing) return
+      if (state === PaymentState.Prepared) return
       it(`does not authorize a(n) ${
-        state === PaymentState.Quoting ? 'authorized QUOTING' : state
+        state === PaymentState.Pending ? 'authorized PENDING' : state
       } payment`, async (): Promise<void> => {
         await OutgoingPayment.query()
           .patch({

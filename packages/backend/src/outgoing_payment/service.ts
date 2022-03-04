@@ -97,7 +97,7 @@ async function createOutgoingPayment(
     return await OutgoingPayment.transaction(deps.knex, async (trx) => {
       const payment = await OutgoingPayment.query(trx)
         .insertAndFetch({
-          state: PaymentState.Quoting,
+          state: PaymentState.Pending,
           intent: {
             paymentPointer: options.paymentPointer,
             incomingPaymentUrl: options.incomingPaymentUrl,
@@ -135,13 +135,13 @@ async function authorizePayment(
       .forUpdate()
       .withGraphFetched('account.asset')
     if (!payment) return OutgoingPaymentError.UnknownPayment
-    if (payment.state === PaymentState.Authorizing) {
+    if (payment.state === PaymentState.Prepared) {
       await payment.$query(trx).patch({
         authorized: true,
         state: PaymentState.Funding
       })
       await sendWebhookEvent(deps, payment, PaymentEventType.PaymentFunding)
-    } else if (payment.state === PaymentState.Quoting && !payment.authorized) {
+    } else if (payment.state === PaymentState.Pending && !payment.authorized) {
       await payment.$query(trx).patch({ authorized: true })
     } else {
       return OutgoingPaymentError.WrongState

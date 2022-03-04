@@ -545,17 +545,17 @@ export type PaymentQuote = {
 };
 
 export enum PaymentState {
-  /** Will transition to AUTHORIZING or FUNDING (if already authorized) when quote is complete */
-  Quoting = 'QUOTING',
+  /** Will transition to PREPARED or FUNDING (if already authorized) when quote is complete */
+  Pending = 'PENDING',
   /** With transition to FUNDING once authorized */
-  Authorizing = 'AUTHORIZING',
+  Prepared = 'PREPARED',
   /** Will transition to SENDING once payment funds are reserved */
   Funding = 'FUNDING',
   /** Paying, will transition to COMPLETED on success */
   Sending = 'SENDING',
   /** Successful completion */
   Completed = 'COMPLETED',
-  /** Payment quote expired; can be requoted to QUOTING */
+  /** Payment quote expired; can be requoted to PENDING */
   Expired = 'EXPIRED',
   /** Payment rejected by ASPSP */
   Rejected = 'REJECTED',

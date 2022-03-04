@@ -186,26 +186,23 @@ export class OutgoingPayment
   }
 }
 
-export enum PendingState {
+export enum PaymentState {
   // Initial state. In this state, an empty account is generated, and the payment is automatically resolved & quoted.
-  // On success, transition to `AUTHORIZING` or `FUNDING` if already authorized.
+  // On success, transition to `PREPARED` or `FUNDING` if already authorized.
   // On failure, transition to `FAILED`.
-  Quoting = 'QUOTING',
+  Pending = 'PENDING',
   // Awaiting authorization.
   // On authorization, transition to `FUNDING`.
   // On quote expiration, transition to `EXPIRED`.
-  Authorizing = 'AUTHORIZING',
+  Prepared = 'PREPARED',
   // Awaiting money from the user's wallet account to be deposited to the payment account to reserve it for the payment.
   // On success, transition to `SENDING`.
   Funding = 'FUNDING',
   // Pay from the account to the destination.
   // On success, transition to `COMPLETED`.
-  Sending = 'SENDING'
-}
-
-enum FinalState {
+  Sending = 'SENDING',
   // The payment quote expired.
-  // Requoting transitions to `QUOTING`.
+  // Requoting transitions to `PENDING`.
   Expired = 'EXPIRED',
   // Payment rejected by ASPSP
   Rejected = 'REJECTED',
@@ -214,12 +211,6 @@ enum FinalState {
   // Successful completion.
   Completed = 'COMPLETED'
 }
-
-export const PaymentState = {
-  ...PendingState,
-  ...FinalState
-}
-export type PaymentState = PendingState | FinalState
 
 export enum PaymentDepositType {
   PaymentFunding = 'outgoing_payment.funding'

@@ -1,7 +1,7 @@
 import * as knex from 'knex'
 
 import { ServiceDependencies } from './service'
-import { OutgoingPayment, PaymentState, PendingState } from './model'
+import { OutgoingPayment, PaymentState } from './model'
 import { canRetryError, PaymentError } from './errors'
 import * as lifecycle from './lifecycle'
 import { IlpPlugin } from './ilp_plugin'
@@ -9,11 +9,15 @@ import { IlpPlugin } from './ilp_plugin'
 // First retry waits 10 seconds, second retry waits 20 (more) seconds, etc.
 export const RETRY_BACKOFF_SECONDS = 10
 
-const maxStateAttempts: { [key in PendingState]: number } = {
-  QUOTING: 5, // quoting
-  AUTHORIZING: Infinity, // waiting for authorization
+const maxStateAttempts: { [key in PaymentState]: number } = {
+  PENDING: 5, // quoting
+  PREPARED: Infinity, // waiting for authorization
   FUNDING: Infinity, // waiting for funds
-  SENDING: 5 // send money
+  SENDING: 5, // send money
+  COMPLETED: Infinity,
+  EXPIRED: Infinity,
+  FAILED: Infinity,
+  REJECTED: Infinity
 }
 
 // Returns the id of the processed payment (if any).
@@ -51,7 +55,7 @@ export async function getPendingPayment(
     .forUpdate()
     // Don't wait for a payment that is already being processed.
     .skipLocked()
-    .whereIn('state', [PaymentState.Quoting, PaymentState.Sending])
+    .whereIn('state', [PaymentState.Pending, PaymentState.Sending])
     // Back off between retries.
     .andWhere((builder: knex.QueryBuilder) => {
       builder
@@ -63,7 +67,7 @@ export async function getPendingPayment(
     })
     .orWhere((builder: knex.QueryBuilder) => {
       builder
-        .where('state', PaymentState.Authorizing)
+        .where('state', PaymentState.Prepared)
         .andWhere('quoteActivationDeadline', '<', now)
     })
     .withGraphFetched('account.asset')
@@ -98,14 +102,14 @@ export async function handlePaymentLifecycle(
   // Plugins are cleaned up in `finally` to avoid leaking http2 connections.
   let plugin: IlpPlugin
   switch (payment.state) {
-    case PaymentState.Quoting:
+    case PaymentState.Pending:
       plugin = deps.makeIlpPlugin({
         sourceAccount: payment,
         unfulfillable: true
       })
       return plugin
         .connect()
-        .then(() => lifecycle.handleQuoting(deps, payment, plugin))
+        .then(() => lifecycle.handlePending(deps, payment, plugin))
         .catch(onError)
         .finally(() => {
           return plugin.disconnect().catch((err: Error) => {
@@ -115,8 +119,8 @@ export async function handlePaymentLifecycle(
             )
           })
         })
-    case PaymentState.Authorizing:
-      return lifecycle.handleAuthorizing(deps, payment).catch(onError)
+    case PaymentState.Prepared:
+      return lifecycle.handlePrepared(deps, payment).catch(onError)
     case PaymentState.Sending:
       plugin = deps.makeIlpPlugin({
         sourceAccount: payment
