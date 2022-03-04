@@ -5,6 +5,7 @@ exports.up = function (knex) {
     table.string('state').notNullable().index() // PaymentState
     table.string('error').nullable()
     table.integer('stateAttempts').notNullable().defaultTo(0)
+    table.boolean('authorized').notNullable().defaultTo(false)
 
     table.string('intentPaymentPointer').nullable()
     table.string('intentIncomingPaymentUrl').nullable()
@@ -32,8 +33,8 @@ exports.up = function (knex) {
     // from which to request funds for payment
     table.uuid('accountId').notNullable()
     table.foreign('accountId').references('accounts.id')
-    table.integer('destinationAccountScale').notNullable()
-    table.string('destinationAccountCode').notNullable()
+    table.integer('destinationAccountScale').nullable()
+    table.string('destinationAccountCode').nullable()
     table.string('destinationAccountUrl').nullable()
 
     table.timestamp('createdAt').defaultTo(knex.fn.now())
