@@ -36,7 +36,10 @@ describe('Asset Service', (): void => {
 
   beforeAll(
     async (): Promise<void> => {
-      tigerbeetleContainer = await startTigerbeetleContainer()
+      Config.tigerbeetleClusterId = 3
+      tigerbeetleContainer = await startTigerbeetleContainer(
+        Config.tigerbeetleClusterId
+      )
       Config.tigerbeetleReplicaAddresses = [
         tigerbeetleContainer.getMappedPort(TIGERBEETLE_PORT)
       ]

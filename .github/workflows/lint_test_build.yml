@@ -36,7 +36,7 @@ jobs:
       - run: yarn workspace backend lint
       - run: yarn workspace backend format:check
       - run: yarn install --immutable --immutable-cache
-      - run: yarn workspace backend test
+      - run: DEBUG=*testcontainer* yarn workspace backend test
 
   frontend:
     runs-on: ubuntu-latest
