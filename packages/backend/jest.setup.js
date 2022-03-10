@@ -96,6 +96,11 @@ module.exports = async (globalConfig) => {
       .withWaitStrategy(Wait.forLogMessage(/listening on/))
       .start()
 
+    const stream = await tigerbeetleContainer.logs()
+    stream
+      .on('data', (line) => console.log(line))
+      .on('err', (line) => console.error(line))
+      .on('end', () => console.log('Stream closed'))
     process.env.TIGERBEETLE_CLUSTER_ID = TIGERBEETLE_CLUSTER_ID
     process.env.TIGERBEETLE_REPLICA_ADDRESSES = `[${tigerbeetleContainer.getMappedPort(
       TIGERBEETLE_PORT
