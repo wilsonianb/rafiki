@@ -33,6 +33,10 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
       {
         "name": "rates",
         "reference": "workspace:packages/rates"
+      },
+      {
+        "name": "tigerbeetle-node",
+        "reference": "workspace:packages/tigerbeetle-node"
       }
     ],
     "enableTopLevelFallback": true,
@@ -41,7 +45,8 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
       ["@coil/rafiki", ["workspace:."]],
       ["backend", ["workspace:packages/backend"]],
       ["frontend", ["workspace:packages/frontend"]],
-      ["rates", ["workspace:packages/rates"]]
+      ["rates", ["workspace:packages/rates"]],
+      ["tigerbeetle-node", ["workspace:packages/tigerbeetle-node"]]
     ],
     "fallbackPool": [
     ],
@@ -6400,6 +6405,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["raw-body", "npm:2.4.1"],
             ["rosie", "npm:2.1.0"],
             ["testcontainers", "npm:7.20.4"],
+            ["tigerbeetle-node", "workspace:packages/tigerbeetle-node"],
             ["tmp", "npm:0.2.1"],
             ["typescript", "patch:typescript@npm%3A4.2.4#~builtin<compat/typescript>::version=4.2.4&hash=32657b"],
             ["uuid", "npm:8.3.2"]
@@ -16948,6 +16954,15 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["readable-stream", "npm:3.6.0"]
           ],
           "linkType": "HARD",
+        }]
+      ]],
+      ["tigerbeetle-node", [
+        ["workspace:packages/tigerbeetle-node", {
+          "packageLocation": "./packages/tigerbeetle-node/",
+          "packageDependencies": [
+            ["tigerbeetle-node", "workspace:packages/tigerbeetle-node"]
+          ],
+          "linkType": "SOFT",
         }]
       ]],
       ["tildify", [
