@@ -25,7 +25,7 @@ export async function startTigerbeetleContainer(
     .withWaitStrategy(Wait.forLogMessage(/initialized data file/))
     .start()
 
-  return await new GenericContainer(
+  const tigerbeetleContainer = await new GenericContainer(
     'ghcr.io/coilhq/tigerbeetle@sha256:0d8cd6b7a0a7f7ef678c6fc877f294071ead642698db2a438a6599a3ade8fb6f'
   )
     .withExposedPorts(TIGERBEETLE_PORT)
@@ -39,4 +39,12 @@ export async function startTigerbeetleContainer(
     ])
     .withWaitStrategy(Wait.forLogMessage(/listening on/))
     .start()
+
+  const stream = await tigerbeetleContainer.logs()
+  stream
+    .on('data', (line) => console.log(line))
+    .on('err', (line) => console.error(line))
+    .on('end', () => console.log('Stream closed'))
+
+  return tigerbeetleContainer
 }
