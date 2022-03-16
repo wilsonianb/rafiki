@@ -15,5 +15,6 @@ module.exports = {
   modulePaths: [`<rootDir>/packages/${packageName}/src/`],
   name: packageName,
   displayName: packageName,
+  testTimeout: 60000,
   rootDir: '../..'
 }
