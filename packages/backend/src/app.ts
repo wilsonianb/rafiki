@@ -24,6 +24,11 @@ import { AssetService } from './asset/service'
 import { AccountingService } from './accounting/service'
 import { PeerService } from './peer/service'
 import { AccountService } from './open_payments/account/service'
+import {
+  GrantService,
+  AccessType,
+  AccessAction
+} from './open_payments/grant/service'
 import { RatesService } from './rates/service'
 import { SPSPRoutes } from './spsp/routes'
 import { IncomingPaymentRoutes } from './open_payments/payment/incoming/routes'
@@ -70,6 +75,7 @@ export interface AppServices {
   accountingService: Promise<AccountingService>
   peerService: Promise<PeerService>
   accountService: Promise<AccountService>
+  grantService: Promise<GrantService>
   spspRoutes: Promise<SPSPRoutes>
   IncomingPaymentRoutes: Promise<IncomingPaymentRoutes>
   accountRoutes: Promise<AccountRoutes>
@@ -232,6 +238,43 @@ export class App {
     }
   }
 
+  private async _openPaymentsAuth({
+    type,
+    actions
+  }: {
+    type: AccessType
+    actions: AccessAction[]
+  }) {
+    const grantService = await this.container.use('grantService')
+    return async (
+      ctx: Koa.Context,
+      next: () => Promise<unknown>
+    ): Promise<void> => {
+      if (
+        !ctx.request.headers.authorization ||
+        ctx.request.headers.authorization.split(' ')[0] !== 'GNAP'
+      ) {
+        return ctx.throw(401, 'Unauthorized')
+      }
+      const token = ctx.request.headers.authorization.split(' ')[1]
+      const grant = await grantService.get(token)
+      if (!grant || !grant.active) {
+        // TODO: WWW-Authenticate
+        ctx.throw(401, 'Invalid Token')
+      }
+      if (
+        !grant.includesAccess({
+          type,
+          location: ctx.request.url,
+          actions
+        })
+      ) {
+        ctx.throw(403, 'Insufficient Grant')
+      }
+      await next()
+    }
+  }
+
   private async _setupRoutes(): Promise<void> {
     this.publicRouter.use(bodyParser())
     this.publicRouter.get('/healthz', (ctx: AppContext): void => {
@@ -273,6 +316,19 @@ export class App {
     )
     this.publicRouter.post(
       '/pay/:accountId/outgoing-payments',
+      async (ctx) => {
+        const actions = [AccessAction.Create]
+        if (
+          typeof ctx.request.body === 'object' &&
+          ctx.request.body.authorized === 'true'
+        ) {
+          actions.push(AccessAction.Authorize)
+        }
+        return this._openPaymentsAuth({
+          type: AccessType.OutgoingPayment,
+          actions
+        })
+      },
       outgoingPaymentRoutes.create
     )
 
