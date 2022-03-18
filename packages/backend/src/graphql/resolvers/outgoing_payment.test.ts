@@ -24,7 +24,6 @@ import {
   OutgoingPayment as OutgoingPaymentModel,
   PaymentState
 } from '../../open_payments/payment/outgoing/model'
-import { AccountingService } from '../../accounting/service'
 import { AccountService } from '../../open_payments/account/service'
 import {
   OutgoingPayment,
@@ -37,7 +36,6 @@ describe('OutgoingPayment Resolvers', (): void => {
   let deps: IocContract<AppServices>
   let appContainer: TestContainer
   let knex: Knex
-  let accountingService: AccountingService
   let outgoingPaymentService: OutgoingPaymentService
   let accountService: AccountService
 
@@ -59,7 +57,6 @@ describe('OutgoingPayment Resolvers', (): void => {
       deps = await initIocContainer(Config)
       appContainer = await createTestApp(deps)
       knex = await deps.use('knex')
-      accountingService = await deps.use('accountingService')
       outgoingPaymentService = await deps.use('outgoingPaymentService')
       accountService = await deps.use('accountService')
     }
@@ -173,20 +170,15 @@ describe('OutgoingPayment Resolvers', (): void => {
         test.each(states)(
           '200 - %s, error: %s',
           async (state, error): Promise<void> => {
-            const amountSent = BigInt(78)
+            const sentAmount = BigInt(78)
             jest
               .spyOn(outgoingPaymentService, 'get')
               .mockImplementation(async () => {
                 const updatedPayment = payment
                 updatedPayment.state = state
                 updatedPayment.error = error
+                updatedPayment.sentAmount = sentAmount
                 return updatedPayment
-              })
-            jest
-              .spyOn(accountingService, 'getTotalSent')
-              .mockImplementation(async (id: string) => {
-                expect(id).toStrictEqual(payment.id)
-                return amountSent
               })
 
             const query = await appContainer.apolloClient
@@ -223,9 +215,7 @@ describe('OutgoingPayment Resolvers', (): void => {
                         lowExchangeRateEstimate
                         highExchangeRateEstimate
                       }
-                      outcome {
-                        amountSent
-                      }
+                      sentAmount
                       createdAt
                     }
                   }
@@ -276,10 +266,7 @@ describe('OutgoingPayment Resolvers', (): void => {
               highExchangeRateEstimate: payment.quote?.highExchangeRateEstimate.valueOf(),
               __typename: 'PaymentQuote'
             })
-            expect(query.outcome).toEqual({
-              amountSent: amountSent.toString(),
-              __typename: 'OutgoingPaymentOutcome'
-            })
+            expect(query.sentAmount).toEqual(sentAmount.toString())
             expect(new Date(query.createdAt)).toEqual(payment.createdAt)
           }
         )

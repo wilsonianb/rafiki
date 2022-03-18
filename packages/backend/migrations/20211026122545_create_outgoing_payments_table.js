@@ -30,6 +30,8 @@ exports.up = function (knex) {
     table.bigInteger('quoteHighExchangeRateEstimateNumerator').nullable()
     table.bigInteger('quoteHighExchangeRateEstimateDenominator').nullable()
 
+    table.bigInteger('sentAmount').defaultTo(0)
+
     // Open payments account corresponding to wallet account
     // from which to request funds for payment
     table.uuid('accountId').notNullable()
