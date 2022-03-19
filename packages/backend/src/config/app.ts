@@ -80,6 +80,11 @@ export const Config = {
 
   signatureVersion: envInt('SIGNATURE_VERSION', 1),
 
+  tokenIntrospectionUrl: envString(
+    'TOKEN_INTROSPECTION_URL',
+    'http://127.0.0.1:3003/introspect'
+  ),
+
   /** Frontend **/
   frontendUrl: envString('FRONTEND_URL', 'http://localhost:3000')
 }
