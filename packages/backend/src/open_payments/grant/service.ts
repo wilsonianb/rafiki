@@ -112,7 +112,7 @@ export interface Amount {
   assetScale?: number
 }
 
-interface AmountJson {
+interface AmountJSON {
   amount: string
   assetCode?: string
   assetScale?: number
@@ -141,14 +141,14 @@ export interface AccessLimits {
   receiveAmount?: Amount
 }
 
-interface AccessLimitsJson {
+interface AccessLimitsJSON {
   interval?: string
   startAt?: string
   expiresAt?: string
   receivingAccount?: string
   receivingPayment?: string
-  sendAmount?: AmountJson
-  receiveAmount?: AmountJson
+  sendAmount?: AmountJSON
+  receiveAmount?: AmountJSON
 }
 
 export interface GrantAccess {
@@ -159,16 +159,16 @@ export interface GrantAccess {
 }
 
 type GrantAccessJson = Omit<GrantAccess, 'limits'> & {
-  limits?: AccessLimitsJson
+  limits?: AccessLimitsJSON
 }
 
-interface GrantOptions {
+export interface GrantOptions {
   active: boolean
   grant: string
   access?: GrantAccess[]
 }
 
-type GrantJson = Omit<GrantOptions, 'access'> & {
+type GrantJSON = Omit<GrantOptions, 'access'> & {
   access?: GrantAccessJson[]
 }
 
@@ -254,7 +254,7 @@ export class Grant {
     })
   }
 
-  public toJSON(): GrantJson {
+  public toJSON(): GrantJSON {
     return {
       active: this.active,
       grant: this.grant,
