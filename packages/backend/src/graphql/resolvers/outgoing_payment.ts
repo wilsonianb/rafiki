@@ -159,7 +159,7 @@ export const getOutgoingPaymentPageInfo: OutgoingPaymentConnectionResolvers<Apol
 
 export function paymentToGraphql(
   payment: OutgoingPayment
-): Omit<SchemaOutgoingPayment, 'outcome' | 'account'> {
+): Omit<SchemaOutgoingPayment, 'outcome'> {
   return {
     id: payment.id,
     accountId: payment.accountId,
