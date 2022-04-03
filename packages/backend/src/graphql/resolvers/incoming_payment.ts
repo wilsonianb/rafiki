@@ -22,21 +22,18 @@ export const getAccountIncomingPayments: AccountResolvers<ApolloContext>['incomi
   )
 
   return {
-    edges: incomingPayments.map(
-      (incomingPayment: IncomingPayment) =>
-        new Promise.resolve({
-          cursor: incomingPayment.id,
-          node: {
-            ...incomingPayment,
-            receivedAmount: {
-              assetCode: incomingPayment.asset.code,
-              assetScale: incomingPayment.asset.scale
-            },
-            expiresAt: incomingPayment.expiresAt.toISOString(),
-            createdAt: incomingPayment.createdAt?.toISOString()
-          }
-        })
-    )
+    edges: incomingPayments.map((incomingPayment: IncomingPayment) => ({
+      cursor: incomingPayment.id,
+      node: {
+        ...incomingPayment,
+        receivedAmount: {
+          assetCode: incomingPayment.asset.code,
+          assetScale: incomingPayment.asset.scale
+        },
+        expiresAt: incomingPayment.expiresAt.toISOString(),
+        createdAt: incomingPayment.createdAt?.toISOString()
+      }
+    }))
   }
 }
 
