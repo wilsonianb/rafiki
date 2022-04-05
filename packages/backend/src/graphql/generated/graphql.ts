@@ -1,4 +1,5 @@
 import { GraphQLResolveInfo, GraphQLScalarType, GraphQLScalarTypeConfig } from 'graphql';
+import { DeepPartial } from 'utility-types';
 export type Maybe<T> = T | undefined;
 export type Exact<T extends { [key: string]: unknown }> = { [K in keyof T]: T[K] };
 export type MakeOptional<T, K extends keyof T> = Omit<T, K> & { [SubKey in K]?: Maybe<T[SubKey]> };
@@ -248,11 +249,21 @@ export type HttpOutgoingInput = {
 export type IncomingPayment = Model & {
   __typename?: 'IncomingPayment';
   id: Scalars['ID'];
-  active: Scalars['Boolean'];
-  createdAt: Scalars['String'];
+  accountId: Scalars['ID'];
+  state: IncomingPaymentState;
   expiresAt: Scalars['String'];
+  incomingAmount?: Maybe<IncomingPaymentAmount>;
+  receivedAmount: IncomingPaymentAmount;
   description?: Maybe<Scalars['String']>;
+  externalRef?: Maybe<Scalars['String']>;
+  createdAt: Scalars['String'];
+};
+
+export type IncomingPaymentAmount = {
+  __typename?: 'IncomingPaymentAmount';
   amount: Scalars['UInt64'];
+  assetCode: Scalars['String'];
+  assetScale: Scalars['Int'];
 };
 
 export type IncomingPaymentConnection = {
@@ -266,6 +277,17 @@ export type IncomingPaymentEdge = {
   node: IncomingPayment;
   cursor: Scalars['String'];
 };
+
+export enum IncomingPaymentState {
+  /** The payment has a state of PENDING when it is initially created. */
+  Pending = 'PENDING',
+  /** As soon as payment has started (funds have cleared into the account) the state moves to PROCESSING */
+  Processing = 'PROCESSING',
+  /** The payment is either auto-completed once the received amount equals the expected `incomingAmount.amount`, or it is completed manually via an API call. */
+  Completed = 'COMPLETED',
+  /** If the payment expires before it is completed then the state will move to EXPIRED and no further payments will be accepted. */
+  Expired = 'EXPIRED'
+}
 
 export enum LiquidityError {
   AlreadyCommitted = 'AlreadyCommitted',
@@ -472,13 +494,13 @@ export type OutgoingPayment = Model & {
   __typename?: 'OutgoingPayment';
   id: Scalars['ID'];
   accountId: Scalars['ID'];
-  state: PaymentState;
+  state: OutgoingPaymentState;
   authorized: Scalars['Boolean'];
   error?: Maybe<Scalars['String']>;
   stateAttempts: Scalars['Int'];
   receivingAccount?: Maybe<Scalars['String']>;
-  sendAmount?: Maybe<PaymentAmount>;
-  receiveAmount?: Maybe<PaymentAmount>;
+  sendAmount?: Maybe<OutgoingPaymentAmount>;
+  receiveAmount?: Maybe<OutgoingPaymentAmount>;
   receivingPayment?: Maybe<Scalars['String']>;
   description?: Maybe<Scalars['String']>;
   externalRef?: Maybe<Scalars['String']>;
@@ -486,6 +508,13 @@ export type OutgoingPayment = Model & {
   quote?: Maybe<PaymentQuote>;
   outcome?: Maybe<OutgoingPaymentOutcome>;
   createdAt: Scalars['String'];
+};
+
+export type OutgoingPaymentAmount = {
+  __typename?: 'OutgoingPaymentAmount';
+  amount: Scalars['UInt64'];
+  assetCode?: Maybe<Scalars['String']>;
+  assetScale?: Maybe<Scalars['Int']>;
 };
 
 export type OutgoingPaymentConnection = {
@@ -513,6 +542,23 @@ export type OutgoingPaymentResponse = {
   payment?: Maybe<OutgoingPayment>;
 };
 
+export enum OutgoingPaymentState {
+  /** Will transition to PREPARED or FUNDING (if already authorized) when quote is complete */
+  Pending = 'PENDING',
+  /** Will transition to FUNDING once authorized */
+  Prepared = 'PREPARED',
+  /** Will transition to SENDING once payment funds are reserved */
+  Funding = 'FUNDING',
+  /** Paying, will transition to COMPLETED on success */
+  Sending = 'SENDING',
+  /** Successful completion */
+  Completed = 'COMPLETED',
+  /** Payment quote expired; can be requoted to PENDING */
+  Expired = 'EXPIRED',
+  /** Payment failed */
+  Failed = 'FAILED'
+}
+
 export type PageInfo = {
   __typename?: 'PageInfo';
   /** Paginating forwards: the cursor to continue. */
@@ -523,13 +569,6 @@ export type PageInfo = {
   hasPreviousPage: Scalars['Boolean'];
   /** Paginating backwards: the cursor to continue. */
   startCursor?: Maybe<Scalars['String']>;
-};
-
-export type PaymentAmount = {
-  __typename?: 'PaymentAmount';
-  amount: Scalars['UInt64'];
-  assetCode?: Maybe<Scalars['String']>;
-  assetScale?: Maybe<Scalars['Int']>;
 };
 
 export type PaymentAmountInput = {
@@ -547,23 +586,6 @@ export type PaymentQuote = {
   lowExchangeRateEstimate: Scalars['Float'];
   highExchangeRateEstimate: Scalars['Float'];
 };
-
-export enum PaymentState {
-  /** Will transition to PREPARED or FUNDING (if already authorized) when quote is complete */
-  Pending = 'PENDING',
-  /** Will transition to FUNDING once authorized */
-  Prepared = 'PREPARED',
-  /** Will transition to SENDING once payment funds are reserved */
-  Funding = 'FUNDING',
-  /** Paying, will transition to COMPLETED on success */
-  Sending = 'SENDING',
-  /** Successful completion */
-  Completed = 'COMPLETED',
-  /** Payment quote expired; can be requoted to PENDING */
-  Expired = 'EXPIRED',
-  /** Payment failed */
-  Failed = 'FAILED'
-}
 
 export enum PaymentType {
   FixedSend = 'FIXED_SEND',
@@ -800,149 +822,152 @@ export type DirectiveResolverFn<TResult = {}, TParent = {}, TContext = {}, TArgs
 
 /** Mapping between all available schema types and the resolvers types */
 export type ResolversTypes = {
-  Account: ResolverTypeWrapper<Partial<Account>>;
-  ID: ResolverTypeWrapper<Partial<Scalars['ID']>>;
-  String: ResolverTypeWrapper<Partial<Scalars['String']>>;
-  Int: ResolverTypeWrapper<Partial<Scalars['Int']>>;
-  AccountWithdrawal: ResolverTypeWrapper<Partial<AccountWithdrawal>>;
-  AccountWithdrawalMutationResponse: ResolverTypeWrapper<Partial<AccountWithdrawalMutationResponse>>;
-  Boolean: ResolverTypeWrapper<Partial<Scalars['Boolean']>>;
-  AddAssetLiquidityInput: ResolverTypeWrapper<Partial<AddAssetLiquidityInput>>;
-  AddPeerLiquidityInput: ResolverTypeWrapper<Partial<AddPeerLiquidityInput>>;
-  ApiKey: ResolverTypeWrapper<Partial<ApiKey>>;
-  Asset: ResolverTypeWrapper<Partial<Asset>>;
-  AssetEdge: ResolverTypeWrapper<Partial<AssetEdge>>;
-  AssetInput: ResolverTypeWrapper<Partial<AssetInput>>;
-  AssetMutationResponse: ResolverTypeWrapper<Partial<AssetMutationResponse>>;
-  AssetsConnection: ResolverTypeWrapper<Partial<AssetsConnection>>;
-  CreateAccountInput: ResolverTypeWrapper<Partial<CreateAccountInput>>;
-  CreateAccountMutationResponse: ResolverTypeWrapper<Partial<CreateAccountMutationResponse>>;
-  CreateAccountWithdrawalInput: ResolverTypeWrapper<Partial<CreateAccountWithdrawalInput>>;
-  CreateApiKeyInput: ResolverTypeWrapper<Partial<CreateApiKeyInput>>;
-  CreateApiKeyMutationResponse: ResolverTypeWrapper<Partial<CreateApiKeyMutationResponse>>;
-  CreateAssetInput: ResolverTypeWrapper<Partial<CreateAssetInput>>;
-  CreateAssetLiquidityWithdrawalInput: ResolverTypeWrapper<Partial<CreateAssetLiquidityWithdrawalInput>>;
-  CreateOutgoingPaymentInput: ResolverTypeWrapper<Partial<CreateOutgoingPaymentInput>>;
-  CreatePeerInput: ResolverTypeWrapper<Partial<CreatePeerInput>>;
-  CreatePeerLiquidityWithdrawalInput: ResolverTypeWrapper<Partial<CreatePeerLiquidityWithdrawalInput>>;
-  CreatePeerMutationResponse: ResolverTypeWrapper<Partial<CreatePeerMutationResponse>>;
-  DeleteAllApiKeysInput: ResolverTypeWrapper<Partial<DeleteAllApiKeysInput>>;
-  DeleteAllApiKeysMutationResponse: ResolverTypeWrapper<Partial<DeleteAllApiKeysMutationResponse>>;
-  DeletePeerMutationResponse: ResolverTypeWrapper<Partial<DeletePeerMutationResponse>>;
-  Http: ResolverTypeWrapper<Partial<Http>>;
-  HttpIncomingInput: ResolverTypeWrapper<Partial<HttpIncomingInput>>;
-  HttpInput: ResolverTypeWrapper<Partial<HttpInput>>;
-  HttpOutgoing: ResolverTypeWrapper<Partial<HttpOutgoing>>;
-  HttpOutgoingInput: ResolverTypeWrapper<Partial<HttpOutgoingInput>>;
-  IncomingPayment: ResolverTypeWrapper<Partial<IncomingPayment>>;
-  IncomingPaymentConnection: ResolverTypeWrapper<Partial<IncomingPaymentConnection>>;
-  IncomingPaymentEdge: ResolverTypeWrapper<Partial<IncomingPaymentEdge>>;
-  LiquidityError: ResolverTypeWrapper<Partial<LiquidityError>>;
-  LiquidityMutationResponse: ResolverTypeWrapper<Partial<LiquidityMutationResponse>>;
+  Account: ResolverTypeWrapper<DeepPartial<Account>>;
+  ID: ResolverTypeWrapper<DeepPartial<Scalars['ID']>>;
+  String: ResolverTypeWrapper<DeepPartial<Scalars['String']>>;
+  Int: ResolverTypeWrapper<DeepPartial<Scalars['Int']>>;
+  AccountWithdrawal: ResolverTypeWrapper<DeepPartial<AccountWithdrawal>>;
+  AccountWithdrawalMutationResponse: ResolverTypeWrapper<DeepPartial<AccountWithdrawalMutationResponse>>;
+  Boolean: ResolverTypeWrapper<DeepPartial<Scalars['Boolean']>>;
+  AddAssetLiquidityInput: ResolverTypeWrapper<DeepPartial<AddAssetLiquidityInput>>;
+  AddPeerLiquidityInput: ResolverTypeWrapper<DeepPartial<AddPeerLiquidityInput>>;
+  ApiKey: ResolverTypeWrapper<DeepPartial<ApiKey>>;
+  Asset: ResolverTypeWrapper<DeepPartial<Asset>>;
+  AssetEdge: ResolverTypeWrapper<DeepPartial<AssetEdge>>;
+  AssetInput: ResolverTypeWrapper<DeepPartial<AssetInput>>;
+  AssetMutationResponse: ResolverTypeWrapper<DeepPartial<AssetMutationResponse>>;
+  AssetsConnection: ResolverTypeWrapper<DeepPartial<AssetsConnection>>;
+  CreateAccountInput: ResolverTypeWrapper<DeepPartial<CreateAccountInput>>;
+  CreateAccountMutationResponse: ResolverTypeWrapper<DeepPartial<CreateAccountMutationResponse>>;
+  CreateAccountWithdrawalInput: ResolverTypeWrapper<DeepPartial<CreateAccountWithdrawalInput>>;
+  CreateApiKeyInput: ResolverTypeWrapper<DeepPartial<CreateApiKeyInput>>;
+  CreateApiKeyMutationResponse: ResolverTypeWrapper<DeepPartial<CreateApiKeyMutationResponse>>;
+  CreateAssetInput: ResolverTypeWrapper<DeepPartial<CreateAssetInput>>;
+  CreateAssetLiquidityWithdrawalInput: ResolverTypeWrapper<DeepPartial<CreateAssetLiquidityWithdrawalInput>>;
+  CreateOutgoingPaymentInput: ResolverTypeWrapper<DeepPartial<CreateOutgoingPaymentInput>>;
+  CreatePeerInput: ResolverTypeWrapper<DeepPartial<CreatePeerInput>>;
+  CreatePeerLiquidityWithdrawalInput: ResolverTypeWrapper<DeepPartial<CreatePeerLiquidityWithdrawalInput>>;
+  CreatePeerMutationResponse: ResolverTypeWrapper<DeepPartial<CreatePeerMutationResponse>>;
+  DeleteAllApiKeysInput: ResolverTypeWrapper<DeepPartial<DeleteAllApiKeysInput>>;
+  DeleteAllApiKeysMutationResponse: ResolverTypeWrapper<DeepPartial<DeleteAllApiKeysMutationResponse>>;
+  DeletePeerMutationResponse: ResolverTypeWrapper<DeepPartial<DeletePeerMutationResponse>>;
+  Http: ResolverTypeWrapper<DeepPartial<Http>>;
+  HttpIncomingInput: ResolverTypeWrapper<DeepPartial<HttpIncomingInput>>;
+  HttpInput: ResolverTypeWrapper<DeepPartial<HttpInput>>;
+  HttpOutgoing: ResolverTypeWrapper<DeepPartial<HttpOutgoing>>;
+  HttpOutgoingInput: ResolverTypeWrapper<DeepPartial<HttpOutgoingInput>>;
+  IncomingPayment: ResolverTypeWrapper<DeepPartial<IncomingPayment>>;
+  IncomingPaymentAmount: ResolverTypeWrapper<DeepPartial<IncomingPaymentAmount>>;
+  IncomingPaymentConnection: ResolverTypeWrapper<DeepPartial<IncomingPaymentConnection>>;
+  IncomingPaymentEdge: ResolverTypeWrapper<DeepPartial<IncomingPaymentEdge>>;
+  IncomingPaymentState: ResolverTypeWrapper<DeepPartial<IncomingPaymentState>>;
+  LiquidityError: ResolverTypeWrapper<DeepPartial<LiquidityError>>;
+  LiquidityMutationResponse: ResolverTypeWrapper<DeepPartial<LiquidityMutationResponse>>;
   Model: ResolversTypes['Account'] | ResolversTypes['ApiKey'] | ResolversTypes['Asset'] | ResolversTypes['IncomingPayment'] | ResolversTypes['OutgoingPayment'] | ResolversTypes['Peer'];
   Mutation: ResolverTypeWrapper<{}>;
   MutationResponse: ResolversTypes['AccountWithdrawalMutationResponse'] | ResolversTypes['AssetMutationResponse'] | ResolversTypes['CreateAccountMutationResponse'] | ResolversTypes['CreateApiKeyMutationResponse'] | ResolversTypes['CreatePeerMutationResponse'] | ResolversTypes['DeleteAllApiKeysMutationResponse'] | ResolversTypes['DeletePeerMutationResponse'] | ResolversTypes['LiquidityMutationResponse'] | ResolversTypes['RedeemApiKeyMutationResponse'] | ResolversTypes['RefreshSessionMutationResponse'] | ResolversTypes['RevokeSessionMutationResponse'] | ResolversTypes['TransferMutationResponse'] | ResolversTypes['TriggerAccountEventsMutationResponse'] | ResolversTypes['UpdatePeerMutationResponse'];
-  OutgoingPayment: ResolverTypeWrapper<Partial<OutgoingPayment>>;
-  OutgoingPaymentConnection: ResolverTypeWrapper<Partial<OutgoingPaymentConnection>>;
-  OutgoingPaymentEdge: ResolverTypeWrapper<Partial<OutgoingPaymentEdge>>;
-  OutgoingPaymentOutcome: ResolverTypeWrapper<Partial<OutgoingPaymentOutcome>>;
-  OutgoingPaymentResponse: ResolverTypeWrapper<Partial<OutgoingPaymentResponse>>;
-  PageInfo: ResolverTypeWrapper<Partial<PageInfo>>;
-  PaymentAmount: ResolverTypeWrapper<Partial<PaymentAmount>>;
-  PaymentAmountInput: ResolverTypeWrapper<Partial<PaymentAmountInput>>;
-  PaymentQuote: ResolverTypeWrapper<Partial<PaymentQuote>>;
-  Float: ResolverTypeWrapper<Partial<Scalars['Float']>>;
-  PaymentState: ResolverTypeWrapper<Partial<PaymentState>>;
-  PaymentType: ResolverTypeWrapper<Partial<PaymentType>>;
-  Peer: ResolverTypeWrapper<Partial<Peer>>;
-  PeerEdge: ResolverTypeWrapper<Partial<PeerEdge>>;
-  PeersConnection: ResolverTypeWrapper<Partial<PeersConnection>>;
+  OutgoingPayment: ResolverTypeWrapper<DeepPartial<OutgoingPayment>>;
+  OutgoingPaymentAmount: ResolverTypeWrapper<DeepPartial<OutgoingPaymentAmount>>;
+  OutgoingPaymentConnection: ResolverTypeWrapper<DeepPartial<OutgoingPaymentConnection>>;
+  OutgoingPaymentEdge: ResolverTypeWrapper<DeepPartial<OutgoingPaymentEdge>>;
+  OutgoingPaymentOutcome: ResolverTypeWrapper<DeepPartial<OutgoingPaymentOutcome>>;
+  OutgoingPaymentResponse: ResolverTypeWrapper<DeepPartial<OutgoingPaymentResponse>>;
+  OutgoingPaymentState: ResolverTypeWrapper<DeepPartial<OutgoingPaymentState>>;
+  PageInfo: ResolverTypeWrapper<DeepPartial<PageInfo>>;
+  PaymentAmountInput: ResolverTypeWrapper<DeepPartial<PaymentAmountInput>>;
+  PaymentQuote: ResolverTypeWrapper<DeepPartial<PaymentQuote>>;
+  Float: ResolverTypeWrapper<DeepPartial<Scalars['Float']>>;
+  PaymentType: ResolverTypeWrapper<DeepPartial<PaymentType>>;
+  Peer: ResolverTypeWrapper<DeepPartial<Peer>>;
+  PeerEdge: ResolverTypeWrapper<DeepPartial<PeerEdge>>;
+  PeersConnection: ResolverTypeWrapper<DeepPartial<PeersConnection>>;
   Query: ResolverTypeWrapper<{}>;
-  RedeemApiKeyInput: ResolverTypeWrapper<Partial<RedeemApiKeyInput>>;
-  RedeemApiKeyMutationResponse: ResolverTypeWrapper<Partial<RedeemApiKeyMutationResponse>>;
-  RefreshSessionInput: ResolverTypeWrapper<Partial<RefreshSessionInput>>;
-  RefreshSessionMutationResponse: ResolverTypeWrapper<Partial<RefreshSessionMutationResponse>>;
-  RevokeSessionInput: ResolverTypeWrapper<Partial<RevokeSessionInput>>;
-  RevokeSessionMutationResponse: ResolverTypeWrapper<Partial<RevokeSessionMutationResponse>>;
-  Session: ResolverTypeWrapper<Partial<Session>>;
-  TransferMutationResponse: ResolverTypeWrapper<Partial<TransferMutationResponse>>;
-  TriggerAccountEventsMutationResponse: ResolverTypeWrapper<Partial<TriggerAccountEventsMutationResponse>>;
-  UInt64: ResolverTypeWrapper<Partial<Scalars['UInt64']>>;
-  UpdateAssetInput: ResolverTypeWrapper<Partial<UpdateAssetInput>>;
-  UpdatePeerInput: ResolverTypeWrapper<Partial<UpdatePeerInput>>;
-  UpdatePeerMutationResponse: ResolverTypeWrapper<Partial<UpdatePeerMutationResponse>>;
+  RedeemApiKeyInput: ResolverTypeWrapper<DeepPartial<RedeemApiKeyInput>>;
+  RedeemApiKeyMutationResponse: ResolverTypeWrapper<DeepPartial<RedeemApiKeyMutationResponse>>;
+  RefreshSessionInput: ResolverTypeWrapper<DeepPartial<RefreshSessionInput>>;
+  RefreshSessionMutationResponse: ResolverTypeWrapper<DeepPartial<RefreshSessionMutationResponse>>;
+  RevokeSessionInput: ResolverTypeWrapper<DeepPartial<RevokeSessionInput>>;
+  RevokeSessionMutationResponse: ResolverTypeWrapper<DeepPartial<RevokeSessionMutationResponse>>;
+  Session: ResolverTypeWrapper<DeepPartial<Session>>;
+  TransferMutationResponse: ResolverTypeWrapper<DeepPartial<TransferMutationResponse>>;
+  TriggerAccountEventsMutationResponse: ResolverTypeWrapper<DeepPartial<TriggerAccountEventsMutationResponse>>;
+  UInt64: ResolverTypeWrapper<DeepPartial<Scalars['UInt64']>>;
+  UpdateAssetInput: ResolverTypeWrapper<DeepPartial<UpdateAssetInput>>;
+  UpdatePeerInput: ResolverTypeWrapper<DeepPartial<UpdatePeerInput>>;
+  UpdatePeerMutationResponse: ResolverTypeWrapper<DeepPartial<UpdatePeerMutationResponse>>;
 };
 
 /** Mapping between all available schema types and the resolvers parents */
 export type ResolversParentTypes = {
-  Account: Partial<Account>;
-  ID: Partial<Scalars['ID']>;
-  String: Partial<Scalars['String']>;
-  Int: Partial<Scalars['Int']>;
-  AccountWithdrawal: Partial<AccountWithdrawal>;
-  AccountWithdrawalMutationResponse: Partial<AccountWithdrawalMutationResponse>;
-  Boolean: Partial<Scalars['Boolean']>;
-  AddAssetLiquidityInput: Partial<AddAssetLiquidityInput>;
-  AddPeerLiquidityInput: Partial<AddPeerLiquidityInput>;
-  ApiKey: Partial<ApiKey>;
-  Asset: Partial<Asset>;
-  AssetEdge: Partial<AssetEdge>;
-  AssetInput: Partial<AssetInput>;
-  AssetMutationResponse: Partial<AssetMutationResponse>;
-  AssetsConnection: Partial<AssetsConnection>;
-  CreateAccountInput: Partial<CreateAccountInput>;
-  CreateAccountMutationResponse: Partial<CreateAccountMutationResponse>;
-  CreateAccountWithdrawalInput: Partial<CreateAccountWithdrawalInput>;
-  CreateApiKeyInput: Partial<CreateApiKeyInput>;
-  CreateApiKeyMutationResponse: Partial<CreateApiKeyMutationResponse>;
-  CreateAssetInput: Partial<CreateAssetInput>;
-  CreateAssetLiquidityWithdrawalInput: Partial<CreateAssetLiquidityWithdrawalInput>;
-  CreateOutgoingPaymentInput: Partial<CreateOutgoingPaymentInput>;
-  CreatePeerInput: Partial<CreatePeerInput>;
-  CreatePeerLiquidityWithdrawalInput: Partial<CreatePeerLiquidityWithdrawalInput>;
-  CreatePeerMutationResponse: Partial<CreatePeerMutationResponse>;
-  DeleteAllApiKeysInput: Partial<DeleteAllApiKeysInput>;
-  DeleteAllApiKeysMutationResponse: Partial<DeleteAllApiKeysMutationResponse>;
-  DeletePeerMutationResponse: Partial<DeletePeerMutationResponse>;
-  Http: Partial<Http>;
-  HttpIncomingInput: Partial<HttpIncomingInput>;
-  HttpInput: Partial<HttpInput>;
-  HttpOutgoing: Partial<HttpOutgoing>;
-  HttpOutgoingInput: Partial<HttpOutgoingInput>;
-  IncomingPayment: Partial<IncomingPayment>;
-  IncomingPaymentConnection: Partial<IncomingPaymentConnection>;
-  IncomingPaymentEdge: Partial<IncomingPaymentEdge>;
-  LiquidityMutationResponse: Partial<LiquidityMutationResponse>;
+  Account: DeepPartial<Account>;
+  ID: DeepPartial<Scalars['ID']>;
+  String: DeepPartial<Scalars['String']>;
+  Int: DeepPartial<Scalars['Int']>;
+  AccountWithdrawal: DeepPartial<AccountWithdrawal>;
+  AccountWithdrawalMutationResponse: DeepPartial<AccountWithdrawalMutationResponse>;
+  Boolean: DeepPartial<Scalars['Boolean']>;
+  AddAssetLiquidityInput: DeepPartial<AddAssetLiquidityInput>;
+  AddPeerLiquidityInput: DeepPartial<AddPeerLiquidityInput>;
+  ApiKey: DeepPartial<ApiKey>;
+  Asset: DeepPartial<Asset>;
+  AssetEdge: DeepPartial<AssetEdge>;
+  AssetInput: DeepPartial<AssetInput>;
+  AssetMutationResponse: DeepPartial<AssetMutationResponse>;
+  AssetsConnection: DeepPartial<AssetsConnection>;
+  CreateAccountInput: DeepPartial<CreateAccountInput>;
+  CreateAccountMutationResponse: DeepPartial<CreateAccountMutationResponse>;
+  CreateAccountWithdrawalInput: DeepPartial<CreateAccountWithdrawalInput>;
+  CreateApiKeyInput: DeepPartial<CreateApiKeyInput>;
+  CreateApiKeyMutationResponse: DeepPartial<CreateApiKeyMutationResponse>;
+  CreateAssetInput: DeepPartial<CreateAssetInput>;
+  CreateAssetLiquidityWithdrawalInput: DeepPartial<CreateAssetLiquidityWithdrawalInput>;
+  CreateOutgoingPaymentInput: DeepPartial<CreateOutgoingPaymentInput>;
+  CreatePeerInput: DeepPartial<CreatePeerInput>;
+  CreatePeerLiquidityWithdrawalInput: DeepPartial<CreatePeerLiquidityWithdrawalInput>;
+  CreatePeerMutationResponse: DeepPartial<CreatePeerMutationResponse>;
+  DeleteAllApiKeysInput: DeepPartial<DeleteAllApiKeysInput>;
+  DeleteAllApiKeysMutationResponse: DeepPartial<DeleteAllApiKeysMutationResponse>;
+  DeletePeerMutationResponse: DeepPartial<DeletePeerMutationResponse>;
+  Http: DeepPartial<Http>;
+  HttpIncomingInput: DeepPartial<HttpIncomingInput>;
+  HttpInput: DeepPartial<HttpInput>;
+  HttpOutgoing: DeepPartial<HttpOutgoing>;
+  HttpOutgoingInput: DeepPartial<HttpOutgoingInput>;
+  IncomingPayment: DeepPartial<IncomingPayment>;
+  IncomingPaymentAmount: DeepPartial<IncomingPaymentAmount>;
+  IncomingPaymentConnection: DeepPartial<IncomingPaymentConnection>;
+  IncomingPaymentEdge: DeepPartial<IncomingPaymentEdge>;
+  LiquidityMutationResponse: DeepPartial<LiquidityMutationResponse>;
   Model: ResolversParentTypes['Account'] | ResolversParentTypes['ApiKey'] | ResolversParentTypes['Asset'] | ResolversParentTypes['IncomingPayment'] | ResolversParentTypes['OutgoingPayment'] | ResolversParentTypes['Peer'];
   Mutation: {};
   MutationResponse: ResolversParentTypes['AccountWithdrawalMutationResponse'] | ResolversParentTypes['AssetMutationResponse'] | ResolversParentTypes['CreateAccountMutationResponse'] | ResolversParentTypes['CreateApiKeyMutationResponse'] | ResolversParentTypes['CreatePeerMutationResponse'] | ResolversParentTypes['DeleteAllApiKeysMutationResponse'] | ResolversParentTypes['DeletePeerMutationResponse'] | ResolversParentTypes['LiquidityMutationResponse'] | ResolversParentTypes['RedeemApiKeyMutationResponse'] | ResolversParentTypes['RefreshSessionMutationResponse'] | ResolversParentTypes['RevokeSessionMutationResponse'] | ResolversParentTypes['TransferMutationResponse'] | ResolversParentTypes['TriggerAccountEventsMutationResponse'] | ResolversParentTypes['UpdatePeerMutationResponse'];
-  OutgoingPayment: Partial<OutgoingPayment>;
-  OutgoingPaymentConnection: Partial<OutgoingPaymentConnection>;
-  OutgoingPaymentEdge: Partial<OutgoingPaymentEdge>;
-  OutgoingPaymentOutcome: Partial<OutgoingPaymentOutcome>;
-  OutgoingPaymentResponse: Partial<OutgoingPaymentResponse>;
-  PageInfo: Partial<PageInfo>;
-  PaymentAmount: Partial<PaymentAmount>;
-  PaymentAmountInput: Partial<PaymentAmountInput>;
-  PaymentQuote: Partial<PaymentQuote>;
-  Float: Partial<Scalars['Float']>;
-  Peer: Partial<Peer>;
-  PeerEdge: Partial<PeerEdge>;
-  PeersConnection: Partial<PeersConnection>;
+  OutgoingPayment: DeepPartial<OutgoingPayment>;
+  OutgoingPaymentAmount: DeepPartial<OutgoingPaymentAmount>;
+  OutgoingPaymentConnection: DeepPartial<OutgoingPaymentConnection>;
+  OutgoingPaymentEdge: DeepPartial<OutgoingPaymentEdge>;
+  OutgoingPaymentOutcome: DeepPartial<OutgoingPaymentOutcome>;
+  OutgoingPaymentResponse: DeepPartial<OutgoingPaymentResponse>;
+  PageInfo: DeepPartial<PageInfo>;
+  PaymentAmountInput: DeepPartial<PaymentAmountInput>;
+  PaymentQuote: DeepPartial<PaymentQuote>;
+  Float: DeepPartial<Scalars['Float']>;
+  Peer: DeepPartial<Peer>;
+  PeerEdge: DeepPartial<PeerEdge>;
+  PeersConnection: DeepPartial<PeersConnection>;
   Query: {};
-  RedeemApiKeyInput: Partial<RedeemApiKeyInput>;
-  RedeemApiKeyMutationResponse: Partial<RedeemApiKeyMutationResponse>;
-  RefreshSessionInput: Partial<RefreshSessionInput>;
-  RefreshSessionMutationResponse: Partial<RefreshSessionMutationResponse>;
-  RevokeSessionInput: Partial<RevokeSessionInput>;
-  RevokeSessionMutationResponse: Partial<RevokeSessionMutationResponse>;
-  Session: Partial<Session>;
-  TransferMutationResponse: Partial<TransferMutationResponse>;
-  TriggerAccountEventsMutationResponse: Partial<TriggerAccountEventsMutationResponse>;
-  UInt64: Partial<Scalars['UInt64']>;
-  UpdateAssetInput: Partial<UpdateAssetInput>;
-  UpdatePeerInput: Partial<UpdatePeerInput>;
-  UpdatePeerMutationResponse: Partial<UpdatePeerMutationResponse>;
+  RedeemApiKeyInput: DeepPartial<RedeemApiKeyInput>;
+  RedeemApiKeyMutationResponse: DeepPartial<RedeemApiKeyMutationResponse>;
+  RefreshSessionInput: DeepPartial<RefreshSessionInput>;
+  RefreshSessionMutationResponse: DeepPartial<RefreshSessionMutationResponse>;
+  RevokeSessionInput: DeepPartial<RevokeSessionInput>;
+  RevokeSessionMutationResponse: DeepPartial<RevokeSessionMutationResponse>;
+  Session: DeepPartial<Session>;
+  TransferMutationResponse: DeepPartial<TransferMutationResponse>;
+  TriggerAccountEventsMutationResponse: DeepPartial<TriggerAccountEventsMutationResponse>;
+  UInt64: DeepPartial<Scalars['UInt64']>;
+  UpdateAssetInput: DeepPartial<UpdateAssetInput>;
+  UpdatePeerInput: DeepPartial<UpdatePeerInput>;
+  UpdatePeerMutationResponse: DeepPartial<UpdatePeerMutationResponse>;
 };
 
 export type AuthDirectiveArgs = {  };
@@ -1067,11 +1092,21 @@ export type HttpOutgoingResolvers<ContextType = any, ParentType extends Resolver
 
 export type IncomingPaymentResolvers<ContextType = any, ParentType extends ResolversParentTypes['IncomingPayment'] = ResolversParentTypes['IncomingPayment']> = {
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
-  active?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
-  createdAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  accountId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  state?: Resolver<ResolversTypes['IncomingPaymentState'], ParentType, ContextType>;
   expiresAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  incomingAmount?: Resolver<Maybe<ResolversTypes['IncomingPaymentAmount']>, ParentType, ContextType>;
+  receivedAmount?: Resolver<ResolversTypes['IncomingPaymentAmount'], ParentType, ContextType>;
   description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  externalRef?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  createdAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type IncomingPaymentAmountResolvers<ContextType = any, ParentType extends ResolversParentTypes['IncomingPaymentAmount'] = ResolversParentTypes['IncomingPaymentAmount']> = {
   amount?: Resolver<ResolversTypes['UInt64'], ParentType, ContextType>;
+  assetCode?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  assetScale?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -1137,13 +1172,13 @@ export type MutationResponseResolvers<ContextType = any, ParentType extends Reso
 export type OutgoingPaymentResolvers<ContextType = any, ParentType extends ResolversParentTypes['OutgoingPayment'] = ResolversParentTypes['OutgoingPayment']> = {
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   accountId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
-  state?: Resolver<ResolversTypes['PaymentState'], ParentType, ContextType>;
+  state?: Resolver<ResolversTypes['OutgoingPaymentState'], ParentType, ContextType>;
   authorized?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   error?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   stateAttempts?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   receivingAccount?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
-  sendAmount?: Resolver<Maybe<ResolversTypes['PaymentAmount']>, ParentType, ContextType>;
-  receiveAmount?: Resolver<Maybe<ResolversTypes['PaymentAmount']>, ParentType, ContextType>;
+  sendAmount?: Resolver<Maybe<ResolversTypes['OutgoingPaymentAmount']>, ParentType, ContextType>;
+  receiveAmount?: Resolver<Maybe<ResolversTypes['OutgoingPaymentAmount']>, ParentType, ContextType>;
   receivingPayment?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   externalRef?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
@@ -1151,6 +1186,13 @@ export type OutgoingPaymentResolvers<ContextType = any, ParentType extends Resol
   quote?: Resolver<Maybe<ResolversTypes['PaymentQuote']>, ParentType, ContextType>;
   outcome?: Resolver<Maybe<ResolversTypes['OutgoingPaymentOutcome']>, ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type OutgoingPaymentAmountResolvers<ContextType = any, ParentType extends ResolversParentTypes['OutgoingPaymentAmount'] = ResolversParentTypes['OutgoingPaymentAmount']> = {
+  amount?: Resolver<ResolversTypes['UInt64'], ParentType, ContextType>;
+  assetCode?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  assetScale?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -1184,13 +1226,6 @@ export type PageInfoResolvers<ContextType = any, ParentType extends ResolversPar
   hasNextPage?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   hasPreviousPage?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   startCursor?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
-  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
-};
-
-export type PaymentAmountResolvers<ContextType = any, ParentType extends ResolversParentTypes['PaymentAmount'] = ResolversParentTypes['PaymentAmount']> = {
-  amount?: Resolver<ResolversTypes['UInt64'], ParentType, ContextType>;
-  assetCode?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
-  assetScale?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -1308,6 +1343,7 @@ export type Resolvers<ContextType = any> = {
   Http?: HttpResolvers<ContextType>;
   HttpOutgoing?: HttpOutgoingResolvers<ContextType>;
   IncomingPayment?: IncomingPaymentResolvers<ContextType>;
+  IncomingPaymentAmount?: IncomingPaymentAmountResolvers<ContextType>;
   IncomingPaymentConnection?: IncomingPaymentConnectionResolvers<ContextType>;
   IncomingPaymentEdge?: IncomingPaymentEdgeResolvers<ContextType>;
   LiquidityMutationResponse?: LiquidityMutationResponseResolvers<ContextType>;
@@ -1315,12 +1351,12 @@ export type Resolvers<ContextType = any> = {
   Mutation?: MutationResolvers<ContextType>;
   MutationResponse?: MutationResponseResolvers<ContextType>;
   OutgoingPayment?: OutgoingPaymentResolvers<ContextType>;
+  OutgoingPaymentAmount?: OutgoingPaymentAmountResolvers<ContextType>;
   OutgoingPaymentConnection?: OutgoingPaymentConnectionResolvers<ContextType>;
   OutgoingPaymentEdge?: OutgoingPaymentEdgeResolvers<ContextType>;
   OutgoingPaymentOutcome?: OutgoingPaymentOutcomeResolvers<ContextType>;
   OutgoingPaymentResponse?: OutgoingPaymentResponseResolvers<ContextType>;
   PageInfo?: PageInfoResolvers<ContextType>;
-  PaymentAmount?: PaymentAmountResolvers<ContextType>;
   PaymentQuote?: PaymentQuoteResolvers<ContextType>;
   Peer?: PeerResolvers<ContextType>;
   PeerEdge?: PeerEdgeResolvers<ContextType>;

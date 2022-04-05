@@ -1392,6 +1392,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@graphql-codegen/add@npm:^3.1.1":
+  version: 3.1.1
+  resolution: "@graphql-codegen/add@npm:3.1.1"
+  dependencies:
+    "@graphql-codegen/plugin-helpers": ^2.3.2
+    tslib: ~2.3.0
+  peerDependencies:
+    graphql: ^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.0 || ^15.0.0 || ^16.0.0
+  checksum: 293ed4b679dfa18ba977a6e159f0760e64bf9e153d139d4b2d6fc21f4438170a516959c7841c766f4187f17b788f569333fb4ab126c151627553724b38183101
+  languageName: node
+  linkType: hard
+
 "@graphql-codegen/cli@npm:1.21.5":
   version: 1.21.5
   resolution: "@graphql-codegen/cli@npm:1.21.5"
@@ -1483,6 +1495,22 @@ __metadata:
   peerDependencies:
     graphql: ^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.0 || ^15.0.0
   checksum: 055228cd4bc84be8e11e0922362972b72156630ad5a6b25219fe5e4e663fa59ac307e12459493d785b02e8e7427bc3f30fba398fb529b342b7e380f53bfd9bae
+  languageName: node
+  linkType: hard
+
+"@graphql-codegen/plugin-helpers@npm:^2.3.2":
+  version: 2.4.2
+  resolution: "@graphql-codegen/plugin-helpers@npm:2.4.2"
+  dependencies:
+    "@graphql-tools/utils": ^8.5.2
+    change-case-all: 1.0.14
+    common-tags: 1.8.2
+    import-from: 4.0.0
+    lodash: ~4.17.0
+    tslib: ~2.3.0
+  peerDependencies:
+    graphql: ^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.0 || ^15.0.0 || ^16.0.0
+  checksum: ad87d71e83a451f4d7a07989b2ae88461ca87cb6a592d17f51c85f57adb41a256f93804aca5907beb2dc11044d8568c45ce2f05b6ce1e2d25cd41d7d9f1332d7
   languageName: node
   linkType: hard
 
@@ -2030,6 +2058,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@graphql-tools/utils@npm:^8.5.2":
+  version: 8.6.5
+  resolution: "@graphql-tools/utils@npm:8.6.5"
+  dependencies:
+    tslib: ~2.3.0
+  peerDependencies:
+    graphql: ^14.0.0 || ^15.0.0 || ^16.0.0
+  checksum: cda451a54fd10d174c16f61c53672f08ebc467912c005f5bd6acc1269c10cc37236d3379eaa9b964c96511323596f14989847ee25d05c921ba9bc9ba55f8bc7b
+  languageName: node
+  linkType: hard
+
 "@graphql-tools/wrap@npm:^7.0.0, @graphql-tools/wrap@npm:^7.0.4, @graphql-tools/wrap@npm:^7.0.6":
   version: 7.0.8
   resolution: "@graphql-tools/wrap@npm:7.0.8"
@@ -2068,9 +2107,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@interledger/pay@npm:^0.3.3":
-  version: 0.3.3
-  resolution: "@interledger/pay@npm:0.3.3"
+"@interledger/pay@npm:0.4.0-alpha.0":
+  version: 0.4.0-alpha.0
+  resolution: "@interledger/pay@npm:0.4.0-alpha.0"
   dependencies:
     abort-controller: ^3.0.0
     ilp-logger: ^1.4.4
@@ -2078,7 +2117,7 @@ __metadata:
     ilp-protocol-stream: ^2.6.4
     long: ^4.0.0
     node-fetch: 2.6.1
-  checksum: c8c819695a87d76b16408037d3d774da5ee33756f18a9488a99a33ac4508cb047bff7573ce2bb9aab9db1c875ec821e23baa58ff3f21487e458e56919e28105b
+  checksum: 70bb37bb81b9519612040149a9d5499c0cbad919297c30b7a993ee6587294ce8c22b66a40f4a8159dc09b44c9e60cae8e5fb92284c509613b395f55ccab66a33
   languageName: node
   linkType: hard
 
@@ -4598,6 +4637,7 @@ __metadata:
     "@adonisjs/fold": ^8.1.0
     "@apollo/client": ^3.3.20
     "@faker-js/faker": ^6.0.0
+    "@graphql-codegen/add": ^3.1.1
     "@graphql-codegen/cli": 1.21.5
     "@graphql-codegen/introspection": 1.18.2
     "@graphql-codegen/typescript": 1.22.2
@@ -4606,7 +4646,7 @@ __metadata:
     "@graphql-tools/load": ^7.1.9
     "@graphql-tools/schema": ^8.1.2
     "@graphql-tools/utils": ^8.5.3
-    "@interledger/pay": ^0.3.3
+    "@interledger/pay": 0.4.0-alpha.0
     "@interledger/stream-receiver": ^0.2.2
     "@koa/cors": ^3.1.0
     "@koa/router": ^10.0.0
@@ -4645,6 +4685,7 @@ __metadata:
     ilp-protocol-ildcp: ^2.2.2
     ilp-protocol-stream: ^2.7.0
     ioredis: ^4.26.0
+    iso8601-duration: ^1.3.0
     knex: ^0.21.17
     koa: ^2.13.1
     koa-bodyparser: ^4.3.0
@@ -4663,6 +4704,7 @@ __metadata:
     tigerbeetle-node: ^0.4.1
     tmp: ^0.2.1
     typescript: ^4.2.4
+    utility-types: ^3.10.0
     uuid: ^8.3.2
   languageName: unknown
   linkType: soft
@@ -5499,6 +5541,13 @@ __metadata:
   version: 1.8.0
   resolution: "common-tags@npm:1.8.0"
   checksum: fb0cc9420d149176f2bd2b1fc9e6df622cd34eccaca60b276aa3253a7c9241e8a8ed1ec0702b2679eba7e47aeef721869c686bbd7257b75b5c44993c8462cd7f
+  languageName: node
+  linkType: hard
+
+"common-tags@npm:1.8.2":
+  version: 1.8.2
+  resolution: "common-tags@npm:1.8.2"
+  checksum: 767a6255a84bbc47df49a60ab583053bb29a7d9687066a18500a516188a062c4e4cd52de341f22de0b07062e699b1b8fe3cfa1cb55b241cb9301aeb4f45b4dff
   languageName: node
   linkType: hard
 
@@ -8327,6 +8376,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"import-from@npm:4.0.0":
+  version: 4.0.0
+  resolution: "import-from@npm:4.0.0"
+  checksum: 1fa29c05b048da18914e91d9a529e5d9b91774bebbfab10e53f59bcc1667917672b971cf102fee857f142e5e433ce69fa1f0a596e1c7d82f9947a5ec352694b9
+  languageName: node
+  linkType: hard
+
 "import-local@npm:^3.0.2":
   version: 3.0.2
   resolution: "import-local@npm:3.0.2"
@@ -8948,6 +9004,13 @@ __metadata:
   version: 2.0.0
   resolution: "isexe@npm:2.0.0"
   checksum: 26bf6c5480dda5161c820c5b5c751ae1e766c587b1f951ea3fcfc973bafb7831ae5b54a31a69bd670220e42e99ec154475025a468eae58ea262f813fdc8d1c62
+  languageName: node
+  linkType: hard
+
+"iso8601-duration@npm:^1.3.0":
+  version: 1.3.0
+  resolution: "iso8601-duration@npm:1.3.0"
+  checksum: 22a0d23bde4b4791775caa60b9fd6334e5d6c58cd2bede1dbfc6296c9beef8f70ebf9e8cabb29ae0ca2a84f14c8ab52580f2f9a255411812f6d0d3f0e5ad9031
   languageName: node
   linkType: hard
 
@@ -14504,6 +14567,13 @@ typescript@^4.2.4:
     has-symbols: ^1.0.1
     object.getownpropertydescriptors: ^2.1.1
   checksum: ea371c30b90576862487ae4efd7182aa5855019549a4019d82629acc2709e8ccb0f38944403eebec622fff8ebb44ac3f46a52d745d5f543d30606132a4905f96
+  languageName: node
+  linkType: hard
+
+"utility-types@npm:^3.10.0":
+  version: 3.10.0
+  resolution: "utility-types@npm:3.10.0"
+  checksum: 8f274415c6196ab62883b8bd98c9d2f8829b58016e4269aaa1ebd84184ac5dda7dc2ca45800c0d5e0e0650966ba063bf9a412aaeaea6850ca4440a391283d5c8
   languageName: node
   linkType: hard
 

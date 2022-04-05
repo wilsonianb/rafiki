@@ -71,9 +71,9 @@ export interface AppServices {
   peerService: Promise<PeerService>
   accountService: Promise<AccountService>
   spspRoutes: Promise<SPSPRoutes>
-  IncomingPaymentRoutes: Promise<IncomingPaymentRoutes>
+  incomingPaymentRoutes: Promise<IncomingPaymentRoutes>
   accountRoutes: Promise<AccountRoutes>
-  IncomingPaymentService: Promise<IncomingPaymentService>
+  incomingPaymentService: Promise<IncomingPaymentService>
   streamServer: Promise<StreamServer>
   webhookService: Promise<WebhookService>
   outgoingPaymentService: Promise<OutgoingPaymentService>
@@ -266,6 +266,10 @@ export class App {
       '/pay/:accountId/incoming-payments',
       incomingPaymentRoutes.create
     )
+    this.publicRouter.put(
+      '/incoming-payments/:incomingPaymentId',
+      incomingPaymentRoutes.update
+    )
 
     this.publicRouter.get(
       '/outgoing-payments/:outgoingPaymentId',
@@ -275,7 +279,6 @@ export class App {
       '/pay/:accountId/outgoing-payments',
       outgoingPaymentRoutes.create
     )
-
     this.publicRouter.put(
       '/pay/:accountId/outgoing-payments',
       outgoingPaymentRoutes.update
@@ -333,7 +336,7 @@ export class App {
         this.logger.warn({ error: err.message }, 'processIncomingPayment error')
         return true
       })
-      .then((hasMoreWork: boolean) => {
+      .then((hasMoreWork) => {
         if (hasMoreWork) process.nextTick(() => this.processIncomingPayment())
         else
           setTimeout(
