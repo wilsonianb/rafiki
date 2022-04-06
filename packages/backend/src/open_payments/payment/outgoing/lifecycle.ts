@@ -91,6 +91,17 @@ export async function handlePending(
     }
   })
 
+  // if (payment.authorized &&
+  //   !(await validateGrant(
+  //     deps,
+  //     payment,
+  //     grant, // ???
+  //     AccessAction.Authorize
+  //   ))
+  // ) {
+  //   throw LifecycleError.InsufficientGrant
+  // }
+
   if (state === PaymentState.Funding) {
     await sendWebhookEvent(deps, payment, PaymentEventType.PaymentFunding)
   }

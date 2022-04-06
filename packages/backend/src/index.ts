@@ -24,7 +24,6 @@ import { createAssetService } from './asset/service'
 import { createAccountingService } from './accounting/service'
 import { createPeerService } from './peer/service'
 import { createAccountService } from './open_payments/account/service'
-import { createGrantService } from './open_payments/grant/service'
 import { createSPSPRoutes } from './spsp/routes'
 import { createAccountRoutes } from './open_payments/account/routes'
 import { createIncomingPaymentRoutes } from './open_payments/payment/incoming/routes'
@@ -160,17 +159,13 @@ export function initIocContainer(
   container.singleton('accountService', async (deps) => {
     const logger = await deps.use('logger')
     const assetService = await deps.use('assetService')
+    const config = await deps.use('config')
     return await createAccountService({
       knex: await deps.use('knex'),
       logger: logger,
       accountingService: await deps.use('accountingService'),
-      assetService: assetService
-    })
-  })
-  container.singleton('grantService', async (deps) => {
-    return await createGrantService({
-      logger: await deps.use('logger'),
-      tokenIntrospectionUrl: config.tokenIntrospectionUrl
+      assetService: assetService,
+      publicHost: config.publicHost
     })
   })
   container.singleton('spspRoutes', async (deps) => {

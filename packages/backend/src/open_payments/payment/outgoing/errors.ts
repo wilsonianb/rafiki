@@ -9,7 +9,8 @@ export enum OutgoingPaymentError {
   InvalidAmount = 'InvalidAmount',
   InvalidAuthorized = 'InvalidAuthorized',
   InvalidDestination = 'InvalidDestination',
-  InvalidState = 'InvalidState'
+  InvalidState = 'InvalidState',
+  InsufficientGrant = 'InsufficientGrant'
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types
@@ -25,7 +26,8 @@ export const errorToCode: {
   [OutgoingPaymentError.InvalidAmount]: 400,
   [OutgoingPaymentError.InvalidAuthorized]: 400,
   [OutgoingPaymentError.InvalidDestination]: 400,
-  [OutgoingPaymentError.InvalidState]: 400
+  [OutgoingPaymentError.InvalidState]: 400,
+  [OutgoingPaymentError.InsufficientGrant]: 403
 }
 
 export const errorToMessage: {
@@ -37,7 +39,8 @@ export const errorToMessage: {
   [OutgoingPaymentError.InvalidAmount]: 'invalid amount',
   [OutgoingPaymentError.InvalidAuthorized]: 'invalid authorized',
   [OutgoingPaymentError.InvalidDestination]: 'invalid destination',
-  [OutgoingPaymentError.InvalidState]: 'invalid state'
+  [OutgoingPaymentError.InvalidState]: 'invalid state',
+  [OutgoingPaymentError.InsufficientGrant]: 'unauthorized'
 }
 
 export const FundingError = { ...OutgoingPaymentError, ...TransferError }
@@ -56,6 +59,8 @@ export enum LifecycleError {
   BadState = 'BadState',
   // Account asset conflicts with sendAmount asset
   SourceAssetConflict = 'SourceAssetConflict',
+  // Grant permission limit(s) exceeded
+  InsufficientGrant = 'InsufficientGrant',
 
   // These errors shouldn't ever trigger (impossible states), but they exist to satisfy types:
   MissingBalance = 'MissingBalance',

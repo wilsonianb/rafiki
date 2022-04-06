@@ -23,6 +23,9 @@ export class OutgoingPayment
   public error?: string | null
   public stateAttempts!: number
   public expiresAt?: Date | null
+  public createGrant?: string
+  public authorizeGrant?: string
+  public authorizedAt?: Date
 
   public receivingAccount?: string
   public receivingPayment?: string
