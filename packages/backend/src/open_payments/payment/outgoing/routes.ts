@@ -106,16 +106,19 @@ async function createOutgoingPayment(
   if (body.externalRef !== undefined && typeof body.externalRef !== 'string')
     return ctx.throw(400, 'invalid externalRef')
 
-  const paymentOrErr = await deps.outgoingPaymentService.create({
-    accountId,
-    authorized,
-    receivingAccount: body.receivingAccount,
-    sendAmount,
-    receiveAmount,
-    receivingPayment: body.receivingPayment,
-    description: body.description,
-    externalRef: body.externalRef
-  })
+  const paymentOrErr = await deps.outgoingPaymentService.create(
+    {
+      accountId,
+      authorized,
+      receivingAccount: body.receivingAccount,
+      sendAmount,
+      receiveAmount,
+      receivingPayment: body.receivingPayment,
+      description: body.description,
+      externalRef: body.externalRef
+    },
+    ctx.grant
+  ) // assert that grant exists?
 
   if (isOutgoingPaymentError(paymentOrErr)) {
     return ctx.throw(errorToCode[paymentOrErr], errorToMessage[paymentOrErr])
@@ -176,13 +179,16 @@ async function updateOutgoingPayment(
     }
   }
 
-  const paymentOrErr = await deps.outgoingPaymentService.update({
-    id: outgoingPaymentId,
-    authorized,
-    state,
-    sendAmount,
-    receiveAmount
-  })
+  const paymentOrErr = await deps.outgoingPaymentService.update(
+    {
+      id: outgoingPaymentId,
+      authorized,
+      state,
+      sendAmount,
+      receiveAmount
+    },
+    ctx.grant
+  )
 
   if (isOutgoingPaymentError(paymentOrErr)) {
     return ctx.throw(errorToCode[paymentOrErr], errorToMessage[paymentOrErr])

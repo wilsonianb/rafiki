@@ -484,7 +484,7 @@ export type OutgoingPayment = Model & {
   externalRef?: Maybe<Scalars['String']>;
   expiresAt?: Maybe<Scalars['String']>;
   quote?: Maybe<PaymentQuote>;
-  outcome?: Maybe<OutgoingPaymentOutcome>;
+  sentAmount: Scalars['UInt64'];
   createdAt: Scalars['String'];
 };
 
@@ -498,11 +498,6 @@ export type OutgoingPaymentEdge = {
   __typename?: 'OutgoingPaymentEdge';
   node: OutgoingPayment;
   cursor: Scalars['String'];
-};
-
-export type OutgoingPaymentOutcome = {
-  __typename?: 'OutgoingPaymentOutcome';
-  amountSent: Scalars['UInt64'];
 };
 
 export type OutgoingPaymentResponse = {
@@ -845,7 +840,6 @@ export type ResolversTypes = {
   OutgoingPayment: ResolverTypeWrapper<Partial<OutgoingPayment>>;
   OutgoingPaymentConnection: ResolverTypeWrapper<Partial<OutgoingPaymentConnection>>;
   OutgoingPaymentEdge: ResolverTypeWrapper<Partial<OutgoingPaymentEdge>>;
-  OutgoingPaymentOutcome: ResolverTypeWrapper<Partial<OutgoingPaymentOutcome>>;
   OutgoingPaymentResponse: ResolverTypeWrapper<Partial<OutgoingPaymentResponse>>;
   PageInfo: ResolverTypeWrapper<Partial<PageInfo>>;
   PaymentAmount: ResolverTypeWrapper<Partial<PaymentAmount>>;
@@ -919,7 +913,6 @@ export type ResolversParentTypes = {
   OutgoingPayment: Partial<OutgoingPayment>;
   OutgoingPaymentConnection: Partial<OutgoingPaymentConnection>;
   OutgoingPaymentEdge: Partial<OutgoingPaymentEdge>;
-  OutgoingPaymentOutcome: Partial<OutgoingPaymentOutcome>;
   OutgoingPaymentResponse: Partial<OutgoingPaymentResponse>;
   PageInfo: Partial<PageInfo>;
   PaymentAmount: Partial<PaymentAmount>;
@@ -1149,7 +1142,7 @@ export type OutgoingPaymentResolvers<ContextType = any, ParentType extends Resol
   externalRef?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   expiresAt?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   quote?: Resolver<Maybe<ResolversTypes['PaymentQuote']>, ParentType, ContextType>;
-  outcome?: Resolver<Maybe<ResolversTypes['OutgoingPaymentOutcome']>, ParentType, ContextType>;
+  sentAmount?: Resolver<ResolversTypes['UInt64'], ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
@@ -1163,11 +1156,6 @@ export type OutgoingPaymentConnectionResolvers<ContextType = any, ParentType ext
 export type OutgoingPaymentEdgeResolvers<ContextType = any, ParentType extends ResolversParentTypes['OutgoingPaymentEdge'] = ResolversParentTypes['OutgoingPaymentEdge']> = {
   node?: Resolver<ResolversTypes['OutgoingPayment'], ParentType, ContextType>;
   cursor?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
-  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
-};
-
-export type OutgoingPaymentOutcomeResolvers<ContextType = any, ParentType extends ResolversParentTypes['OutgoingPaymentOutcome'] = ResolversParentTypes['OutgoingPaymentOutcome']> = {
-  amountSent?: Resolver<ResolversTypes['UInt64'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -1317,7 +1305,6 @@ export type Resolvers<ContextType = any> = {
   OutgoingPayment?: OutgoingPaymentResolvers<ContextType>;
   OutgoingPaymentConnection?: OutgoingPaymentConnectionResolvers<ContextType>;
   OutgoingPaymentEdge?: OutgoingPaymentEdgeResolvers<ContextType>;
-  OutgoingPaymentOutcome?: OutgoingPaymentOutcomeResolvers<ContextType>;
   OutgoingPaymentResponse?: OutgoingPaymentResponseResolvers<ContextType>;
   PageInfo?: PageInfoResolvers<ContextType>;
   PaymentAmount?: PaymentAmountResolvers<ContextType>;

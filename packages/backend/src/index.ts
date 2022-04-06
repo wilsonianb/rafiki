@@ -159,11 +159,13 @@ export function initIocContainer(
   container.singleton('accountService', async (deps) => {
     const logger = await deps.use('logger')
     const assetService = await deps.use('assetService')
+    const config = await deps.use('config')
     return await createAccountService({
       knex: await deps.use('knex'),
       logger: logger,
       accountingService: await deps.use('accountingService'),
-      assetService: assetService
+      assetService: assetService,
+      publicHost: config.publicHost
     })
   })
   container.singleton('spspRoutes', async (deps) => {

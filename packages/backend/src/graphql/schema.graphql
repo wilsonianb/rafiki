@@ -381,7 +381,7 @@ type OutgoingPayment implements Model {
   externalRef: String
   expiresAt: String
   quote: PaymentQuote
-  outcome: OutgoingPaymentOutcome
+  sentAmount: UInt64!
   createdAt: String!
 }
 
@@ -420,10 +420,6 @@ type PaymentQuote {
   minExchangeRate: Float!
   lowExchangeRateEstimate: Float!
   highExchangeRateEstimate: Float!
-}
-
-type OutgoingPaymentOutcome {
-  amountSent: UInt64!
 }
 
 input PaymentAmountInput {

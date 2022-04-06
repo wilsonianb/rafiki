@@ -13,6 +13,7 @@ export interface CreateOptions {
 export interface AccountService {
   create(options: CreateOptions): Promise<Account>
   get(id: string): Promise<Account | undefined>
+  getUrl(id: string): string
   processNext(): Promise<string | undefined>
   triggerEvents(limit: number): Promise<number>
 }
@@ -21,26 +22,20 @@ interface ServiceDependencies extends BaseService {
   knex: TransactionOrKnex
   accountingService: AccountingService
   assetService: AssetService
+  publicHost: string
 }
 
-export async function createAccountService({
-  logger,
-  knex,
-  accountingService,
-  assetService
-}: ServiceDependencies): Promise<AccountService> {
-  const log = logger.child({
-    service: 'AccountService'
-  })
-  const deps: ServiceDependencies = {
-    logger: log,
-    knex,
-    accountingService,
-    assetService
+export async function createAccountService(
+  deps_: ServiceDependencies
+): Promise<AccountService> {
+  const deps = {
+    ...deps_,
+    logger: deps_.logger.child({ service: 'AccountService' })
   }
   return {
     create: (options) => createAccount(deps, options),
     get: (id) => getAccount(deps, id),
+    getUrl: (id) => getAccountUrl(deps, id),
     processNext: () => processNextAccount(deps),
     triggerEvents: (limit) => triggerAccountEvents(deps, limit)
   }
@@ -74,6 +69,10 @@ async function getAccount(
   id: string
 ): Promise<Account | undefined> {
   return await Account.query(deps.knex).findById(id).withGraphJoined('asset')
+}
+
+function getAccountUrl(deps: ServiceDependencies, id: string): string {
+  return `${deps.publicHost}/accounts/${id}`
 }
 
 // Returns the id of the processed account (if any).

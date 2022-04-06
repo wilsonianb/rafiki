@@ -3487,13 +3487,17 @@
             "deprecationReason": null
           },
           {
-            "name": "outcome",
+            "name": "sentAmount",
             "description": null,
             "args": [],
             "type": {
-              "kind": "OBJECT",
-              "name": "OutgoingPaymentOutcome",
-              "ofType": null
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "UInt64",
+                "ofType": null
+              }
             },
             "isDeprecated": false,
             "deprecationReason": null
@@ -3608,33 +3612,6 @@
               "ofType": {
                 "kind": "SCALAR",
                 "name": "String",
-                "ofType": null
-              }
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          }
-        ],
-        "inputFields": null,
-        "interfaces": [],
-        "enumValues": null,
-        "possibleTypes": null
-      },
-      {
-        "kind": "OBJECT",
-        "name": "OutgoingPaymentOutcome",
-        "description": null,
-        "fields": [
-          {
-            "name": "amountSent",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "NON_NULL",
-              "name": null,
-              "ofType": {
-                "kind": "SCALAR",
-                "name": "UInt64",
                 "ofType": null
               }
             },

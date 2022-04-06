@@ -91,6 +91,17 @@ export async function handlePending(
     }
   })
 
+  // if (payment.authorized &&
+  //   !(await validateGrant(
+  //     deps,
+  //     payment,
+  //     grant, // ???
+  //     AccessAction.Authorize
+  //   ))
+  // ) {
+  //   throw LifecycleError.InsufficientGrant
+  // }
+
   if (state === PaymentState.Funding) {
     await sendWebhookEvent(deps, payment, PaymentEventType.PaymentFunding)
   }
@@ -259,8 +270,13 @@ export async function handleFailed(
   payment: OutgoingPayment,
   error: string
 ): Promise<void> {
+  const sentAmount = await deps.accountingService.getTotalSent(payment.id)
+  if (sentAmount === undefined) {
+    throw LifecycleError.MissingBalance
+  }
   await payment.$query(deps.knex).patch({
     state: PaymentState.Failed,
+    sentAmount,
     error
   })
   await sendWebhookEvent(deps, payment, PaymentEventType.PaymentFailed)
@@ -270,8 +286,13 @@ const handleCompleted = async (
   deps: ServiceDependencies,
   payment: OutgoingPayment
 ): Promise<void> => {
+  const sentAmount = await deps.accountingService.getTotalSent(payment.id)
+  if (sentAmount === undefined) {
+    throw LifecycleError.MissingBalance
+  }
   await payment.$query(deps.knex).patch({
-    state: PaymentState.Completed
+    state: PaymentState.Completed,
+    sentAmount
   })
   await sendWebhookEvent(deps, payment, PaymentEventType.PaymentCompleted)
 }
@@ -281,9 +302,8 @@ export const sendWebhookEvent = async (
   payment: OutgoingPayment,
   type: PaymentEventType
 ): Promise<void> => {
-  const amountSent = await deps.accountingService.getTotalSent(payment.id)
   const balance = await deps.accountingService.getBalance(payment.id)
-  if (amountSent === undefined || balance === undefined) {
+  if (balance === undefined) {
     throw LifecycleError.MissingBalance
   }
 
@@ -296,7 +316,7 @@ export const sendWebhookEvent = async (
     : undefined
   await PaymentEvent.query(deps.knex).insertAndFetch({
     type,
-    data: payment.toData({ amountSent, balance }),
+    data: payment.toData({ balance }),
     withdrawal
   })
 }

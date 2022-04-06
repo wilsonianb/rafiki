@@ -23,6 +23,9 @@ export class OutgoingPayment
   public error?: string | null
   public stateAttempts!: number
   public expiresAt?: Date | null
+  public createGrant?: string
+  public authorizeGrant?: string
+  public authorizedAt?: Date
 
   public receivingAccount?: string
   public receivingPayment?: string
@@ -148,6 +151,8 @@ export class OutgoingPayment
     return this.account.asset
   }
 
+  public sentAmount!: bigint
+
   static relationMappings = {
     account: {
       relation: Model.HasOneRelation,
@@ -168,13 +173,7 @@ export class OutgoingPayment
     }
   }
 
-  public toData({
-    amountSent,
-    balance
-  }: {
-    amountSent: bigint
-    balance: bigint
-  }): PaymentData {
+  public toData({ balance }: { balance: bigint }): PaymentData {
     const data: PaymentData = {
       payment: {
         id: this.id,
@@ -183,9 +182,7 @@ export class OutgoingPayment
         authorized: this.authorized,
         stateAttempts: this.stateAttempts,
         createdAt: new Date(+this.createdAt).toISOString(),
-        outcome: {
-          amountSent: amountSent.toString()
-        },
+        sentAmount: this.sentAmount.toString(),
         balance: balance.toString()
       }
     }
@@ -321,9 +318,7 @@ export type PaymentData = {
       lowExchangeRateEstimate: number
       highExchangeRateEstimate: number
     }
-    outcome: {
-      amountSent: string
-    }
+    sentAmount: string
     balance: string
   }
 }

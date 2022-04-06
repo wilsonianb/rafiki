@@ -8,6 +8,8 @@ exports.up = function (knex) {
     table.boolean('authorized').notNullable().defaultTo(false)
     table.string('description').nullable()
     table.string('externalRef').nullable()
+    table.string('createGrant').nullable().index()
+    table.string('authorizeGrant').nullable().index()
 
     table.string('receivingAccount').nullable()
     table.string('receivingPayment').nullable()
@@ -30,6 +32,8 @@ exports.up = function (knex) {
     table.bigInteger('quoteHighExchangeRateEstimateNumerator').nullable()
     table.bigInteger('quoteHighExchangeRateEstimateDenominator').nullable()
 
+    table.bigInteger('sentAmount').defaultTo(0)
+
     // Open payments account corresponding to wallet account
     // from which to request funds for payment
     table.uuid('accountId').notNullable()
@@ -37,6 +41,7 @@ exports.up = function (knex) {
 
     table.timestamp('createdAt').defaultTo(knex.fn.now())
     table.timestamp('updatedAt').defaultTo(knex.fn.now())
+    table.timestamp('authorizedAt').nullable()
 
     table.index(['accountId', 'createdAt', 'id'])
   })

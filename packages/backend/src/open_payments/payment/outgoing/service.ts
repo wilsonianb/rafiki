@@ -1,3 +1,6 @@
+import assert from 'assert'
+import { parse, end } from 'iso8601-duration'
+import * as knex from 'knex'
 import {
   ForeignKeyViolationError,
   TransactionOrKnex,
@@ -6,7 +9,12 @@ import {
 
 import { Pagination } from '../../../shared/baseModel'
 import { BaseService } from '../../../shared/baseService'
-import { FundingError, LifecycleError, OutgoingPaymentError } from './errors'
+import {
+  FundingError,
+  LifecycleError,
+  OutgoingPaymentError,
+  isOutgoingPaymentError
+} from './errors'
 import { sendWebhookEvent } from './lifecycle'
 import {
   OutgoingPayment,
@@ -16,6 +24,13 @@ import {
 } from './model'
 import { AccountingService } from '../../../accounting/service'
 import { AccountService } from '../../account/service'
+import {
+  Grant,
+  GrantAccess,
+  AccessType,
+  AccessAction,
+  AccessLimits
+} from '../../grant/service'
 import { RatesService } from '../../../rates/service'
 import { IlpPlugin, IlpPluginOptions } from './ilp_plugin'
 import * as worker from './worker'
@@ -23,10 +38,12 @@ import * as worker from './worker'
 export interface OutgoingPaymentService {
   get(id: string): Promise<OutgoingPayment | undefined>
   create(
-    options: CreateOutgoingPaymentOptions
+    options: CreateOutgoingPaymentOptions,
+    grant?: Grant
   ): Promise<OutgoingPayment | OutgoingPaymentError>
   update(
-    options: UpdateOutgoingPaymentOptions
+    options: UpdateOutgoingPaymentOptions,
+    grant?: Grant
   ): Promise<OutgoingPayment | OutgoingPaymentError>
   fund(
     options: FundOutgoingPaymentOptions
@@ -89,7 +106,8 @@ export interface CreateOutgoingPaymentOptions {
 
 async function createOutgoingPayment(
   deps: ServiceDependencies,
-  options: CreateOutgoingPaymentOptions
+  options: CreateOutgoingPaymentOptions,
+  grant?: Grant
 ): Promise<OutgoingPayment | OutgoingPaymentError> {
   if (options.receivingPayment) {
     if (options.receivingAccount) {
@@ -135,9 +153,46 @@ async function createOutgoingPayment(
       const payment = await OutgoingPayment.query(trx)
         .insertAndFetch({
           ...options,
-          state: PaymentState.Pending
+          state: PaymentState.Pending,
+          createGrant: grant?.grant
         })
         .withGraphFetched('account.asset')
+
+      if (payment.authorized) {
+        await payment.$query(trx).patch({
+          authorizeGrant: grant?.grant,
+          authorizedAt: payment.createdAt
+        })
+      }
+
+      if (grant) {
+        const validCreate = await validateGrant(
+          {
+            ...deps,
+            knex: trx
+          },
+          payment,
+          grant,
+          AccessAction.Create
+        )
+        if (!validCreate) {
+          throw OutgoingPaymentError.InsufficientGrant
+        }
+        if (payment.authorized) {
+          const validAuthorize = await validateGrant(
+            {
+              ...deps,
+              knex: trx
+            },
+            payment,
+            grant,
+            AccessAction.Authorize
+          )
+          if (!validAuthorize) {
+            throw OutgoingPaymentError.InsufficientGrant
+          }
+        }
+      }
 
       await deps.accountingService.createLiquidityAccount({
         id: payment.id,
@@ -147,6 +202,7 @@ async function createOutgoingPayment(
       return payment
     })
   } catch (err) {
+    // if (isOutgoingPaymentError(err)) return err
     if (err instanceof ForeignKeyViolationError) {
       return OutgoingPaymentError.UnknownAccount
     }
@@ -170,9 +226,9 @@ async function updatePayment(
     sendAmount,
     receiveAmount,
     state
-  }: UpdateOutgoingPaymentOptions
+  }: UpdateOutgoingPaymentOptions,
+  grant?: Grant
 ): Promise<OutgoingPayment | OutgoingPaymentError> {
-  // TODO: introspect access token
   if (!sendAmount && !receiveAmount) {
     if (!authorized) {
       return OutgoingPaymentError.InvalidAmount
@@ -187,68 +243,333 @@ async function updatePayment(
   if (authorized !== undefined && authorized !== true) {
     return OutgoingPaymentError.InvalidAuthorized
   }
-  return deps.knex.transaction(async (trx) => {
-    const payment = await OutgoingPayment.query(trx)
-      .findById(id)
-      .forUpdate()
-      .withGraphFetched('account.asset')
-    if (!payment) return OutgoingPaymentError.UnknownPayment
+  try {
+    return deps.knex.transaction(async (trx) => {
+      const payment = await OutgoingPayment.query(trx)
+        .findById(id)
+        .forUpdate()
+        .withGraphFetched('account.asset')
+      if (!payment) return OutgoingPaymentError.UnknownPayment
 
-    if (sendAmount || receiveAmount) {
-      const update: PartialModelObject<OutgoingPayment> = {}
-      switch (payment.state) {
-        case PaymentState.Pending:
-        case PaymentState.Prepared:
-        case PaymentState.Expired:
-          update.state = PaymentState.Pending
-          update.expiresAt = null
-          break
-        default:
-          return OutgoingPaymentError.WrongState
-      }
+      if (sendAmount || receiveAmount) {
+        const update: PartialModelObject<OutgoingPayment> = {}
+        switch (payment.state) {
+          case PaymentState.Pending:
+          case PaymentState.Prepared:
+          case PaymentState.Expired:
+            update.state = PaymentState.Pending
+            update.expiresAt = null
+            break
+          default:
+            return OutgoingPaymentError.WrongState
+        }
 
-      if (sendAmount) {
-        if (sendAmount.assetCode || sendAmount.assetScale) {
-          if (
-            sendAmount.assetCode !== payment.account.asset.code ||
-            sendAmount.assetScale !== payment.account.asset.scale
-          ) {
-            return OutgoingPaymentError.InvalidAmount
+        if (sendAmount) {
+          if (sendAmount.assetCode || sendAmount.assetScale) {
+            if (
+              sendAmount.assetCode !== payment.account.asset.code ||
+              sendAmount.assetScale !== payment.account.asset.scale
+            ) {
+              return OutgoingPaymentError.InvalidAmount
+            }
           }
+          update.sendAmount = {
+            amount: sendAmount.amount,
+            assetCode: payment.account.asset.code,
+            assetScale: payment.account.asset.scale
+          }
+          update.receiveAmount = null
+        } else {
+          update.receiveAmount = receiveAmount
+          update.sendAmount = null
         }
-        update.sendAmount = {
-          amount: sendAmount.amount,
-          assetCode: payment.account.asset.code,
-          assetScale: payment.account.asset.scale
+        await payment.$query(trx).patch(update)
+      }
+      if (authorized) {
+        const update: PartialModelObject<OutgoingPayment> = {
+          authorized,
+          authorizedAt: new Date(),
+          authorizeGrant: grant?.grant
         }
-        update.receiveAmount = null
-      } else {
-        update.receiveAmount = receiveAmount
-        update.sendAmount = null
+        if (payment.state === PaymentState.Prepared) {
+          update.state = PaymentState.Funding
+          await sendWebhookEvent(
+            {
+              ...deps,
+              knex: trx
+            },
+            payment,
+            PaymentEventType.PaymentFunding
+          )
+        } else if (
+          payment.state !== PaymentState.Pending ||
+          payment.authorized
+        ) {
+          return OutgoingPaymentError.WrongState
+        }
+        await payment.$query(trx).patch(update)
+        if (grant) {
+          const validAuthorize = await validateGrant(
+            {
+              ...deps,
+              knex: trx
+            },
+            payment,
+            grant,
+            AccessAction.Authorize
+          )
+          if (!validAuthorize) {
+            throw OutgoingPaymentError.InsufficientGrant
+          }
+          // TODO: if unquoted, store grant
+          // overwrite existing grant?
+        }
       }
-      await payment.$query(trx).patch(update)
-    }
-    if (authorized) {
-      const update: PartialModelObject<OutgoingPayment> = {
-        authorized
-      }
-      if (payment.state === PaymentState.Prepared) {
-        update.state = PaymentState.Funding
-        await sendWebhookEvent(
-          {
-            ...deps,
-            knex: trx
-          },
-          payment,
-          PaymentEventType.PaymentFunding
-        )
-      } else if (payment.state !== PaymentState.Pending || payment.authorized) {
-        return OutgoingPaymentError.WrongState
-      }
-      await payment.$query(trx).patch(update)
-    }
-    return payment
+      return payment
+    })
+  } catch (err) {
+    if (isOutgoingPaymentError(err)) return err
+    throw err
+  }
+}
+
+function validateAccessLimits(
+  payment: OutgoingPayment,
+  limits: AccessLimits,
+  time: Date
+): boolean {
+  return (
+    validateTimeLimits(limits, time) &&
+    validateReceiverLimits(payment, limits) &&
+    validateAmountAssets(payment, limits)
+    // TODO: locations
+  )
+}
+
+function validateTimeLimits(limits: AccessLimits, time: Date): boolean {
+  return (
+    (!limits.startAt || limits.startAt.getTime() <= time.getTime()) &&
+    (!limits.expiresAt || time.getTime() < limits.expiresAt.getTime())
+  )
+}
+
+function validateReceiverLimits(
+  payment: OutgoingPayment,
+  limits: AccessLimits
+): boolean {
+  if (
+    limits.receivingAccount &&
+    payment.receivingAccount &&
+    payment.receivingAccount !== limits.receivingAccount
+  ) {
+    return false
+  }
+  return (
+    !limits.receivingPayment ||
+    payment.receivingPayment === limits.receivingPayment
+  )
+}
+
+function validateAmountAssets(
+  payment: OutgoingPayment,
+  limits: AccessLimits
+): boolean {
+  if (
+    limits.sendAmount &&
+    // TODO: use payment.asset
+    (limits.sendAmount.assetCode !== payment.account.asset.code ||
+      limits.sendAmount.assetScale !== payment.account.asset.scale)
+  ) {
+    return false
+  }
+  return (
+    !limits.receiveAmount ||
+    !payment.receiveAmount ||
+    (limits.receiveAmount.assetCode === payment.receiveAmount.assetCode &&
+      limits.receiveAmount.assetScale === payment.receiveAmount.assetScale)
+  )
+}
+
+// punt and return true if payment's sendAmount, receiveAmount and/or receivingAccount are unknown
+// and cannot be checked.
+// In which case, should this return a conditional true?
+// Or should authorizing pre-quote do a limited grant check, with the expectation of doing a full check post-quote?
+// should that limited check be performed at token introspection and the outgoing payment should only do full checks
+// when quoted and authorized?
+
+// when are sendAmount and receiveAmount assets validated?
+
+// "payment" is locked by the "deps.knex" transaction.
+async function validateGrant(
+  deps: ServiceDependencies,
+  payment: OutgoingPayment,
+  grant: Grant,
+  action: AccessAction
+): Promise<boolean> {
+  const grantAccess = grant.getAccess({
+    type: AccessType.OutgoingPayment,
+    action,
+    location: deps.accountService.getUrl(payment.accountId)
   })
+
+  if (!grantAccess) {
+    // log?
+    return false
+  }
+
+  let validSendAmount = !payment.sendAmount
+  let validReceiveAmount = !payment.receiveAmount
+
+  // what other payments apply to those intervals
+  // how much of the other payments' amounts can be applied to other intervals?
+
+  // assert.ok(payment.sendAmount && payment.receiveAmount && payment.authorizedAt)
+
+  // Find access right(s) that authorize this payment (pending send/receive limits).
+  // Also track access right(s) to which existing competing
+  // payments can be assigned to satisfy send/receive limits.
+  const paymentAccess: GrantAccess[] = []
+  const otherAccess: GrantAccess[] = []
+
+  const paymentTime = payment.authorizedAt || payment.createdAt
+  for (const access of grantAccess) {
+    if (!access.limits) {
+      return true
+    }
+    if (validateAccessLimits(payment, access.limits, paymentTime)) {
+      if (!access.limits.sendAmount) {
+        validSendAmount = true
+      }
+      if (!access.limits.receiveAmount) {
+        validReceiveAmount = true
+      }
+      if (validSendAmount && validReceiveAmount) {
+        return true
+      }
+      // Store access.limits.interval as current interval's startAt/expiresAt
+      if (access.limits?.interval && access.limits?.startAt) {
+        // Store all preceding intervals as individual accesses in otherAccess
+        let startAt = access.limits.startAt
+        const interval = parse(access.limits.interval)
+        let expiresAt = end(interval, startAt)
+        while (expiresAt.getTime() < paymentTime.getTime()) {
+          otherAccess.push({
+            ...access,
+            limits: {
+              ...access.limits,
+              startAt,
+              expiresAt
+            }
+          })
+          startAt = expiresAt
+          expiresAt = end(interval, startAt)
+        }
+        access.limits = {
+          ...access.limits,
+          startAt,
+          expiresAt
+        }
+      }
+      paymentAccess.push(access)
+    } else {
+      // Exclude pre-startAt access
+      const now = new Date()
+      if (
+        !access.limits?.startAt ||
+        access.limits?.startAt.getTime() <= now.getTime()
+      ) {
+        otherAccess.push(access)
+      }
+    }
+  }
+
+  if (!paymentAccess) {
+    return false
+  }
+
+  if (!validSendAmount) {
+    assert.ok(payment.sendAmount)
+    if (
+      paymentAccess.reduce(
+        (prev, access) =>
+          prev + (access.limits?.sendAmount?.amount ?? BigInt(0)),
+        BigInt(0)
+      ) < payment.sendAmount.amount
+    ) {
+      // Payment amount single-handedly exceeds sendAmount limit(s)
+      return false
+    }
+  }
+
+  if (!validReceiveAmount) {
+    assert.ok(payment.receiveAmount)
+    if (
+      paymentAccess.reduce(
+        (prev, access) =>
+          prev + (access.limits?.receiveAmount?.amount ?? BigInt(0)),
+        BigInt(0)
+      ) < payment.receiveAmount.amount
+    ) {
+      // Payment amount single-handedly exceeds receiveAmount limit(s)
+      return false
+    }
+  }
+
+  const whereGrant =
+    action === AccessAction.Create
+      ? { creatGrant: payment.createGrant }
+      : { authorizeGrant: payment.authorizeGrant }
+
+  const existingPayments = await OutgoingPayment.query(deps.knex)
+    // Ensure the payments cannot be processed concurrently by multiple workers.
+    // .forUpdate()  // why do these need to be locked?
+    .where(whereGrant)
+    .andWhereNot({
+      id: payment.id
+    })
+    .andWhere((builder: knex.QueryBuilder) => {
+      builder
+        // Only check existing *authorized* (and quoted) payments
+        // (which happens to prevent deadlocking)
+        .whereIn('state', [
+          PaymentState.Funding,
+          PaymentState.Sending,
+          PaymentState.Completed
+        ])
+        .orWhereNot('sentAmount', 0)
+    })
+
+  if (!existingPayments) {
+    return true
+  }
+
+  // const competingPayments: Record<string, OutgoingPayment[]> = {}
+
+  // for (const action in paymentAccess) {
+  //   competingPayments[action] = existingPayments.filter(payment => {
+  //     if (action === AccessAction.Authorize && !payment.authorized) { // ????
+  //       return false
+  //     }
+  //     const time = payment.authorizedAt //|| payment.createdAt
+  //     if (!access.limits || validateAccessLimits(payment, limits, time)) {
+  //       return true
+  //     }
+  //     return false
+  //   })
+  //   if (!competingPayments[action]) {
+  //     // The payment may use the entire send limit (for this action)
+  //     delete paymentAccess[action]
+  //     if (!paymentAccess) {
+  //       return true
+  //     }
+  //   }
+  // }
+
+  // Do paymentAccess rights support payment and applicable existing payments?
+
+  // Attempt to assign existing payment(s) to other access(es) first
+
+  return false
 }
 
 export interface FundOutgoingPaymentOptions {

@@ -1647,7 +1647,6 @@ describe('Liquidity Resolvers', (): void => {
                 id: eventId,
                 type,
                 data: payment.toData({
-                  amountSent: BigInt(0),
                   balance: BigInt(0)
                 })
               })
@@ -1804,7 +1803,6 @@ describe('Liquidity Resolvers', (): void => {
               if (isPaymentEventType(type)) {
                 liquidityAccount = payment
                 data = payment.toData({
-                  amountSent: BigInt(0),
                   balance: amount
                 })
               } else if (isIncomingPaymentEventType(type)) {
