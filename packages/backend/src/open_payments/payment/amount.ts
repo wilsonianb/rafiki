@@ -3,3 +3,9 @@ export interface Amount {
   assetCode: string
   assetScale: number
 }
+
+export interface AmountJSON {
+  value: string
+  assetCode: string
+  assetScale: number
+}

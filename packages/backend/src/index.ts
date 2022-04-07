@@ -12,13 +12,14 @@ import { App, AppServices } from './app'
 import { Config } from './config/app'
 import { GraphileProducer } from './messaging/graphileProducer'
 import { createRatesService } from './rates/service'
+import { createQuoteService } from './open_payments/quote/service'
 import { createOutgoingPaymentRoutes } from './open_payments/payment/outgoing/routes'
 import { createOutgoingPaymentService } from './open_payments/payment/outgoing/service'
 import {
   createIlpPlugin,
   IlpPlugin,
   IlpPluginOptions
-} from './open_payments/payment/outgoing/ilp_plugin'
+} from './open_payments/shared/ilp_plugin'
 import { createHttpTokenService } from './httpToken/service'
 import { createAssetService } from './asset/service'
 import { createAccountingService } from './accounting/service'
@@ -230,6 +231,21 @@ export function initIocContainer(
     }
   })
 
+  container.singleton('quoteService', async (deps) => {
+    const config = await deps.use('config')
+    return await createQuoteService({
+      slippage: config.slippage,
+      quoteLifespan: config.quoteLifespan,
+      quoteUrl: config.quoteUrl,
+      signatureSecret: config.signatureSecret,
+      signatureVersion: config.signatureVersion,
+      logger: await deps.use('logger'),
+      knex: await deps.use('knex'),
+      makeIlpPlugin: await deps.use('makeIlpPlugin'),
+      accountService: await deps.use('accountService'),
+      ratesService: await deps.use('ratesService')
+    })
+  })
   container.singleton('outgoingPaymentService', async (deps) => {
     const config = await deps.use('config')
     return await createOutgoingPaymentService({

@@ -8,7 +8,7 @@ import { AccountingService } from '../../../accounting/service'
 import { AccountService } from '../../account/service'
 import { Amount } from '../amount'
 import { RatesService } from '../../../rates/service'
-import { IlpPlugin, IlpPluginOptions } from './ilp_plugin'
+import { IlpPlugin, IlpPluginOptions } from '../../shared/ilp_plugin'
 import * as worker from './worker'
 
 export interface OutgoingPaymentService {

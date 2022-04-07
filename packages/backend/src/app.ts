@@ -33,12 +33,10 @@ import { AccountRoutes } from './open_payments/account/routes'
 import { IncomingPaymentService } from './open_payments/payment/incoming/service'
 import { StreamServer } from '@interledger/stream-receiver'
 import { WebhookService } from './webhook/service'
+import { QuoteService } from './open_payments/quote/service'
 import { OutgoingPaymentRoutes } from './open_payments/payment/outgoing/routes'
 import { OutgoingPaymentService } from './open_payments/payment/outgoing/service'
-import {
-  IlpPlugin,
-  IlpPluginOptions
-} from './open_payments/payment/outgoing/ilp_plugin'
+import { IlpPlugin, IlpPluginOptions } from './open_payments/shared/ilp_plugin'
 import { ApiKeyService } from './apiKey/service'
 import { SessionService } from './session/service'
 import { addDirectivesToSchema } from './graphql/directives'
@@ -76,11 +74,12 @@ export interface AppServices {
   accountService: Promise<AccountService>
   spspRoutes: Promise<SPSPRoutes>
   incomingPaymentRoutes: Promise<IncomingPaymentRoutes>
+  outgoingPaymentRoutes: Promise<OutgoingPaymentRoutes>
   accountRoutes: Promise<AccountRoutes>
   incomingPaymentService: Promise<IncomingPaymentService>
   streamServer: Promise<StreamServer>
   webhookService: Promise<WebhookService>
-  outgoingPaymentRoutes: Promise<OutgoingPaymentRoutes>
+  quoteService: Promise<QuoteService>
   outgoingPaymentService: Promise<OutgoingPaymentService>
   makeIlpPlugin: Promise<(options: IlpPluginOptions) => IlpPlugin>
   ratesService: Promise<RatesService>

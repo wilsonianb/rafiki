@@ -9,7 +9,7 @@ import {
   PaymentEventType
 } from './model'
 import { ServiceDependencies } from './service'
-import { IlpPlugin } from './ilp_plugin'
+import { IlpPlugin } from '../../shared/ilp_plugin'
 
 const MAX_INT64 = BigInt('9223372036854775807')
 
@@ -30,8 +30,6 @@ export async function handlePending(
   } else {
     options.destinationAccount = payment.receivingAccount
     if (payment.receiveAmount) {
-      assert.ok(payment.receiveAmount.assetCode)
-      assert.ok(payment.receiveAmount.assetScale)
       options.amountToDeliver = {
         value: payment.receiveAmount.value,
         assetCode: payment.receiveAmount.assetCode,
