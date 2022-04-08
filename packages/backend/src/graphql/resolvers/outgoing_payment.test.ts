@@ -26,6 +26,7 @@ import {
 } from '../../open_payments/payment/outgoing/model'
 import { AccountingService } from '../../accounting/service'
 import { AccountService } from '../../open_payments/account/service'
+import { Amount } from '../../open_payments/payment/amount'
 import {
   OutgoingPayment,
   OutgoingPaymentResponse,
@@ -41,15 +42,15 @@ describe('OutgoingPayment Resolvers', (): void => {
   let outgoingPaymentService: OutgoingPaymentService
   let accountService: AccountService
 
-  const receivingAccount = 'http://wallet2.example/bob'
-  const receivingPayment = 'http://wallet2.example/bob/incoming-payments/123'
-  const sendAmount = {
-    amount: BigInt(123),
+  const receivingAccount = 'http://wallet2.example/pay/bob'
+  const receivingPayment = 'http://wallet2.example/incoming/123'
+  const sendAmount: Amount = {
+    value: BigInt(123),
     assetCode: randomAsset().code,
     assetScale: randomAsset().scale
   }
-  const receiveAmount = {
-    amount: BigInt(56),
+  const receiveAmount: Amount = {
+    value: BigInt(56),
     assetCode: 'XRP',
     assetScale: 9
   }
@@ -92,14 +93,14 @@ describe('OutgoingPayment Resolvers', (): void => {
       receivingAccount,
       sendAmount: sendAmountOpts
         ? {
-            amount: sendAmountOpts.amount,
+            value: sendAmountOpts.value,
             assetCode: sendAmount.assetCode,
             assetScale: sendAmount.assetScale
           }
         : undefined,
       receiveAmount: receiveAmountOpts
         ? {
-            amount: receiveAmountOpts.amount,
+            value: receiveAmountOpts.value,
             assetCode: receiveAmount.assetCode,
             assetScale: receiveAmount.assetScale
           }
@@ -239,7 +240,7 @@ describe('OutgoingPayment Resolvers', (): void => {
             expect(query.sendAmount).toEqual(
               sendAmount
                 ? {
-                    amount: sendAmount.amount.toString() || null,
+                    amount: sendAmount.value.toString() || null,
                     assetCode: sendAmount.assetCode,
                     assetScale: sendAmount.assetScale,
                     __typename: 'OutgoingPaymentAmount'
@@ -249,7 +250,7 @@ describe('OutgoingPayment Resolvers', (): void => {
             expect(query.receiveAmount).toEqual(
               receiveAmount
                 ? {
-                    amount: receiveAmount.amount.toString() || null,
+                    value: receiveAmount.value.toString() || null,
                     assetCode: receiveAmount.assetCode,
                     assetScale: receiveAmount.assetScale,
                     __typename: 'OutgoingPaymentAmount'
@@ -306,10 +307,10 @@ describe('OutgoingPayment Resolvers', (): void => {
     }
 
     test.each`
-      receivingAccount    | sendAmount                       | receiveAmount                       | receivingPayment    | description  | externalRef  | type
-      ${receivingAccount} | ${{ amount: sendAmount.amount }} | ${undefined}                        | ${undefined}        | ${'rent'}    | ${'202201'}  | ${'fixed send'}
-      ${receivingAccount} | ${undefined}                     | ${{ amount: receiveAmount.amount }} | ${undefined}        | ${undefined} | ${undefined} | ${'fixed receive'}
-      ${undefined}        | ${undefined}                     | ${undefined}                        | ${receivingPayment} | ${undefined} | ${undefined} | ${'incoming payment'}
+      receivingAccount    | sendAmount    | receiveAmount    | receivingPayment    | description  | externalRef  | type
+      ${receivingAccount} | ${sendAmount} | ${undefined}     | ${undefined}        | ${'rent'}    | ${'202201'}  | ${'fixed send'}
+      ${receivingAccount} | ${undefined}  | ${receiveAmount} | ${undefined}        | ${undefined} | ${undefined} | ${'fixed receive'}
+      ${undefined}        | ${undefined}  | ${undefined}     | ${receivingPayment} | ${undefined} | ${undefined} | ${'incoming payment'}
     `(
       '200 ($type)',
       async ({
