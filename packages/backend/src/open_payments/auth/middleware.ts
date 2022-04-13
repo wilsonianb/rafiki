@@ -1,5 +1,8 @@
+import Ajv from 'ajv'
 import assert from 'assert'
 import axios from 'axios'
+
+import spec from './server_spec.json'
 
 import {
   AccessType,
@@ -10,6 +13,14 @@ import {
   GrantAccessJSON
 } from './grant'
 import { AppContext } from '../../app'
+
+const ajv = new Ajv({
+  discriminator: true,
+  strict: 'log'
+  // schemas: [spec]
+})
+
+ajv.addSchema(spec, 'openapi.json')
 
 export function createAuthMiddleware({
   type,
@@ -77,6 +88,15 @@ async function getGrant(
       }
     )
     // TODO: validate data is grant
+    console.log(data)
+    try {
+      // console.log(ajv.validate({ $ref: 'openapi.json#/components/schemas/access' }, data))
+      // assert.ok(ajv.validate({ $ref: 'openapi.json#/components/schemas/access' }, data))
+      assert.ok(ajv.validate('openapi.json#/components/schemas/access', data))
+    } catch (e) {
+      console.log(e)
+    }
+
     assert.ok(data.active !== undefined)
     assert.ok(data.grant)
     const options: GrantOptions = {

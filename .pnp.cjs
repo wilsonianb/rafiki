@@ -5093,10 +5093,10 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           ],
           "linkType": "HARD",
         }],
-        ["npm:8.6.3", {
-          "packageLocation": "./.yarn/cache/ajv-npm-8.6.3-ccbb84803e-690ffb9408.zip/node_modules/ajv/",
+        ["npm:8.11.0", {
+          "packageLocation": "./.yarn/cache/ajv-npm-8.11.0-83d029789c-5e0ff22680.zip/node_modules/ajv/",
           "packageDependencies": [
-            ["ajv", "npm:8.6.3"],
+            ["ajv", "npm:8.11.0"],
             ["fast-deep-equal", "npm:3.1.3"],
             ["json-schema-traverse", "npm:1.0.0"],
             ["require-from-string", "npm:2.0.2"],
@@ -6364,7 +6364,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["@types/tmp", "npm:0.2.3"],
             ["@types/uuid", "npm:8.3.0"],
             ["add", "npm:2.0.6"],
-            ["ajv", "npm:8.6.3"],
+            ["ajv", "npm:8.11.0"],
             ["apollo-server", "virtual:aa59773ac87791c4813d53447077fcf8a847d6de5a301d34dc31286584b1dbb26d30d3adb5b4c41c1e8aea04371e926fda05c09c6253647c432e11d872a304ba#npm:3.5.0"],
             ["apollo-server-koa", "virtual:aa59773ac87791c4813d53447077fcf8a847d6de5a301d34dc31286584b1dbb26d30d3adb5b4c41c1e8aea04371e926fda05c09c6253647c432e11d872a304ba#npm:2.25.1"],
             ["axios", "npm:0.21.4"],

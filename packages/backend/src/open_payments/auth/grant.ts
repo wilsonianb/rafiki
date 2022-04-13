@@ -1,6 +1,24 @@
+// import Ajv, {JSONSchemaType} from 'ajv'
 import assert from 'assert'
 
 import { Amount } from '../payment/amount'
+// import spec from './server_spec.json'
+
+// // const ajv = new Ajv()
+// const ajv = new Ajv({
+//   discriminator: true,
+//   // schemas: [spec]
+// })
+
+// ajv.addSchema(spec, 'openapi.json')
+
+// ajv.addKeyword('openapi')
+
+// console.log(ajv)
+
+// const validate = ajv.getSchema("openapi.json#/components/schemas/access")
+// const validate = ajv.compile(spec['components']['schemas']['access'])
+// console.log(validate)
 
 interface AmountJSON {
   value: string
@@ -62,6 +80,52 @@ export interface GrantOptions {
 export type GrantJSON = Omit<GrantOptions, 'access'> & {
   access?: GrantAccessJSON[]
 }
+
+// const schema: JSONSchemaType<MyData> = {
+//   type: 'object',
+//   properties: {
+//     active: {
+//       type: 'boolean'
+//     },
+//     grant: {
+//       type: 'string'
+//     },
+//     access: {
+//       type: 'array',
+//       items: {
+//         type: 'object',
+//         properties: {
+//           type: {
+//             type: 'string',
+//             enum: [
+//               'account',
+
+//             - incoming-payment
+//             - outgoing-payment
+//         actions:
+//           type: array
+//           items:
+//             type: string
+//             enum:
+//               - create
+//               - read
+//               - update
+//               - read-all
+//               - list
+//               - list-all
+//         identifier:
+//           type: string
+//           format: uri
+//         limits:
+//           $ref: '#/components/schemas/limits'
+//       required:
+//         - type
+//         - actions
+//       }
+//     }
+//   },
+//   required: ['active']
+// }
 
 export class Grant {
   constructor(options: GrantOptions) {

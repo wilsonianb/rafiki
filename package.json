@@ -11,7 +11,7 @@
     "format:local": "prettier --write $INIT_CWD",
     "format:check:local": "prettier --check $INIT_CWD",
     "test": "jest --passWithNoTests",
-    "test:local": "jest $INIT_CWD --passWithNoTests",
+    "test:local": "jest $INIT_CWD/src/open_payments/auth/m* --passWithNoTests",
     "build": "tsc --build",
     "postinstall": "[ -d '.husky' ] && husky install || true"
   },
