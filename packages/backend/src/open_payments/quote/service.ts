@@ -166,7 +166,9 @@ export async function startQuote(
 
     // validateAssets(deps, options, destination)
 
-    const prices = await deps.ratesService.prices()
+    const prices = await deps.ratesService.prices().catch((_err: Error) => {
+      throw new Error('missing prices')
+    })
     const quoteOptions: Pay.QuoteOptions = {
       plugin,
       destination,
@@ -198,6 +200,10 @@ export async function startQuote(
           destination.destinationPaymentDetails.incomingAmount?.value ===
             options.receiveAmount.value
         )
+      }
+    } else {
+      if (!destination.destinationPaymentDetails.incomingAmount) {
+        throw QuoteError.InvalidDestination
       }
     }
     const quote = await Pay.startQuote(quoteOptions).finally(() => {

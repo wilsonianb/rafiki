@@ -22,7 +22,6 @@ import { AccountingService } from '../../accounting/service'
 import { AssetOptions } from '../../asset/service'
 import { Amount } from '../payment/amount'
 import { IncomingPayment } from '../payment/incoming/model'
-// import { RatesService } from '../../rates/service'
 // import { Pagination } from '../../shared/baseModel'
 // import { getPageTests } from '../../shared/baseModel.test'
 import { isIncomingPaymentError } from '../payment/incoming/errors'
@@ -31,7 +30,6 @@ describe('QuoteService', (): void => {
   let deps: IocContract<AppServices>
   let appContainer: TestContainer
   let quoteService: QuoteService
-  // let ratesService: RatesService
   let accountingService: AccountingService
   let knex: Knex
   let accountId: string
@@ -156,7 +154,6 @@ describe('QuoteService', (): void => {
       deps = await initIocContainer(Config)
       appContainer = await createTestApp(deps)
       accountingService = await deps.use('accountingService')
-      // ratesService = await deps.use('ratesService')
 
       knex = await deps.use('knex')
       config = await deps.use('config')
@@ -308,7 +305,11 @@ describe('QuoteService', (): void => {
           paymentType: Pay.PaymentType.FixedDelivery,
           sendAmount,
           receiveAmount: {
-            value: BigInt(Math.ceil(123 * quote.minExchangeRate.valueOf())),
+            value: BigInt(
+              Math.ceil(
+                Number(sendAmount.value) * quote.minExchangeRate.valueOf()
+              )
+            ),
             assetCode: destinationAsset.code,
             assetScale: destinationAsset.scale
           },
@@ -443,5 +444,30 @@ describe('QuoteService', (): void => {
         ).resolves.toEqual(error)
       }
     )
+
+    it('fails on rate service error)', async (): Promise<void> => {
+      const ratesService = await deps.use('ratesService')
+      jest
+        .spyOn(ratesService, 'prices')
+        .mockImplementation(() => Promise.reject(new Error('fail')))
+      await expect(
+        quoteService.create({
+          accountId,
+          receivingPayment
+        })
+      ).rejects.toThrow('missing prices')
+    })
+
+    it('fails on incoming payment without incomingAmount)', async (): Promise<void> => {
+      await incomingPayment.$query(knex).patch({
+        incomingAmount: undefined
+      })
+      await expect(
+        quoteService.create({
+          accountId,
+          receivingPayment
+        })
+      ).resolves.toEqual(QuoteError.InvalidDestination)
+    })
   })
 })

@@ -1,5 +1,4 @@
 import * as Pay from '@interledger/pay'
-import assert from 'assert'
 
 import { LifecycleError } from './errors'
 import {
@@ -9,101 +8,29 @@ import {
   PaymentEventType
 } from './model'
 import { ServiceDependencies } from './service'
+import { isQuoteError } from '../../quote/errors'
 import { IlpPlugin } from '../../shared/ilp_plugin'
-
-const MAX_INT64 = BigInt('9223372036854775807')
 
 // Acquire a quote for the user to approve.
 // "payment" is locked by the "deps.knex" transaction.
 export async function handlePending(
   deps: ServiceDependencies,
-  payment: OutgoingPayment,
-  plugin: IlpPlugin
+  payment: OutgoingPayment
 ): Promise<void> {
-  const prices = await deps.ratesService.prices().catch((_err: Error) => {
-    throw LifecycleError.PricesUnavailable
+  const quoteOrErr = await deps.quoteService.create({
+    accountId: payment.accountId,
+    receivingAccount: payment.receivingAccount || undefined,
+    receivingPayment: payment.receivingPayment || undefined,
+    sendAmount: payment.sendAmount || undefined,
+    receiveAmount: payment.receiveAmount || undefined
   })
-
-  const options: Pay.SetupOptions = { plugin }
-  if (payment.receivingPayment) {
-    options.destinationPayment = payment.receivingPayment
-  } else {
-    options.destinationAccount = payment.receivingAccount
-    if (payment.receiveAmount) {
-      options.amountToDeliver = {
-        value: payment.receiveAmount.value,
-        assetCode: payment.receiveAmount.assetCode,
-        assetScale: payment.receiveAmount.assetScale
-      }
-    }
+  if (isQuoteError(quoteOrErr)) {
+    throw quoteOrErr
   }
-  const destination = await Pay.setupPayment(options)
-
-  if (!payment.receivingPayment) {
-    if (!destination.destinationPaymentDetails) {
-      throw LifecycleError.MissingIncomingPayment
-    }
-    await payment.$query(deps.knex).patch({
-      receivingPayment: destination.destinationPaymentDetails.id
-    })
-  }
-
-  validateAssets(deps, payment, destination)
-
-  const quote = await Pay.startQuote({
-    plugin,
-    destination,
-    sourceAsset: {
-      scale: payment.asset.scale,
-      code: payment.asset.code
-    },
-    amountToSend: payment.sendAmount?.value,
-    amountToDeliver: payment.receiveAmount?.value,
-    slippage: deps.slippage,
-    prices
-  }).finally(() => {
-    return Pay.closeConnection(plugin, destination).catch((err) => {
-      deps.logger.warn(
-        {
-          destination: destination.destinationAddress,
-          error: err.message
-        },
-        'close quote connection failed'
-      )
-    })
-  })
-
-  // Pay.startQuote should return PaymentError.InvalidSourceAmount or
-  // PaymentError.InvalidDestinationAmount for non-positive amounts.
-  // Outgoing payments' sendAmount or receiveAmount should never be
-  // zero or negative.
-  assert.ok(quote.maxSourceAmount > BigInt(0))
-  assert.ok(quote.minDeliveryAmount > BigInt(0))
-
   await payment.$query(deps.knex).patch({
-    state: OutgoingPaymentState.Funding,
-    sendAmount: payment.sendAmount || {
-      value: quote.maxSourceAmount,
-      assetCode: payment.asset.code,
-      assetScale: payment.asset.scale
-    },
-    receiveAmount: {
-      value: payment.receiveAmount?.value || quote.minDeliveryAmount,
-      assetCode: destination.destinationAsset.code,
-      assetScale: destination.destinationAsset.scale
-    },
-    quote: {
-      timestamp: new Date(),
-      targetType: quote.paymentType,
-      // Cap at MAX_INT64 because of postgres type limits.
-      maxPacketAmount:
-        MAX_INT64 < quote.maxPacketAmount ? MAX_INT64 : quote.maxPacketAmount,
-      minExchangeRate: quote.minExchangeRate,
-      lowExchangeRateEstimate: quote.lowEstimatedExchangeRate,
-      highExchangeRateEstimate: quote.highEstimatedExchangeRate
-    }
+    quoteId: quoteOrErr.id,
+    state: OutgoingPaymentState.Funding
   })
-
   await sendWebhookEvent(deps, payment, PaymentEventType.PaymentFunding)
 }
 
@@ -162,9 +89,9 @@ export async function handleSending(
   }
 
   if (
-    (payment.quote.targetType === Pay.PaymentType.FixedSend &&
+    (payment.quote.paymentType === Pay.PaymentType.FixedSend &&
       newMaxSourceAmount <= BigInt(0)) ||
-    (payment.quote.targetType === Pay.PaymentType.FixedDelivery &&
+    (payment.quote.paymentType === Pay.PaymentType.FixedDelivery &&
       newMinDeliveryAmount <= BigInt(0))
   ) {
     // Payment is already (unexpectedly) done. Maybe this is a retry and the previous attempt failed to save the state to Postgres. Or the invoice could have been paid by a totally different payment in the time since the quote.
@@ -172,7 +99,7 @@ export async function handleSending(
       {
         newMaxSourceAmount,
         newMinDeliveryAmount,
-        paymentType: payment.quote.targetType,
+        paymentType: payment.quote.paymentType,
         amountSent,
         incomingPayment: destination.destinationPaymentDetails
       },
@@ -190,30 +117,19 @@ export async function handleSending(
       {
         newMaxSourceAmount,
         newMinDeliveryAmount,
-        paymentType: payment.quote.targetType
+        paymentType: payment.quote.paymentType
       },
       'handleSending bad retry state'
     )
     throw LifecycleError.BadState
   }
 
-  const lowEstimatedExchangeRate = payment.quote.lowExchangeRateEstimate
-  const highEstimatedExchangeRate = payment.quote.highExchangeRateEstimate
+  const lowEstimatedExchangeRate = payment.quote.lowEstimatedExchangeRate
+  const highEstimatedExchangeRate = payment.quote.highEstimatedExchangeRate
   const minExchangeRate = payment.quote.minExchangeRate
-  if (!highEstimatedExchangeRate.isPositive()) {
-    // This shouldn't ever happen, since the rate is correct when they are stored during the quoting stage.
-    deps.logger.error(
-      {
-        lowEstimatedExchangeRate,
-        highEstimatedExchangeRate,
-        minExchangeRate
-      },
-      'invalid estimated rate'
-    )
-    throw LifecycleError.InvalidRatio
-  }
-  const quote = {
-    paymentType: payment.quote.targetType,
+  const quote: Pay.Quote = {
+    ...payment.quote,
+    paymentType: payment.quote.paymentType,
     // Adjust quoted amounts to account for prior partial payment.
     maxSourceAmount: newMaxSourceAmount,
     minDeliveryAmount: newMinDeliveryAmount,
@@ -240,7 +156,7 @@ export async function handleSending(
     {
       destination: destination.destinationAddress,
       error: receipt.error,
-      paymentType: payment.quote.targetType,
+      paymentType: payment.quote.paymentType,
       newMaxSourceAmount,
       newMinDeliveryAmount,
       receiptAmountSent: receipt.amountSent,

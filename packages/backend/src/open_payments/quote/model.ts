@@ -16,6 +16,7 @@ export class Quote extends BaseModel {
       'receiveAmount',
       // 'maxSourceAmount',
       // 'minDeliveryAmount',
+      'paymentType',
       'minExchangeRate',
       'lowEstimatedExchangeRate',
       'highEstimatedExchangeRate'

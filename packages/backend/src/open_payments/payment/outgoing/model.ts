@@ -1,11 +1,11 @@
 import { Model, ModelOptions, QueryContext } from 'objection'
-import * as Pay from '@interledger/pay'
 
 import { LiquidityAccount } from '../../../accounting/service'
 import { Asset } from '../../../asset/model'
 import { ConnectorAccount } from '../../../connector/core/rafiki'
 import { Account } from '../../account/model'
-import { Amount } from '../amount'
+import { Quote } from '../../quote/model'
+import { Amount, AmountJSON } from '../amount'
 import { BaseModel } from '../../../shared/baseModel'
 import { WebhookEvent } from '../../../webhook/model'
 
@@ -15,7 +15,7 @@ export class OutgoingPayment
   public static readonly tableName = 'outgoingPayments'
 
   static get virtualAttributes(): string[] {
-    return ['sendAmount', 'receiveAmount', 'quote']
+    return ['sendAmount', 'receiveAmount']
   }
 
   public state!: OutgoingPaymentState
@@ -26,11 +26,18 @@ export class OutgoingPayment
   public receivingAccount?: string
   public receivingPayment?: string
 
+  // public get receivingPayment(): string | null {
+  //   return this.quote.receivingPayment || this.receivingPayment
+  // }
+
   private sendAmountValue?: bigint | null
   private sendAmountAssetCode?: string | null
   private sendAmountAssetScale?: number | null
 
   public get sendAmount(): Amount | null {
+    if (this.quote) {
+      return this.quote.sendAmount
+    }
     if (this.sendAmountValue) {
       return {
         value: this.sendAmountValue,
@@ -50,6 +57,9 @@ export class OutgoingPayment
   private receiveAmountAssetScale?: number | null
 
   public get receiveAmount(): Amount | null {
+    if (this.quote) {
+      return this.quote.receiveAmount
+    }
     if (
       this.receiveAmountValue &&
       this.receiveAmountAssetCode &&
@@ -73,80 +83,15 @@ export class OutgoingPayment
   public description?: string
   public externalRef?: string
 
-  private quoteTimestamp?: Date | null
-  private quoteTargetType?: Pay.PaymentType | null
-  private quoteMaxPacketAmount?: bigint | null
-  private quoteMinExchangeRateNumerator?: bigint | null
-  private quoteMinExchangeRateDenominator?: bigint | null
-  private quoteLowExchangeRateEstimateNumerator?: bigint | null
-  private quoteLowExchangeRateEstimateDenominator?: bigint | null
-  private quoteHighExchangeRateEstimateNumerator?: bigint | null
-  private quoteHighExchangeRateEstimateDenominator?: bigint | null
-
-  public get quote(): PaymentQuote | null {
-    if (
-      !this.quoteTimestamp ||
-      !this.quoteTargetType ||
-      !this.quoteMaxPacketAmount ||
-      !this.quoteMinExchangeRateNumerator ||
-      !this.quoteMinExchangeRateDenominator ||
-      !this.quoteLowExchangeRateEstimateNumerator ||
-      !this.quoteLowExchangeRateEstimateDenominator ||
-      !this.quoteHighExchangeRateEstimateNumerator ||
-      !this.quoteHighExchangeRateEstimateDenominator
-    )
-      return null
-
-    return {
-      timestamp: this.quoteTimestamp,
-      targetType: this.quoteTargetType,
-      maxPacketAmount: this.quoteMaxPacketAmount,
-      minExchangeRate: Pay.Ratio.of(
-        Pay.Int.from(this.quoteMinExchangeRateNumerator) as Pay.PositiveInt,
-        Pay.Int.from(this.quoteMinExchangeRateDenominator) as Pay.PositiveInt
-      ),
-      lowExchangeRateEstimate: Pay.Ratio.of(
-        Pay.Int.from(
-          this.quoteLowExchangeRateEstimateNumerator
-        ) as Pay.PositiveInt,
-        Pay.Int.from(
-          this.quoteLowExchangeRateEstimateDenominator
-        ) as Pay.PositiveInt
-      ),
-      highExchangeRateEstimate: Pay.Ratio.of(
-        Pay.Int.from(
-          this.quoteHighExchangeRateEstimateNumerator
-        ) as Pay.PositiveInt,
-        Pay.Int.from(
-          this.quoteHighExchangeRateEstimateDenominator
-        ) as Pay.PositiveInt
-      )
-    }
-  }
-
-  public set quote(value: PaymentQuote | null) {
-    this.quoteTimestamp = value?.timestamp ?? null
-    this.quoteTargetType = value?.targetType ?? null
-    this.quoteMaxPacketAmount = value?.maxPacketAmount ?? null
-    this.quoteMinExchangeRateNumerator = value?.minExchangeRate.a.value ?? null
-    this.quoteMinExchangeRateDenominator =
-      value?.minExchangeRate.b.value ?? null
-    this.quoteLowExchangeRateEstimateNumerator =
-      value?.lowExchangeRateEstimate.a.value ?? null
-    this.quoteLowExchangeRateEstimateDenominator =
-      value?.lowExchangeRateEstimate.b.value ?? null
-    this.quoteHighExchangeRateEstimateNumerator =
-      value?.highExchangeRateEstimate.a.value ?? null
-    this.quoteHighExchangeRateEstimateDenominator =
-      value?.highExchangeRateEstimate.b.value ?? null
-  }
-
   // Open payments account id of the sender
   public accountId!: string
   public account?: Account
 
   public readonly assetId!: string
   public asset!: Asset
+
+  public quoteId?: string
+  public quote?: Quote
 
   static relationMappings = {
     account: {
@@ -163,6 +108,14 @@ export class OutgoingPayment
       join: {
         from: 'outgoingPayments.assetId',
         to: 'assets.id'
+      }
+    },
+    quote: {
+      relation: Model.HasOneRelation,
+      modelClass: Quote,
+      join: {
+        from: 'outgoingPayments.quoteId',
+        to: 'quotes.id'
       }
     }
   }
@@ -225,29 +178,8 @@ export class OutgoingPayment
     if (this.error) {
       data.payment.error = this.error
     }
-    if (this.quote) {
-      data.payment.quote = {
-        ...this.quote,
-        timestamp: this.quote.timestamp.toISOString(),
-        maxPacketAmount: this.quote.maxPacketAmount.toString(),
-        minExchangeRate: this.quote.minExchangeRate.valueOf(),
-        lowExchangeRateEstimate: this.quote.lowExchangeRateEstimate.valueOf(),
-        highExchangeRateEstimate: this.quote.highExchangeRateEstimate.valueOf()
-      }
-    }
     return data
   }
-}
-
-interface PaymentQuote {
-  timestamp: Date
-  targetType: Pay.PaymentType
-  maxPacketAmount: bigint
-  minExchangeRate: Pay.Ratio
-  lowExchangeRateEstimate: Pay.Ratio
-  // Note that the upper exchange rate bound is *exclusive*.
-  // (Pay.PositiveRatio, but validated later)
-  highExchangeRateEstimate: Pay.Ratio
 }
 
 export enum OutgoingPaymentState {
@@ -282,12 +214,6 @@ export const PaymentEventType = {
 }
 export type PaymentEventType = PaymentDepositType | PaymentWithdrawType
 
-interface AmountData {
-  value: string
-  assetCode: string
-  assetScale: number
-}
-
 export type PaymentData = {
   payment: {
     id: string
@@ -298,18 +224,10 @@ export type PaymentData = {
     stateAttempts: number
     receivingAccount?: string
     receivingPayment?: string
-    sendAmount?: AmountData
-    receiveAmount?: AmountData
+    sendAmount?: AmountJSON
+    receiveAmount?: AmountJSON
     description?: string
     externalRef?: string
-    quote?: {
-      timestamp: string
-      targetType: Pay.PaymentType
-      maxPacketAmount: string
-      minExchangeRate: number
-      lowExchangeRateEstimate: number
-      highExchangeRateEstimate: number
-    }
     outcome: {
       amountSent: string
     }

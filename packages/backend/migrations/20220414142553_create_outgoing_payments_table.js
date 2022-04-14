@@ -34,6 +34,9 @@ exports.up = function (knex) {
     table.uuid('assetId').notNullable()
     table.foreign('assetId').references('assets.id')
 
+    table.uuid('quoteId').notNullable()
+    table.foreign('quoteId').references('quotes.id')
+
     table.timestamp('createdAt').defaultTo(knex.fn.now())
     table.timestamp('updatedAt').defaultTo(knex.fn.now())
 

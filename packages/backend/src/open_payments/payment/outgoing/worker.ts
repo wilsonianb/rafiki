@@ -96,18 +96,7 @@ export async function handlePaymentLifecycle(
         sourceAccount: payment,
         unfulfillable: true
       })
-      return plugin
-        .connect()
-        .then(() => lifecycle.handlePending(deps, payment, plugin))
-        .catch(onError)
-        .finally(() => {
-          return plugin.disconnect().catch((err: Error) => {
-            deps.logger.warn(
-              { error: err.message },
-              'error disconnecting plugin'
-            )
-          })
-        })
+      return lifecycle.handlePending(deps, payment).catch(onError)
     case OutgoingPaymentState.Sending:
       plugin = deps.makeIlpPlugin({
         sourceAccount: payment

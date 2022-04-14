@@ -6,8 +6,8 @@ import { FundingError, LifecycleError, OutgoingPaymentError } from './errors'
 import { OutgoingPayment, OutgoingPaymentState } from './model'
 import { AccountingService } from '../../../accounting/service'
 import { AccountService } from '../../account/service'
+import { QuoteService } from '../../quote/service'
 import { Amount } from '../amount'
-import { RatesService } from '../../../rates/service'
 import { IlpPlugin, IlpPluginOptions } from '../../shared/ilp_plugin'
 import * as worker from './worker'
 
@@ -28,11 +28,9 @@ export interface OutgoingPaymentService {
 
 export interface ServiceDependencies extends BaseService {
   knex: TransactionOrKnex
-  slippage: number
-  quoteLifespan: number // milliseconds
   accountingService: AccountingService
   accountService: AccountService
-  ratesService: RatesService
+  quoteService: QuoteService
   makeIlpPlugin: (options: IlpPluginOptions) => IlpPlugin
 }
 
@@ -63,7 +61,7 @@ async function getOutgoingPayment(
 
 export interface CreateOutgoingPaymentOptions {
   accountId: string
-  authorized?: boolean
+  quoteId?: string
   sendAmount?: Amount
   receiveAmount?: Amount
   receivingAccount?: string
@@ -76,7 +74,13 @@ async function createOutgoingPayment(
   deps: ServiceDependencies,
   options: CreateOutgoingPaymentOptions
 ): Promise<OutgoingPayment | OutgoingPaymentError> {
-  if (options.receivingPayment) {
+  if (options.quoteId) {
+    if (options.receivingAccount || options.receivingPayment) {
+      return OutgoingPaymentError.InvalidDestination
+    } else if (options.sendAmount || options.receiveAmount) {
+      return OutgoingPaymentError.InvalidAmount
+    }
+  } else if (options.receivingPayment) {
     if (options.receivingAccount) {
       return OutgoingPaymentError.InvalidDestination
     }
