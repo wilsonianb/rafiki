@@ -17,6 +17,8 @@ exports.up = function (knex) {
     table.bigInteger('highExchangeRateEstimateNumerator').notNullable()
     table.bigInteger('highExchangeRateEstimateDenominator').notNullable()
 
+    table.timestamp('expiresAt').notNullable()
+
     table.boolean('completeReceivingPayment').notNullable().defaultTo(false)
 
     // Open Payments account from which this quote's payment would be sent

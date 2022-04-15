@@ -3568,25 +3568,17 @@
             "deprecationReason": null
           },
           {
-            "name": "receivingAccount",
-            "description": null,
-            "args": [],
-            "type": {
-              "kind": "SCALAR",
-              "name": "String",
-              "ofType": null
-            },
-            "isDeprecated": false,
-            "deprecationReason": null
-          },
-          {
             "name": "sendAmount",
             "description": null,
             "args": [],
             "type": {
-              "kind": "OBJECT",
-              "name": "Amount",
-              "ofType": null
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "OBJECT",
+                "name": "Amount",
+                "ofType": null
+              }
             },
             "isDeprecated": false,
             "deprecationReason": null
@@ -3596,9 +3588,13 @@
             "description": null,
             "args": [],
             "type": {
-              "kind": "OBJECT",
-              "name": "Amount",
-              "ofType": null
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "OBJECT",
+                "name": "Amount",
+                "ofType": null
+              }
             },
             "isDeprecated": false,
             "deprecationReason": null
@@ -3993,7 +3989,7 @@
         "description": null,
         "fields": [
           {
-            "name": "timestamp",
+            "name": "receivingPayment",
             "description": null,
             "args": [],
             "type": {
@@ -4009,15 +4005,31 @@
             "deprecationReason": null
           },
           {
-            "name": "targetType",
+            "name": "sendAmount",
             "description": null,
             "args": [],
             "type": {
               "kind": "NON_NULL",
               "name": null,
               "ofType": {
-                "kind": "ENUM",
-                "name": "PaymentType",
+                "kind": "OBJECT",
+                "name": "Amount",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "receiveAmount",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "OBJECT",
+                "name": "Amount",
                 "ofType": null
               }
             },
@@ -4057,7 +4069,7 @@
             "deprecationReason": null
           },
           {
-            "name": "lowExchangeRateEstimate",
+            "name": "lowEstimatedExchangeRate",
             "description": null,
             "args": [],
             "type": {
@@ -4073,7 +4085,7 @@
             "deprecationReason": null
           },
           {
-            "name": "highExchangeRateEstimate",
+            "name": "highEstimatedExchangeRate",
             "description": null,
             "args": [],
             "type": {
@@ -4082,6 +4094,22 @@
               "ofType": {
                 "kind": "SCALAR",
                 "name": "Float",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
+          },
+          {
+            "name": "createdAt",
+            "description": null,
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String",
                 "ofType": null
               }
             },

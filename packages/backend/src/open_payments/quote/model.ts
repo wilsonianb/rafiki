@@ -50,7 +50,7 @@ export class Quote extends BaseModel {
     }
   }
 
-  public expiresAt?: Date | null
+  public expiresAt!: Date
 
   public receivingPayment!: string
 

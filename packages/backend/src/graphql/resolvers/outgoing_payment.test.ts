@@ -1,7 +1,7 @@
 import assert from 'assert'
 import { gql } from 'apollo-server-koa'
 import Knex from 'knex'
-import { PaymentError, PaymentType } from '@interledger/pay'
+import { PaymentError } from '@interledger/pay'
 import { v4 as uuid } from 'uuid'
 import * as Pay from '@interledger/pay'
 
@@ -88,19 +88,6 @@ describe('OutgoingPayment Resolvers', (): void => {
   ): Promise<OutgoingPaymentModel> => {
     const payment = await outgoingPaymentService.create(options)
     assert.ok(!isOutgoingPaymentError(payment))
-    await payment.$query(knex).patch({
-      quote: {
-        timestamp: new Date(),
-        targetType: PaymentType.FixedSend,
-        maxPacketAmount: BigInt(789),
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        minExchangeRate: Pay.Ratio.from(1.23)!,
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        lowExchangeRateEstimate: Pay.Ratio.from(1.2)!,
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        highExchangeRateEstimate: Pay.Ratio.from(2.3)!
-      }
-    })
     return payment
   }
 
@@ -174,7 +161,6 @@ describe('OutgoingPayment Resolvers', (): void => {
                       state
                       error
                       stateAttempts
-                      receivingAccount
                       receivingPayment
                       sendAmount {
                         value
@@ -189,12 +175,11 @@ describe('OutgoingPayment Resolvers', (): void => {
                       description
                       externalRef
                       quote {
-                        timestamp
-                        targetType
                         maxPacketAmount
                         minExchangeRate
-                        lowExchangeRateEstimate
-                        highExchangeRateEstimate
+                        lowEstimatedExchangeRate
+                        highEstimatedExchangeRate
+                        createdAt
                       }
                       outcome {
                         amountSent
@@ -214,7 +199,6 @@ describe('OutgoingPayment Resolvers', (): void => {
             expect(query.state).toEqual(state)
             expect(query.error).toEqual(error)
             expect(query.stateAttempts).toBe(0)
-            expect(query.receivingAccount).toEqual(receivingAccount)
             expect(query.sendAmount).toEqual(
               sendAmount
                 ? {
@@ -239,12 +223,12 @@ describe('OutgoingPayment Resolvers', (): void => {
             expect(query.description).toEqual(description)
             expect(query.externalRef).toBeNull()
             expect(query.quote).toEqual({
-              timestamp: payment.quote?.timestamp.toISOString(),
               targetType: SchemaPaymentType.FixedSend,
-              maxPacketAmount: payment.quote?.maxPacketAmount.toString(),
-              minExchangeRate: payment.quote?.minExchangeRate.valueOf(),
-              lowExchangeRateEstimate: payment.quote?.lowExchangeRateEstimate.valueOf(),
-              highExchangeRateEstimate: payment.quote?.highExchangeRateEstimate.valueOf(),
+              maxPacketAmount: payment.quote.maxPacketAmount.toString(),
+              minExchangeRate: payment.quote.minExchangeRate.valueOf(),
+              lowEstimatedExchangeRate: payment.quote.lowEstimatedExchangeRate.valueOf(),
+              highEstimatedExchangeRate: payment.quote.highEstimatedExchangeRate.valueOf(),
+              createdAt: payment.quote.createdAt.toISOString(),
               __typename: 'PaymentQuote'
             })
             expect(query.outcome).toEqual({

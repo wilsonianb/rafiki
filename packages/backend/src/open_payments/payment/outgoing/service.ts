@@ -2,13 +2,24 @@ import { ForeignKeyViolationError, TransactionOrKnex } from 'objection'
 
 import { Pagination } from '../../../shared/baseModel'
 import { BaseService } from '../../../shared/baseService'
-import { FundingError, LifecycleError, OutgoingPaymentError } from './errors'
-import { OutgoingPayment, OutgoingPaymentState } from './model'
+import {
+  FundingError,
+  LifecycleError,
+  OutgoingPaymentError,
+  isOutgoingPaymentError
+} from './errors'
+import {
+  OutgoingPayment,
+  OutgoingPaymentState,
+  PaymentEventType
+} from './model'
 import { AccountingService } from '../../../accounting/service'
 import { AccountService } from '../../account/service'
 import { QuoteService } from '../../quote/service'
+import { isQuoteError } from '../../quote/errors'
 import { Amount } from '../amount'
 import { IlpPlugin, IlpPluginOptions } from '../../shared/ilp_plugin'
+import { sendWebhookEvent } from './lifecycle'
 import * as worker from './worker'
 
 export interface OutgoingPaymentService {
@@ -81,6 +92,11 @@ async function createOutgoingPayment(
       return OutgoingPaymentError.InvalidAmount
     }
   } else if (options.receivingPayment) {
+    const quoteOrErr = await deps.quoteService.create(options)
+    if (isQuoteError(quoteOrErr)) {
+      return quoteOrErr
+    }
+
     if (options.receivingAccount) {
       return OutgoingPaymentError.InvalidDestination
     }
@@ -119,25 +135,41 @@ async function createOutgoingPayment(
     return await OutgoingPayment.transaction(deps.knex, async (trx) => {
       const payment = await OutgoingPayment.query(trx)
         .insertAndFetch({
+          id: options.quoteId,
           ...options,
-          assetId: account.assetId,
-          state: options.quoteId
-            ? OutgoingPaymentState.Funding
-            : OutgoingPaymentState.Pending
+          state: OutgoingPaymentState.Funding
         })
-        .withGraphFetched('[asset, quote.asset]')
+        .withGraphFetched('[quote.asset]')
+
+      if (
+        payment.accountId !== payment.quote.accountId ||
+        payment.quote.expiresAt.getTime() <= payment.createdAt.getTime()
+      ) {
+        throw OutgoingPaymentError.InvalidQuote
+      }
 
       // TODO: move to fundPayment
       await deps.accountingService.createLiquidityAccount({
         id: payment.id,
         asset: payment.asset
       })
-
+      await sendWebhookEvent(
+        {
+          ...deps,
+          knex: trx
+        },
+        payment,
+        PaymentEventType.PaymentCreated
+      )
       return payment
     })
   } catch (err) {
     if (err instanceof ForeignKeyViolationError) {
+      // check quote and account
+      console.log(err)
       return OutgoingPaymentError.UnknownAccount
+    } else if (isOutgoingPaymentError(err)) {
+      return err
     }
     throw err
   }

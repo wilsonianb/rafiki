@@ -91,12 +91,6 @@ export async function handlePaymentLifecycle(
   // Plugins are cleaned up in `finally` to avoid leaking http2 connections.
   let plugin: IlpPlugin
   switch (payment.state) {
-    case OutgoingPaymentState.Pending:
-      plugin = deps.makeIlpPlugin({
-        sourceAccount: payment,
-        unfulfillable: true
-      })
-      return lifecycle.handlePending(deps, payment).catch(onError)
     case OutgoingPaymentState.Sending:
       plugin = deps.makeIlpPlugin({
         sourceAccount: payment

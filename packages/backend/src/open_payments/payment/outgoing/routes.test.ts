@@ -1,4 +1,3 @@
-import * as Pay from '@interledger/pay'
 import assert from 'assert'
 import * as httpMocks from 'node-mocks-http'
 import Knex from 'knex'
@@ -186,18 +185,7 @@ describe('Outgoing Payment Routes', (): void => {
       await outgoingPayment.$query(knex).patch({
         state: OutgoingPaymentState.Funding,
         sendAmount,
-        receiveAmount,
-        quote: {
-          timestamp: new Date(),
-          targetType: Pay.PaymentType.FixedSend,
-          maxPacketAmount: BigInt(789),
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          minExchangeRate: Pay.Ratio.from(1.23)!,
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          lowExchangeRateEstimate: Pay.Ratio.from(1.2)!,
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          highExchangeRateEstimate: Pay.Ratio.from(2.3)!
-        }
+        receiveAmount
       })
       const ctx = createContext(
         {

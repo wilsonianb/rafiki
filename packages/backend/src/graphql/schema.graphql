@@ -392,9 +392,8 @@ type OutgoingPayment implements Model {
   state: OutgoingPaymentState!
   error: String
   stateAttempts: Int!
-  receivingAccount: String
-  sendAmount: Amount
-  receiveAmount: Amount
+  sendAmount: Amount!
+  receiveAmount: Amount!
   receivingPayment: String
   description: String
   externalRef: String
@@ -422,12 +421,15 @@ enum PaymentType {
 }
 
 type PaymentQuote {
-  timestamp: String!
-  targetType: PaymentType!
+  receivingPayment: String!
+  sendAmount: Amount!
+  receiveAmount: Amount!
   maxPacketAmount: UInt64!
   minExchangeRate: Float!
-  lowExchangeRateEstimate: Float!
-  highExchangeRateEstimate: Float!
+  lowEstimatedExchangeRate: Float!
+  highEstimatedExchangeRate: Float!
+  createdAt: String!
+  # expiresAt: String!
 }
 
 type OutgoingPaymentOutcome {

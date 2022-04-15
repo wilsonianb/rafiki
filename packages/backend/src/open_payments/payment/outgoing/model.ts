@@ -14,75 +14,26 @@ export class OutgoingPayment
   implements ConnectorAccount, LiquidityAccount {
   public static readonly tableName = 'outgoingPayments'
 
-  static get virtualAttributes(): string[] {
-    return ['receivingPayment', 'sendAmount', 'receiveAmount']
-  }
+  // static get virtualAttributes(): string[] {
+  //   return ['receivingPayment', 'sendAmount', 'receiveAmount']
+  // }
 
   public state!: OutgoingPaymentState
   // The "| null" is necessary so that `$beforeUpdate` can modify a patch to remove the error. If `$beforeUpdate` set `error = undefined`, the patch would ignore the modification.
   public error?: string | null
   public stateAttempts!: number
 
-  public receivingAccount?: string
-  private _receivingPayment?: string | null
-
-  public get receivingPayment(): string | null {
-    return this.quote?.receivingPayment || this._receivingPayment || null
+  public get receivingPayment(): string {
+    return this.quote.receivingPayment
   }
 
-  public set receivingPayment(payment: string | null) {
-    this._receivingPayment = payment
+  public get sendAmount(): Amount {
+    // this requires 'quote.asset'
+    return this.quote.sendAmount
   }
 
-  private sendAmountValue?: bigint | null
-  private sendAmountAssetCode?: string | null
-  private sendAmountAssetScale?: number | null
-
-  public get sendAmount(): Amount | null {
-    if (this.quote) {
-      // this requires 'quote.asset'
-      return this.quote.sendAmount
-    }
-    if (this.sendAmountValue) {
-      return {
-        value: this.sendAmountValue,
-        assetCode: this.asset.code,
-        assetScale: this.asset.scale
-      }
-    }
-    return null
-  }
-
-  public set sendAmount(amount: Amount | null) {
-    this.sendAmountValue = amount?.value ?? null
-  }
-
-  private receiveAmountValue?: bigint | null
-  private receiveAmountAssetCode?: string | null
-  private receiveAmountAssetScale?: number | null
-
-  public get receiveAmount(): Amount | null {
-    if (this.quote) {
-      return this.quote.receiveAmount
-    }
-    if (
-      this.receiveAmountValue &&
-      this.receiveAmountAssetCode &&
-      this.receiveAmountAssetScale
-    ) {
-      return {
-        value: this.receiveAmountValue,
-        assetCode: this.receiveAmountAssetCode,
-        assetScale: this.receiveAmountAssetScale
-      }
-    }
-    return null
-  }
-
-  public set receiveAmount(amount: Amount | null) {
-    this.receiveAmountValue = amount?.value ?? null
-    this.receiveAmountAssetCode = amount?.assetCode ?? null
-    this.receiveAmountAssetScale = amount?.assetScale ?? null
+  public get receiveAmount(): Amount {
+    return this.quote.receiveAmount
   }
 
   public description?: string
@@ -92,11 +43,17 @@ export class OutgoingPayment
   public accountId!: string
   public account?: Account
 
-  public readonly assetId!: string
-  public asset!: Asset
+  public quote!: Quote
 
-  public quoteId?: string
-  public quote?: Quote
+  public processAt!: Date | null
+
+  public get assetId(): string {
+    return this.quote.assetId
+  }
+
+  public get asset(): Asset {
+    return this.quote.asset
+  }
 
   static relationMappings = {
     account: {
@@ -107,19 +64,11 @@ export class OutgoingPayment
         to: 'accounts.id'
       }
     },
-    asset: {
-      relation: Model.HasOneRelation,
-      modelClass: Asset,
-      join: {
-        from: 'outgoingPayments.assetId',
-        to: 'assets.id'
-      }
-    },
     quote: {
       relation: Model.HasOneRelation,
       modelClass: Quote,
       join: {
-        from: 'outgoingPayments.quoteId',
+        from: 'outgoingPayments.id',
         to: 'quotes.id'
       }
     }
@@ -146,32 +95,21 @@ export class OutgoingPayment
         id: this.id,
         accountId: this.accountId,
         state: this.state,
+        receivingPayment: this.receivingPayment,
+        sendAmount: {
+          ...this.sendAmount,
+          value: this.sendAmount.value.toString()
+        },
+        receiveAmount: {
+          ...this.receiveAmount,
+          value: this.receiveAmount.value.toString()
+        },
         stateAttempts: this.stateAttempts,
         createdAt: new Date(+this.createdAt).toISOString(),
         outcome: {
           amountSent: amountSent.toString()
         },
         balance: balance.toString()
-      }
-    }
-    if (this.receivingAccount) {
-      data.payment.receivingAccount = this.receivingAccount
-    }
-    if (this.receivingPayment) {
-      data.payment.receivingPayment = this.receivingPayment
-    }
-    if (this.sendAmount) {
-      data.payment.sendAmount = {
-        value: this.sendAmount.value.toString(),
-        assetCode: this.sendAmount.assetCode,
-        assetScale: this.sendAmount.assetScale
-      }
-    }
-    if (this.receiveAmount) {
-      data.payment.receiveAmount = {
-        value: this.receiveAmount.value.toString(),
-        assetCode: this.receiveAmount.assetCode,
-        assetScale: this.receiveAmount.assetScale
       }
     }
     if (this.description) {
@@ -188,12 +126,11 @@ export class OutgoingPayment
 }
 
 export enum OutgoingPaymentState {
-  // Initial state. In this state, an empty account is generated, and the payment is automatically resolved & quoted.
-  // On success, transition to `FUNDING`.
-  // On failure, transition to `FAILED`.
   Pending = 'PENDING',
+  // Initial state.
   // Awaiting money from the user's wallet account to be deposited to the payment account to reserve it for the payment.
   // On success, transition to `SENDING`.
+  // On failure, transition to `FAILED`.
   Funding = 'FUNDING',
   // Pay from the account to the destination.
   // On success, transition to `COMPLETED`.
@@ -205,7 +142,7 @@ export enum OutgoingPaymentState {
 }
 
 export enum PaymentDepositType {
-  PaymentFunding = 'outgoing_payment.funding'
+  PaymentCreated = 'outgoing_payment.created'
 }
 
 export enum PaymentWithdrawType {

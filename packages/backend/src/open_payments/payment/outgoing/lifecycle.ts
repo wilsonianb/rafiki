@@ -8,31 +8,7 @@ import {
   PaymentEventType
 } from './model'
 import { ServiceDependencies } from './service'
-import { isQuoteError } from '../../quote/errors'
 import { IlpPlugin } from '../../shared/ilp_plugin'
-
-// Acquire a quote for the user to approve.
-// "payment" is locked by the "deps.knex" transaction.
-export async function handlePending(
-  deps: ServiceDependencies,
-  payment: OutgoingPayment
-): Promise<void> {
-  const quoteOrErr = await deps.quoteService.create({
-    accountId: payment.accountId,
-    receivingAccount: payment.receivingAccount || undefined,
-    receivingPayment: payment.receivingPayment || undefined,
-    sendAmount: payment.sendAmount || undefined,
-    receiveAmount: payment.receiveAmount || undefined
-  })
-  if (isQuoteError(quoteOrErr)) {
-    throw quoteOrErr
-  }
-  await payment.$query(deps.knex).patch({
-    quoteId: quoteOrErr.id,
-    state: OutgoingPaymentState.Funding
-  })
-  await sendWebhookEvent(deps, payment, PaymentEventType.PaymentFunding)
-}
 
 // "payment" is locked by the "deps.knex" transaction.
 export async function handleSending(
@@ -46,9 +22,12 @@ export async function handleSending(
 
   const destination = await Pay.setupPayment({
     plugin,
-    destinationAccount: payment.receivingAccount,
     destinationPayment: payment.receivingPayment
   })
+
+  if (!destination.destinationPaymentDetails) {
+    throw LifecycleError.MissingIncomingPayment
+  }
 
   validateAssets(deps, payment, destination)
 
@@ -62,11 +41,11 @@ export async function handleSending(
   const newMaxSourceAmount = payment.sendAmount.value - amountSent
 
   let newMinDeliveryAmount
-  if (
-    payment.receivingAccount ||
-    (destination.destinationPaymentDetails &&
-      !destination.destinationPaymentDetails.incomingAmount)
-  ) {
+  if (destination.destinationPaymentDetails.incomingAmount) {
+    newMinDeliveryAmount =
+      destination.destinationPaymentDetails.incomingAmount.value -
+      destination.destinationPaymentDetails.receivedAmount.value
+  } else {
     // This is only an approximation of the true amount delivered due to exchange rate variance. The true amount delivered is returned on stream response packets, but due to connection failures there isn't a reliable way to track that in sync with the amount sent.
     // eslint-disable-next-line no-case-declarations
     const amountDelivered = BigInt(
@@ -75,17 +54,6 @@ export async function handleSending(
       )
     )
     newMinDeliveryAmount = payment.receiveAmount.value - amountDelivered
-  } else {
-    if (
-      destination.destinationPaymentDetails &&
-      destination.destinationPaymentDetails.incomingAmount
-    ) {
-      newMinDeliveryAmount =
-        destination.destinationPaymentDetails.incomingAmount.value -
-        destination.destinationPaymentDetails.receivedAmount.value
-    } else {
-      throw LifecycleError.MissingIncomingPayment
-    }
   }
 
   if (

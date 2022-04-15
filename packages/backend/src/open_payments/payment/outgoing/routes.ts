@@ -130,20 +130,15 @@ function outgoingPaymentToBody(
     ].includes(outgoingPayment.state)
       ? 'processing'
       : outgoingPayment.state.toLowerCase(),
-    receivingAccount: outgoingPayment.receivingAccount ?? undefined,
-    receivingPayment: outgoingPayment.receivingPayment ?? undefined,
-    sendAmount: outgoingPayment.sendAmount
-      ? {
-          ...outgoingPayment.sendAmount,
-          value: outgoingPayment.sendAmount.value.toString()
-        }
-      : undefined,
-    receiveAmount: outgoingPayment.receiveAmount
-      ? {
-          ...outgoingPayment.receiveAmount,
-          value: outgoingPayment.receiveAmount.value.toString()
-        }
-      : undefined,
+    receivingPayment: outgoingPayment.receivingPayment,
+    sendAmount: {
+      ...outgoingPayment.sendAmount,
+      value: outgoingPayment.sendAmount.value.toString()
+    },
+    receiveAmount: {
+      ...outgoingPayment.receiveAmount,
+      value: outgoingPayment.receiveAmount.value.toString()
+    },
     description: outgoingPayment.description ?? undefined,
     externalRef: outgoingPayment.externalRef ?? undefined
   }

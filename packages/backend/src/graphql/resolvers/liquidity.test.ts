@@ -2,7 +2,6 @@ import assert from 'assert'
 import { gql } from 'apollo-server-koa'
 import Knex from 'knex'
 import { v4 as uuid } from 'uuid'
-import * as Pay from '@interledger/pay'
 
 import { DepositEventType } from './liquidity'
 import { createTestApp, TestContainer } from '../../tests/app'
@@ -1619,17 +1618,6 @@ describe('Liquidity Resolvers', (): void => {
             value: BigInt(456),
             assetCode: account.asset.code,
             assetScale: account.asset.scale
-          },
-          quote: {
-            timestamp: new Date(),
-            targetType: Pay.PaymentType.FixedSend,
-            maxPacketAmount: BigInt(789),
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            minExchangeRate: Pay.Ratio.from(1.23)!,
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            lowExchangeRateEstimate: Pay.Ratio.from(1.2)!,
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            highExchangeRateEstimate: Pay.Ratio.from(2.3)!
           }
         })
         await expect(accountingService.getBalance(payment.id)).resolves.toEqual(

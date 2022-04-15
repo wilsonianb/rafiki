@@ -246,7 +246,9 @@ export async function startQuote(
         ...quote,
         // Cap at MAX_INT64 because of postgres type limits.
         maxPacketAmount:
-          MAX_INT64 < quote.maxPacketAmount ? MAX_INT64 : quote.maxPacketAmount
+          MAX_INT64 < quote.maxPacketAmount ? MAX_INT64 : quote.maxPacketAmount,
+        // Patch using createdAt below
+        expiresAt: new Date()
       })
       .withGraphFetched('asset')
   } finally {
@@ -262,6 +264,7 @@ export async function finalizeQuote(
   paymentType: Pay.PaymentType
 ): Promise<Quote> {
   const requestHeaders = {
+    Accept: 'application/json',
     'Content-Type': 'application/json'
   }
 
@@ -287,37 +290,36 @@ export async function finalizeQuote(
   if (!res.data.sendAmount?.value || !res.data.receiveAmount?.value) {
     throw QuoteError.InvalidAmount
   }
-  const sendAmountValue = BigInt(res.data.sendAmount.value)
-  const receiveAmountValue = BigInt(res.data.receiveAmount.value)
+  const sendAmount: Amount = {
+    ...res.data.sendAmount,
+    value: BigInt(res.data.sendAmount.value)
+  }
+  const receiveAmount: Amount = {
+    ...res.data.receiveAmount,
+    value: BigInt(res.data.receiveAmount.value)
+  }
   if (paymentType === Pay.PaymentType.FixedSend) {
     if (
-      sendAmountValue !== quote.sendAmount.value ||
-      receiveAmountValue > quote.receiveAmount.value
+      sendAmount.value !== quote.sendAmount.value ||
+      receiveAmount.value > quote.receiveAmount.value
     ) {
       throw QuoteError.InvalidAmount
-    } else if (receiveAmountValue < quote.receiveAmount.value) {
-      await quote.$query(deps.knex).patch({
-        receiveAmount: {
-          ...quote.receiveAmount,
-          value: receiveAmountValue
-        }
-      })
     }
   } else {
     if (
-      receiveAmountValue !== quote.receiveAmount.value ||
-      sendAmountValue > quote.sendAmount.value
+      receiveAmount.value !== quote.receiveAmount.value ||
+      sendAmount.value > quote.sendAmount.value
     ) {
       throw QuoteError.InvalidAmount
-    } else if (sendAmountValue < quote.sendAmount.value) {
-      await quote.$query(deps.knex).patch({
-        sendAmount: {
-          ...quote.sendAmount,
-          value: sendAmountValue
-        }
-      })
     }
   }
+
+  await quote.$query(deps.knex).patch({
+    sendAmount,
+    receiveAmount,
+    expiresAt: new Date(quote.createdAt.getTime() + deps.quoteLifespan)
+  })
+  new Date(Date.now() + deps.quoteLifespan)
   return quote
 }
 

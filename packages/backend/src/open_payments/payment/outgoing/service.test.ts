@@ -83,7 +83,7 @@ describe('OutgoingPaymentService', (): void => {
     [key in OutgoingPaymentState]: PaymentEventType | undefined
   } = {
     [OutgoingPaymentState.Pending]: undefined,
-    [OutgoingPaymentState.Funding]: PaymentEventType.PaymentFunding,
+    [OutgoingPaymentState.Funding]: PaymentEventType.PaymentCreated,
     [OutgoingPaymentState.Sending]: undefined,
     [OutgoingPaymentState.Failed]: PaymentEventType.PaymentFailed,
     [OutgoingPaymentState.Completed]: PaymentEventType.PaymentCompleted

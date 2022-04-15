@@ -183,46 +183,44 @@ describe('QuoteService', (): void => {
         status?: number
       } = { status: 201 }
     ): nock.Scope {
-      return (
-        nock(quoteUrl.origin)
-          // .matchHeader('Accept', 'application/json')
-          // .matchHeader('Content-Type', 'application/json')
-          .post(quoteUrl.pathname, function (this: Definition, body) {
-            assert.ok(this.headers)
-            const signature = this.headers['rafiki-signature']
-            expect(
-              generateQuoteSignature(
-                body,
-                SIGNATURE_SECRET,
-                Config.signatureVersion
-              )
-            ).toEqual(signature)
-            // expect(body).toMatchObject({
-            //   id: event.id,
-            //   type: event.type,
-            //   data: event.data
-            // })
-            return true
-          })
-          .reply(
-            status,
-            function (_path: string, requestBody: Record<string, unknown>) {
-              if (sendAmount) {
-                requestBody.sendAmount = {
-                  ...sendAmount,
-                  value: sendAmount.value.toString()
-                }
+      return nock(quoteUrl.origin)
+        .matchHeader('Accept', 'application/json')
+        .matchHeader('Content-Type', 'application/json')
+        .post(quoteUrl.pathname, function (this: Definition, body) {
+          assert.ok(this.headers)
+          const signature = this.headers['rafiki-signature']
+          expect(
+            generateQuoteSignature(
+              body,
+              SIGNATURE_SECRET,
+              Config.signatureVersion
+            )
+          ).toEqual(signature)
+          // expect(body).toMatchObject({
+          //   id: event.id,
+          //   type: event.type,
+          //   data: event.data
+          // })
+          return true
+        })
+        .reply(
+          status,
+          function (_path: string, requestBody: Record<string, unknown>) {
+            if (sendAmount) {
+              requestBody.sendAmount = {
+                ...sendAmount,
+                value: sendAmount.value.toString()
               }
-              if (receiveAmount) {
-                requestBody.receiveAmount = {
-                  ...receiveAmount,
-                  value: receiveAmount.value.toString()
-                }
-              }
-              return requestBody
             }
-          )
-      )
+            if (receiveAmount) {
+              requestBody.receiveAmount = {
+                ...receiveAmount,
+                value: receiveAmount.value.toString()
+              }
+            }
+            return requestBody
+          }
+        )
     }
 
     test.each`
@@ -360,7 +358,9 @@ describe('QuoteService', (): void => {
       await expect(quoteService.get(quote.id)).resolves.toEqual(quote)
     })
 
-    // fail if incoming payment has no incoming amount
+    // wallet adjusts sendAmount/receiveAmount
+
+    // wallet adjusts incorrectly sendAmount/receiveAmount
 
     // fail if receiveAmount exceed incoming amount (fixed send or fixed receive)
 

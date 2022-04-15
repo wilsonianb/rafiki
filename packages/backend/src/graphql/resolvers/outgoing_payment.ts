@@ -4,7 +4,6 @@ import {
   OutgoingPaymentResolvers,
   OutgoingPaymentConnectionResolvers,
   AccountResolvers,
-  PaymentType as SchemaPaymentType,
   QueryResolvers,
   ResolversTypes
 } from '../generated/graphql'
@@ -166,22 +165,11 @@ export function paymentToGraphql(
     state: payment.state,
     error: payment.error ?? undefined,
     stateAttempts: payment.stateAttempts,
-    receivingAccount: payment.receivingAccount,
     receivingPayment: payment.receivingPayment,
-    sendAmount: payment.sendAmount ?? undefined,
-    receiveAmount: payment.receiveAmount ?? undefined,
+    sendAmount: payment.sendAmount,
+    receiveAmount: payment.receiveAmount,
     description: payment.description,
     externalRef: payment.externalRef,
-    quote: payment.quote
-      ? {
-          ...payment.quote,
-          targetType: SchemaPaymentType[payment.quote.targetType],
-          timestamp: payment.quote.timestamp.toISOString(),
-          minExchangeRate: payment.quote.minExchangeRate.valueOf(),
-          lowExchangeRateEstimate: payment.quote.lowExchangeRateEstimate.valueOf(),
-          highExchangeRateEstimate: payment.quote.highExchangeRateEstimate.valueOf()
-        }
-      : undefined,
     createdAt: new Date(+payment.createdAt).toISOString()
   }
 }
