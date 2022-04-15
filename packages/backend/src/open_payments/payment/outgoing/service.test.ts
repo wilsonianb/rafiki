@@ -34,7 +34,9 @@ import { isTransferError } from '../../../accounting/errors'
 import { AccountingService, TransferOptions } from '../../../accounting/service'
 import { AssetOptions } from '../../../asset/service'
 import { IncomingPayment } from '../incoming/model'
-import { RatesService } from '../../../rates/service'
+import { QuoteService, CreateQuoteOptions } from '../../quote/service'
+import { isQuoteError } from '../../quote/errors'
+import { Quote } from '../../quote/model'
 import { Pagination } from '../../../shared/baseModel'
 import { getPageTests } from '../../../shared/baseModel.test'
 import { Amount } from '../amount'
@@ -44,8 +46,8 @@ describe('OutgoingPaymentService', (): void => {
   let deps: IocContract<AppServices>
   let appContainer: TestContainer
   let outgoingPaymentService: OutgoingPaymentService
-  let ratesService: RatesService
   let accountingService: AccountingService
+  let quoteService: QuoteService
   let knex: Knex
   let accountId: string
   let incomingPayment: IncomingPayment
@@ -85,6 +87,24 @@ describe('OutgoingPaymentService', (): void => {
     [OutgoingPaymentState.Sending]: undefined,
     [OutgoingPaymentState.Failed]: PaymentEventType.PaymentFailed,
     [OutgoingPaymentState.Completed]: PaymentEventType.PaymentCompleted
+  }
+
+  async function createQuote(options: CreateQuoteOptions): Promise<Quote> {
+    const quoteUrl = new URL(Config.quoteUrl)
+    const scope = nock(quoteUrl.origin)
+      // .matchHeader('Accept', 'application/json')
+      // .matchHeader('Content-Type', 'application/json')
+      .post(quoteUrl.pathname)
+      .reply(
+        201,
+        function (_path: string, requestBody: Record<string, unknown>) {
+          return requestBody
+        }
+      )
+    const quote = await quoteService.create(options)
+    scope.isDone()
+    assert.ok(!isQuoteError(quote))
+    return quote
   }
 
   async function createPayment(
@@ -256,7 +276,7 @@ describe('OutgoingPaymentService', (): void => {
       deps = await initIocContainer(Config)
       appContainer = await createTestApp(deps)
       accountingService = await deps.use('accountingService')
-      ratesService = await deps.use('ratesService')
+      quoteService = await deps.use('quoteService')
 
       knex = await deps.use('knex')
       config = await deps.use('config')
@@ -323,6 +343,35 @@ describe('OutgoingPaymentService', (): void => {
   })
 
   describe('create', (): void => {
+    it.only('creates an OutgoingPayment from a quote', async () => {
+      const quote = await createQuote({
+        accountId,
+        receivingPayment
+      })
+      const options = {
+        accountId,
+        quoteId: quote.id,
+        description: 'rent',
+        externalRef: '202201'
+      }
+      const payment = await outgoingPaymentService.create(options)
+      assert.ok(!isOutgoingPaymentError(payment))
+      console.log(payment)
+      expect(payment).toMatchObject({
+        ...options,
+        state: OutgoingPaymentState.Funding,
+        sendAmount: quote.sendAmount,
+        receiveAmount: quote.receiveAmount,
+        receivingPayment,
+        asset
+      })
+      await expectOutcome(payment, { accountBalance: BigInt(0) })
+
+      await expect(outgoingPaymentService.get(payment.id)).resolves.toEqual(
+        payment
+      )
+    })
+
     it('creates an OutgoingPayment to account (FixedSend)', async () => {
       const options = {
         accountId,
@@ -451,16 +500,16 @@ describe('OutgoingPaymentService', (): void => {
         expect(payment.receivingPayment).toBeDefined()
         if (!payment.quote) throw 'no quote'
 
-        expect(payment.quote.timestamp).toBeInstanceOf(Date)
-        expect(payment.quote.targetType).toBe(Pay.PaymentType.FixedSend)
+        expect(payment.quote.createdAt).toBeInstanceOf(Date)
+        expect(payment.quote.paymentType).toBe(Pay.PaymentType.FixedSend)
         expect(payment.quote.maxPacketAmount).toBe(
           BigInt('9223372036854775807')
         )
         expect(payment.quote.minExchangeRate.valueOf()).toBe(
           0.5 * (1 - config.slippage)
         )
-        expect(payment.quote.lowExchangeRateEstimate.valueOf()).toBe(0.5)
-        expect(payment.quote.highExchangeRateEstimate.valueOf()).toBe(
+        expect(payment.quote.lowEstimatedExchangeRate.valueOf()).toBe(0.5)
+        expect(payment.quote.highEstimatedExchangeRate.valueOf()).toBe(
           0.500000000001
         )
 
@@ -491,16 +540,16 @@ describe('OutgoingPaymentService', (): void => {
         expect(payment.receivingPayment).toBeDefined()
         if (!payment.quote) throw 'no quote'
 
-        expect(payment.quote.timestamp).toBeInstanceOf(Date)
-        expect(payment.quote.targetType).toBe(Pay.PaymentType.FixedDelivery)
+        expect(payment.quote.createdAt).toBeInstanceOf(Date)
+        expect(payment.quote.paymentType).toBe(Pay.PaymentType.FixedDelivery)
         expect(payment.quote.maxPacketAmount).toBe(
           BigInt('9223372036854775807')
         )
         expect(payment.quote.minExchangeRate.valueOf()).toBe(
           0.5 * (1 - config.slippage)
         )
-        expect(payment.quote.lowExchangeRateEstimate.valueOf()).toBe(0.5)
-        expect(payment.quote.highExchangeRateEstimate.valueOf()).toBe(
+        expect(payment.quote.lowEstimatedExchangeRate.valueOf()).toBe(0.5)
+        expect(payment.quote.highEstimatedExchangeRate.valueOf()).toBe(
           0.500000000001
         )
 
@@ -538,49 +587,14 @@ describe('OutgoingPaymentService', (): void => {
 
         if (!payment.quote) throw 'no quote'
 
-        expect(payment.quote.targetType).toBe(Pay.PaymentType.FixedDelivery)
+        expect(payment.quote.paymentType).toBe(Pay.PaymentType.FixedDelivery)
         expect(payment.quote.minExchangeRate.valueOf()).toBe(
           0.5 * (1 - config.slippage)
         )
-        expect(payment.quote.lowExchangeRateEstimate.valueOf()).toBe(0.5)
-        expect(payment.quote.highExchangeRateEstimate.valueOf()).toBe(
+        expect(payment.quote.lowEstimatedExchangeRate.valueOf()).toBe(0.5)
+        expect(payment.quote.highEstimatedExchangeRate.valueOf()).toBe(
           0.500000000001
         )
-      })
-
-      it('PENDING (rate service error)', async (): Promise<void> => {
-        const mockFn = jest
-          .spyOn(ratesService, 'prices')
-          .mockImplementation(() => Promise.reject(new Error('fail')))
-        const paymentId = (
-          await createPayment({
-            accountId,
-            receivingAccount,
-            sendAmount
-          })
-        ).id
-        const scope = mockCreateIncomingPayment()
-        const payment = await processNext(
-          paymentId,
-          OutgoingPaymentState.Pending
-        )
-        scope.isDone()
-
-        expect(payment.stateAttempts).toBe(1)
-        expect(payment.quote).toBeNull()
-
-        mockFn.mockRestore()
-        // Fast forward to next attempt.
-        // Only mock the time once (for getPendingPayment) since otherwise ilp/pay's startQuote will get confused.
-        jest
-          .spyOn(Date, 'now')
-          .mockReturnValueOnce(Date.now() + 1 * RETRY_BACKOFF_SECONDS * 1000)
-
-        const payment2 = await processNext(
-          paymentId,
-          OutgoingPaymentState.Funding
-        )
-        expect(payment2.quote).toBeDefined()
       })
 
       // Maybe another person or payment paid the incoming payment already.

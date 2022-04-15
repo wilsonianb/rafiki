@@ -121,10 +121,13 @@ async function createOutgoingPayment(
         .insertAndFetch({
           ...options,
           assetId: account.assetId,
-          state: OutgoingPaymentState.Pending
+          state: options.quoteId
+            ? OutgoingPaymentState.Funding
+            : OutgoingPaymentState.Pending
         })
-        .withGraphFetched('asset')
+        .withGraphFetched('[asset, quote.asset]')
 
+      // TODO: move to fundPayment
       await deps.accountingService.createLiquidityAccount({
         id: payment.id,
         asset: payment.asset
@@ -154,7 +157,7 @@ async function fundPayment(
     const payment = await OutgoingPayment.query(trx)
       .findById(id)
       .forUpdate()
-      .withGraphFetched('asset')
+      .withGraphFetched('[asset, quote]')
     if (!payment) return FundingError.UnknownPayment
     if (payment.state !== OutgoingPaymentState.Funding) {
       return FundingError.WrongState
@@ -182,5 +185,5 @@ async function getAccountPage(
   return await OutgoingPayment.query(deps.knex)
     .getPage(pagination)
     .where({ accountId })
-    .withGraphFetched('asset')
+    .withGraphFetched('[asset, quote]')
 }

@@ -15,7 +15,7 @@ export class OutgoingPayment
   public static readonly tableName = 'outgoingPayments'
 
   static get virtualAttributes(): string[] {
-    return ['sendAmount', 'receiveAmount']
+    return ['receivingPayment', 'sendAmount', 'receiveAmount']
   }
 
   public state!: OutgoingPaymentState
@@ -24,11 +24,15 @@ export class OutgoingPayment
   public stateAttempts!: number
 
   public receivingAccount?: string
-  public receivingPayment?: string
+  private _receivingPayment?: string | null
 
-  // public get receivingPayment(): string | null {
-  //   return this.quote.receivingPayment || this.receivingPayment
-  // }
+  public get receivingPayment(): string | null {
+    return this.quote?.receivingPayment || this._receivingPayment || null
+  }
+
+  public set receivingPayment(payment: string | null) {
+    this._receivingPayment = payment
+  }
 
   private sendAmountValue?: bigint | null
   private sendAmountAssetCode?: string | null
@@ -36,6 +40,7 @@ export class OutgoingPayment
 
   public get sendAmount(): Amount | null {
     if (this.quote) {
+      // this requires 'quote.asset'
       return this.quote.sendAmount
     }
     if (this.sendAmountValue) {

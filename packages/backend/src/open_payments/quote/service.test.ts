@@ -92,54 +92,6 @@ describe('QuoteService', (): void => {
       })
   }
 
-  // async function createQuote(
-  //   options: CreateQuoteOptions
-  // ): Promise<Quote> {
-  //   const quote = await quoteService.create(options)
-  //   assert.ok(!isQuoteError(quote))
-  //   return quote
-  // }
-
-  // async function processNext(
-  //   quoteId: string,
-  //   expectState: QuoteState,
-  //   expectedError?: string
-  // ): Promise<Quote> {
-  //   await expect(quoteService.processNext()).resolves.toBe(quoteId)
-  //   const quote = await quoteService.get(quoteId)
-  //   if (!quote) throw 'no quote'
-  //   if (expectState) expect(quote.state).toBe(expectState)
-  //   // expect(quote.error).toEqual(expectedError || null)
-  //   // const type = webhookTypes[quote.state]
-  //   // if (type) {
-  //   //   await expect(
-  //   //     PaymentEvent.query(knex).where({
-  //   //       type
-  //   //     })
-  //   //   ).resolves.not.toHaveLength(0)
-  //   // }
-  //   return quote
-  // }
-
-  // Mock the time to fast-forward to the time that the specified (absolute, not relative) attempt is scheduled.
-  // function fastForwardToAttempt(stateAttempts: number): void {
-  //   jest
-  //     .spyOn(Date, 'now')
-  //     .mockReturnValue(
-  //       Date.now() + stateAttempts * RETRY_BACKOFF_SECONDS * 1000
-  //     )
-  // }
-
-  // async function payIncomingPayment(amount: bigint): Promise<void> {
-  //   await expect(
-  //     accountingService.createDeposit({
-  //       id: uuid(),
-  //       account: incomingPayment,
-  //       amount
-  //     })
-  //   ).resolves.toBeUndefined()
-  // }
-
   beforeAll(
     async (): Promise<void> => {
       Config.pricesUrl = 'https://test.prices'

@@ -9,22 +9,11 @@ exports.up = function (knex) {
     table.string('externalRef').nullable()
 
     table.string('receivingAccount').nullable()
-    table.string('receivingPayment').nullable()
+    table.string('_receivingPayment').nullable()
     table.bigInteger('sendAmountValue').nullable()
     table.bigInteger('receiveAmountValue').nullable()
     table.string('receiveAmountAssetCode').nullable()
     table.integer('receiveAmountAssetScale').nullable()
-
-    table.timestamp('quoteTimestamp').nullable()
-    table.string('quoteTargetType').nullable() // 'FixedSend' | 'FixedDelivery'
-    table.bigInteger('quoteMaxPacketAmount').nullable()
-
-    table.bigInteger('quoteMinExchangeRateNumerator').nullable()
-    table.bigInteger('quoteMinExchangeRateDenominator').nullable()
-    table.bigInteger('quoteLowExchangeRateEstimateNumerator').nullable()
-    table.bigInteger('quoteLowExchangeRateEstimateDenominator').nullable()
-    table.bigInteger('quoteHighExchangeRateEstimateNumerator').nullable()
-    table.bigInteger('quoteHighExchangeRateEstimateDenominator').nullable()
 
     // Open payments account corresponding to wallet account
     // from which to request funds for payment
@@ -34,7 +23,7 @@ exports.up = function (knex) {
     table.uuid('assetId').notNullable()
     table.foreign('assetId').references('assets.id')
 
-    table.uuid('quoteId').notNullable()
+    table.uuid('quoteId').nullable()
     table.foreign('quoteId').references('quotes.id')
 
     table.timestamp('createdAt').defaultTo(knex.fn.now())
