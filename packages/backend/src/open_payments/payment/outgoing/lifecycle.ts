@@ -17,8 +17,6 @@ export async function handleSending(
   plugin: IlpPlugin
 ): Promise<void> {
   if (!payment.quote) throw LifecycleError.MissingQuote
-  if (!payment.sendAmount) throw LifecycleError.MissingSendAmount
-  if (!payment.receiveAmount) throw LifecycleError.MissingReceiveAmount
 
   const destination = await Pay.setupPayment({
     plugin,

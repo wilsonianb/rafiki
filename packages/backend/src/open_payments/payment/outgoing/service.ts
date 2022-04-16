@@ -4,7 +4,6 @@ import { Pagination } from '../../../shared/baseModel'
 import { BaseService } from '../../../shared/baseService'
 import {
   FundingError,
-  LifecycleError,
   OutgoingPaymentError,
   isOutgoingPaymentError
 } from './errors'
@@ -164,12 +163,11 @@ async function fundPayment(
     const payment = await OutgoingPayment.query(trx)
       .findById(id)
       .forUpdate()
-      .withGraphFetched('[asset, quote]')
+      .withGraphFetched('[quote.asset]')
     if (!payment) return FundingError.UnknownPayment
     if (payment.state !== OutgoingPaymentState.Funding) {
       return FundingError.WrongState
     }
-    if (!payment.sendAmount) throw LifecycleError.MissingSendAmount
     if (amount !== payment.sendAmount.value) return FundingError.InvalidAmount
     const error = await deps.accountingService.createDeposit({
       id: transferId,

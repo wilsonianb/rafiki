@@ -114,6 +114,7 @@ describe('OutgoingPaymentService', (): void => {
   async function createPayment(
     options: CreateOutgoingPaymentOptions
   ): Promise<OutgoingPayment> {
+    // TODO: mock wallet quote and create incoming payment depending on options...
     const payment = await outgoingPaymentService.create(options)
     assert.ok(!isOutgoingPaymentError(payment))
     return payment
@@ -684,44 +685,7 @@ describe('OutgoingPaymentService', (): void => {
         return paymentId
       }
 
-      it('COMPLETED (FixedSend)', async (): Promise<void> => {
-        const paymentId = await setup({
-          receivingAccount,
-          sendAmount
-        })
-
-        const payment = await processNext(
-          paymentId,
-          OutgoingPaymentState.Completed
-        )
-        await expectOutcome(payment, {
-          accountBalance: BigInt(0),
-          amountSent: BigInt(123),
-          amountDelivered: BigInt(Math.floor(123 / 2))
-        })
-      })
-
-      it('COMPLETED (FixedDelivery)', async (): Promise<void> => {
-        const paymentId = await setup({
-          receivingAccount,
-          receiveAmount
-        })
-
-        const payment = await processNext(
-          paymentId,
-          OutgoingPaymentState.Completed
-        )
-        if (!payment.sendAmount) throw 'no sendAmount'
-        const amountSent = receiveAmount.value * BigInt(2)
-        await expectOutcome(payment, {
-          accountBalance: payment.sendAmount.value - amountSent,
-          amountSent,
-          amountDelivered: receiveAmount.value,
-          withdrawAmount: payment.sendAmount.value - amountSent
-        })
-      })
-
-      it('COMPLETED (IncomingPayment)', async (): Promise<void> => {
+      it('COMPLETED', async (): Promise<void> => {
         const paymentId = await setup({
           receivingPayment: receivingPayment
         })
@@ -744,7 +708,7 @@ describe('OutgoingPaymentService', (): void => {
         })
       })
 
-      it('COMPLETED (FixedDelivery, with incoming payment initially partially paid)', async (): Promise<void> => {
+      it('COMPLETED (with incoming payment initially partially paid)', async (): Promise<void> => {
         const amountAlreadyDelivered = BigInt(34)
         await payIncomingPayment(amountAlreadyDelivered)
         const paymentId = await setup({
@@ -902,7 +866,7 @@ describe('OutgoingPaymentService', (): void => {
       })
 
       // Caused by retry after failed SENDING→COMPLETED transition commit.
-      it('COMPLETED (FixedDelivery, already fully paid)', async (): Promise<void> => {
+      it('COMPLETED (already fully paid)', async (): Promise<void> => {
         const paymentId = await setup({
           receivingPayment: receivingPayment
         })
@@ -974,16 +938,15 @@ describe('OutgoingPaymentService', (): void => {
     let quoteAmount: bigint
 
     beforeEach(async (): Promise<void> => {
-      const { id: paymentId } = await createPayment({
+      const quote = await createQuote({
         accountId,
-        receivingAccount,
-        sendAmount
+        receivingPayment
       })
-      const scope = mockCreateIncomingPayment()
-      payment = await processNext(paymentId, OutgoingPaymentState.Funding)
-      scope.isDone()
-      assert.ok(payment.sendAmount)
-      quoteAmount = payment.sendAmount.value
+      payment = await createPayment({
+        accountId,
+        quoteId: quote.id
+      })
+      quoteAmount = quote.sendAmount.value
       await expectOutcome(payment, { accountBalance: BigInt(0) })
     }, 10_000)
 

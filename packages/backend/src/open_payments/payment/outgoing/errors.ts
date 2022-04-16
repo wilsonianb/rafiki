@@ -65,8 +65,6 @@ export enum LifecycleError {
   MissingBalance = 'MissingBalance',
   MissingQuote = 'MissingQuote',
   MissingExpiration = 'MissingExpiration',
-  MissingSendAmount = 'MissingSendAmount',
-  MissingReceiveAmount = 'MissingReceiveAmount',
   MissingIncomingPayment = 'MissingIncomingPayment',
   Unauthorized = 'Unauthorized'
 }

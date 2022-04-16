@@ -14,10 +14,6 @@ export class OutgoingPayment
   implements ConnectorAccount, LiquidityAccount {
   public static readonly tableName = 'outgoingPayments'
 
-  // static get virtualAttributes(): string[] {
-  //   return ['receivingPayment', 'sendAmount', 'receiveAmount']
-  // }
-
   public state!: OutgoingPaymentState
   // The "| null" is necessary so that `$beforeUpdate` can modify a patch to remove the error. If `$beforeUpdate` set `error = undefined`, the patch would ignore the modification.
   public error?: string | null
@@ -28,7 +24,6 @@ export class OutgoingPayment
   }
 
   public get sendAmount(): Amount {
-    // this requires 'quote.asset'
     return this.quote.sendAmount
   }
 
