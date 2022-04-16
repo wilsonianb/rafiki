@@ -1,6 +1,7 @@
 import assert from 'assert'
 import axios from 'axios'
 import { createHmac } from 'crypto'
+import { Transaction } from 'knex'
 import { ModelObject, TransactionOrKnex } from 'objection'
 import * as Pay from '@interledger/pay'
 
@@ -17,7 +18,10 @@ const MAX_INT64 = BigInt('9223372036854775807')
 
 export interface QuoteService {
   get(id: string): Promise<Quote | undefined>
-  create(options: CreateQuoteOptions): Promise<Quote | QuoteError>
+  create(
+    options: CreateQuoteOptions,
+    trx?: Transaction
+  ): Promise<Quote | QuoteError>
 }
 
 export interface ServiceDependencies extends BaseService {
@@ -41,7 +45,8 @@ export async function createQuoteService(
   }
   return {
     get: (id) => getQuote(deps, id),
-    create: (options: CreateQuoteOptions) => createQuote(deps, options)
+    create: (options: CreateQuoteOptions, trx?: Transaction) =>
+      createQuote(deps, options, trx)
   }
 }
 
@@ -62,7 +67,8 @@ export interface CreateQuoteOptions {
 
 async function createQuote(
   deps: ServiceDependencies,
-  options: CreateQuoteOptions
+  options: CreateQuoteOptions,
+  trx?: Transaction
 ): Promise<Quote | QuoteError> {
   if (options.receivingPayment) {
     if (options.receivingAccount) {
@@ -99,28 +105,34 @@ async function createQuote(
     }
   }
 
+  const quoteTrx = trx || (await Quote.startTransaction(deps.knex))
   try {
-    return await Quote.transaction(deps.knex, async (trx) => {
-      const quote = await startQuote(
-        {
-          ...deps,
-          knex: trx
-        },
-        options,
-        account
-      )
-      return await finalizeQuote(
-        {
-          ...deps,
-          knex: trx
-        },
-        quote,
-        options.sendAmount
-          ? Pay.PaymentType.FixedSend
-          : Pay.PaymentType.FixedDelivery
-      )
-    })
+    const ilpQuote = await startQuote(
+      {
+        ...deps,
+        knex: quoteTrx
+      },
+      options,
+      account
+    )
+    const quote = await finalizeQuote(
+      {
+        ...deps,
+        knex: quoteTrx
+      },
+      ilpQuote,
+      options.sendAmount
+        ? Pay.PaymentType.FixedSend
+        : Pay.PaymentType.FixedDelivery
+    )
+    if (!trx) {
+      await quoteTrx.commit()
+    }
+    return quote
   } catch (err) {
+    if (!trx) {
+      await quoteTrx.rollback()
+    }
     if (isQuoteError(err)) {
       return err
     }

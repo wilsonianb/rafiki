@@ -67,7 +67,9 @@ async function getOutgoingPayment(
   deps: ServiceDependencies,
   id: string
 ): Promise<OutgoingPayment | undefined> {
-  return OutgoingPayment.query(deps.knex).findById(id).withGraphJoined('asset')
+  return OutgoingPayment.query(deps.knex)
+    .findById(id)
+    .withGraphJoined('quote.asset')
 }
 
 export interface CreateOutgoingPaymentOptions {
@@ -85,58 +87,29 @@ async function createOutgoingPayment(
   deps: ServiceDependencies,
   options: CreateOutgoingPaymentOptions
 ): Promise<OutgoingPayment | OutgoingPaymentError> {
-  if (options.quoteId) {
-    if (options.receivingAccount || options.receivingPayment) {
-      return OutgoingPaymentError.InvalidDestination
-    } else if (options.sendAmount || options.receiveAmount) {
-      return OutgoingPaymentError.InvalidAmount
-    }
-  } else if (options.receivingPayment) {
-    const quoteOrErr = await deps.quoteService.create(options)
-    if (isQuoteError(quoteOrErr)) {
-      return quoteOrErr
-    }
-
-    if (options.receivingAccount) {
-      return OutgoingPaymentError.InvalidDestination
-    }
-    if (options.sendAmount || options.receiveAmount) {
-      return OutgoingPaymentError.InvalidAmount
-    }
-  } else if (options.receivingAccount) {
-    if (options.sendAmount) {
-      if (options.receiveAmount || options.sendAmount.value <= BigInt(0)) {
-        return OutgoingPaymentError.InvalidAmount
-      }
-    } else if (
-      !options.receiveAmount ||
-      options.receiveAmount.value <= BigInt(0)
-    ) {
-      return OutgoingPaymentError.InvalidAmount
-    }
-  } else {
-    return OutgoingPaymentError.InvalidDestination
-  }
-
   try {
-    const account = await deps.accountService.get(options.accountId)
-    if (!account) {
-      return OutgoingPaymentError.UnknownAccount
-    }
-    if (options.sendAmount) {
-      if (
-        options.sendAmount.assetCode !== account.asset.code ||
-        options.sendAmount.assetScale !== account.asset.scale
-      ) {
-        return OutgoingPaymentError.InvalidAmount
-      }
-    }
-
     return await OutgoingPayment.transaction(deps.knex, async (trx) => {
+      if (options.quoteId) {
+        if (options.receivingAccount || options.receivingPayment) {
+          return OutgoingPaymentError.InvalidDestination
+        } else if (options.sendAmount || options.receiveAmount) {
+          return OutgoingPaymentError.InvalidAmount
+        }
+      } else {
+        // TODO: create quote in transaction
+        const quoteOrErr = await deps.quoteService.create(options)
+        if (isQuoteError(quoteOrErr)) {
+          return quoteOrErr
+        }
+        options.quoteId = quoteOrErr.id
+      }
+
       const payment = await OutgoingPayment.query(trx)
         .insertAndFetch({
           id: options.quoteId,
-          ...options,
+          accountId: options.accountId,
+          description: options.description,
+          externalRef: options.externalRef,
           state: OutgoingPaymentState.Funding
         })
         .withGraphFetched('[quote.asset]')
@@ -165,9 +138,11 @@ async function createOutgoingPayment(
     })
   } catch (err) {
     if (err instanceof ForeignKeyViolationError) {
-      // check quote and account
-      console.log(err)
-      return OutgoingPaymentError.UnknownAccount
+      if (err.constraint === 'outgoingpayments_id_foreign') {
+        return OutgoingPaymentError.UnknownQuote
+      } else if (err.constraint === 'outgoingpayments_accountid_foreign') {
+        return OutgoingPaymentError.UnknownAccount
+      }
     } else if (isOutgoingPaymentError(err)) {
       return err
     }

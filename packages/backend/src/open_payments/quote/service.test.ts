@@ -397,6 +397,17 @@ describe('QuoteService', (): void => {
       }
     )
 
+    it('fails on unknown account', async (): Promise<void> => {
+      await expect(
+        quoteService.create({
+          accountId: uuid(),
+          receivingPayment
+        })
+      ).resolves.toEqual(QuoteError.UnknownAccount)
+    })
+
+    // invalid amount asset
+
     it('fails on rate service error)', async (): Promise<void> => {
       const ratesService = await deps.use('ratesService')
       jest
