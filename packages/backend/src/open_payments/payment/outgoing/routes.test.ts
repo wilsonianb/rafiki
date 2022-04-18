@@ -1,7 +1,9 @@
 import assert from 'assert'
+import Axios from 'axios'
 import * as httpMocks from 'node-mocks-http'
 import Knex from 'knex'
 import { WorkerUtils, makeWorkerUtils } from 'graphile-worker'
+import nock, { Definition } from 'nock'
 import { v4 as uuid } from 'uuid'
 
 import { createContext } from '../../../tests/context'
@@ -13,12 +15,13 @@ import { IocContract } from '@adonisjs/fold'
 import { initIocContainer } from '../../..'
 import { AppServices } from '../../../app'
 import { truncateTables } from '../../../tests/tableManager'
-import { randomAsset } from '../../../tests/asset'
 import { OutgoingPaymentService, CreateOutgoingPaymentOptions } from './service'
 import { isOutgoingPaymentError } from './errors'
 import { OutgoingPaymentState } from './model'
 import { OutgoingPaymentRoutes } from './routes'
 import { Amount } from '../amount'
+import { IncomingPayment } from '../incoming/model'
+import { isIncomingPaymentError } from '../incoming/errors'
 import { AppContext } from '../../../app'
 
 describe('Outgoing Payment Routes', (): void => {
@@ -31,28 +34,82 @@ describe('Outgoing Payment Routes', (): void => {
   let outgoingPaymentRoutes: OutgoingPaymentRoutes
   let accountId: string
   let accountUrl: string
+  let receivingAccount: string
+  let receivingPayment: string
+  let incomingPayment: IncomingPayment
 
   const messageProducer = new GraphileProducer()
   const mockMessageProducer = {
     send: jest.fn()
   }
-  const receivingAccount = `https://wallet.example/${uuid()}`
-  const receivingPayment = `${receivingAccount}/incoming-payments/${uuid()}`
-  const asset = randomAsset()
+  const asset = {
+    scale: 9,
+    code: 'USD'
+  }
   const sendAmount: Amount = {
     value: BigInt(123),
     assetCode: asset.code,
     assetScale: asset.scale
   }
-  const receiveAmount: Amount = {
-    value: BigInt(56),
-    assetCode: asset.code,
-    assetScale: asset.scale
+
+  const destinationAsset = {
+    scale: 9,
+    code: 'XRP'
+  }
+
+  function mockCreateIncomingPayment(receiveAmount?: Amount): nock.Scope {
+    const incomingPaymentsUrl = new URL(`${receivingAccount}/incoming-payments`)
+    return nock(incomingPaymentsUrl.origin)
+      .post(incomingPaymentsUrl.pathname, function (this: Definition, body) {
+        expect(body.incomingAmount).toEqual(
+          receiveAmount
+            ? {
+                value: receiveAmount.value.toString(),
+                assetCode: receiveAmount.assetCode,
+                assetScale: receiveAmount.assetScale
+              }
+            : undefined
+        )
+        return true
+      })
+      .matchHeader('Accept', 'application/json')
+      .matchHeader('Content-Type', 'application/json')
+      .reply(201, function (path, requestBody) {
+        return Axios.post(
+          `http://localhost:${appContainer.port}${path}`,
+          requestBody,
+          {
+            headers: this.req.headers
+          }
+        ).then((res) => res.data)
+      })
+  }
+
+  function mockWalletQuote(): nock.Scope {
+    const quoteUrl = new URL(Config.quoteUrl)
+    return nock(quoteUrl.origin)
+      .matchHeader('Accept', 'application/json')
+      .matchHeader('Content-Type', 'application/json')
+      .post(quoteUrl.pathname)
+      .reply(
+        201,
+        function (_path: string, requestBody: Record<string, unknown>) {
+          return requestBody
+        }
+      )
   }
 
   beforeAll(
     async (): Promise<void> => {
       config = Config
+      config.pricesUrl = 'https://test.prices'
+      nock(config.pricesUrl)
+        .get('/')
+        .reply(200, () => ({
+          USD: 1.0, // base
+          XRP: 2.0
+        }))
+        .persist()
       config.publicHost = 'https://wallet.example'
       deps = await initIocContainer(config)
       deps.bind('messageProducer', async () => mockMessageProducer)
@@ -72,8 +129,39 @@ describe('Outgoing Payment Routes', (): void => {
   beforeEach(
     async (): Promise<void> => {
       const accountService = await deps.use('accountService')
-      accountId = (await accountService.create({ asset })).id
+      accountId = (
+        await accountService.create({
+          asset: {
+            code: sendAmount.assetCode,
+            scale: sendAmount.assetScale
+          }
+        })
+      ).id
       accountUrl = `${config.publicHost}/${accountId}`
+      const destinationAccount = await accountService.create({
+        asset: destinationAsset
+      })
+      const accountingService = await deps.use('accountingService')
+      await expect(
+        accountingService.createDeposit({
+          id: uuid(),
+          account: destinationAccount.asset,
+          amount: BigInt(123)
+        })
+      ).resolves.toBeUndefined()
+      receivingAccount = `${config.publicHost}/${destinationAccount.id}`
+      const incomingPaymentService = await deps.use('incomingPaymentService')
+      incomingPayment = (await incomingPaymentService.create({
+        accountId: destinationAccount.id,
+        incomingAmount: {
+          value: BigInt(56),
+          assetCode: destinationAsset.code,
+          assetScale: destinationAsset.scale
+        },
+        description: 'description!'
+      })) as IncomingPayment
+      assert.ok(!isIncomingPaymentError(incomingPayment))
+      receivingPayment = `${receivingAccount}/incoming-payments/${incomingPayment.id}`
     }
   )
 
@@ -131,50 +219,8 @@ describe('Outgoing Payment Routes', (): void => {
       )
     })
 
-    test.each`
-      sendAmount    | receiveAmount    | description
-      ${sendAmount} | ${undefined}     | ${'fixed-send'}
-      ${undefined}  | ${receiveAmount} | ${'fixed-receive'}
-    `(
-      'returns 200 with a $description open payments outgoing payment',
-      async ({ sendAmount, receiveAmount }): Promise<void> => {
-        const outgoingPayment = await outgoingPaymentService.create({
-          accountId,
-          receivingAccount,
-          sendAmount,
-          receiveAmount
-        })
-        assert.ok(!isOutgoingPaymentError(outgoingPayment))
-        const ctx = createContext(
-          {
-            headers: { Accept: 'application/json' }
-          },
-          { outgoingPaymentId: outgoingPayment.id }
-        )
-        await expect(outgoingPaymentRoutes.get(ctx)).resolves.toBeUndefined()
-        expect(ctx.status).toBe(200)
-        expect(ctx.response.get('Content-Type')).toBe(
-          'application/json; charset=utf-8'
-        )
-
-        expect(ctx.body).toEqual({
-          id: `${accountUrl}/outgoing-payments/${outgoingPayment.id}`,
-          accountId: accountUrl,
-          receivingAccount,
-          sendAmount: sendAmount && {
-            ...sendAmount,
-            value: sendAmount.value.toString()
-          },
-          receiveAmount: receiveAmount && {
-            ...receiveAmount,
-            value: receiveAmount.value.toString()
-          },
-          state: OutgoingPaymentState.Pending.toLowerCase()
-        })
-      }
-    )
-
-    test('returns 200 with a quoted outgoing payment to an incoming payment', async (): Promise<void> => {
+    test('returns 200 with an outgoing payment', async (): Promise<void> => {
+      mockWalletQuote()
       const outgoingPayment = await outgoingPaymentService.create({
         accountId,
         receivingPayment,
@@ -182,11 +228,6 @@ describe('Outgoing Payment Routes', (): void => {
         externalRef: '202201'
       })
       assert.ok(!isOutgoingPaymentError(outgoingPayment))
-      await outgoingPayment.$query(knex).patch({
-        state: OutgoingPaymentState.Funding,
-        sendAmount,
-        receiveAmount
-      })
       const ctx = createContext(
         {
           headers: { Accept: 'application/json' }
@@ -204,12 +245,12 @@ describe('Outgoing Payment Routes', (): void => {
         accountId: accountUrl,
         receivingPayment,
         sendAmount: {
-          ...sendAmount,
-          value: sendAmount.value.toString()
+          ...outgoingPayment.sendAmount,
+          value: outgoingPayment.sendAmount.value.toString()
         },
         receiveAmount: {
-          ...receiveAmount,
-          value: receiveAmount.value.toString()
+          ...outgoingPayment.receiveAmount,
+          value: outgoingPayment.receiveAmount.value.toString()
         },
         state: 'processing',
         description: outgoingPayment.description,
@@ -219,6 +260,7 @@ describe('Outgoing Payment Routes', (): void => {
 
     Object.values(OutgoingPaymentState).forEach((state) => {
       test(`returns 200 with a(n) ${state} outgoing payment`, async (): Promise<void> => {
+        mockWalletQuote()
         const outgoingPayment = await outgoingPaymentService.create({
           accountId,
           receivingPayment
@@ -242,7 +284,15 @@ describe('Outgoing Payment Routes', (): void => {
             OutgoingPaymentState.Sending
           ].includes(state)
             ? 'processing'
-            : state.toLowerCase()
+            : state.toLowerCase(),
+          sendAmount: {
+            ...outgoingPayment.sendAmount,
+            value: outgoingPayment.sendAmount.value.toString()
+          },
+          receiveAmount: {
+            ...outgoingPayment.receiveAmount,
+            value: outgoingPayment.receiveAmount.value.toString()
+          }
         })
       })
     })
@@ -319,7 +369,7 @@ describe('Outgoing Payment Routes', (): void => {
     )
 
     test.each`
-      receivingAccount    | receivingPayment
+      toAccount           | toPayment
       ${receivingAccount} | ${receivingPayment}
       ${undefined}        | ${undefined}
     `(
@@ -337,23 +387,24 @@ describe('Outgoing Payment Routes', (): void => {
       }
     )
 
+    // receivingPayment and receivingAccount are defined in `beforeEach`
+    // and unavailable in the `test.each` table
     test.each`
-      receivingAccount    | receivingPayment    | sendAmount   | receiveAmount
-      ${receivingAccount} | ${undefined}        | ${undefined} | ${undefined}
-      ${receivingAccount} | ${undefined}        | ${123}       | ${123}
-      ${undefined}        | ${receivingPayment} | ${123}       | ${undefined}
-      ${undefined}        | ${receivingPayment} | ${undefined} | ${123}
+      toAccount | toPayment | sendAmount   | receiveAmount
+      ${true}   | ${false}  | ${undefined} | ${undefined}
+      ${true}   | ${false}  | ${123}       | ${123}
+      ${false}  | ${true}   | ${123}       | ${123}
     `(
-      'returns error on invalid destination',
+      'returns error on invalid amount',
       async ({
-        receivingAccount,
-        receivingPayment,
+        toAccount,
+        toPayment,
         sendAmount,
         receiveAmount
       }): Promise<void> => {
         options = {
-          receivingAccount,
-          receivingPayment,
+          receivingPayment: toPayment ? receivingPayment : undefined,
+          receivingAccount: toAccount ? receivingAccount : undefined,
           sendAmount: sendAmount
             ? {
                 value: sendAmount,
@@ -394,12 +445,16 @@ describe('Outgoing Payment Routes', (): void => {
 
     describe('returns the outgoing payment on success', (): void => {
       test.each`
-        sendAmount   | receiveAmount | description
-        ${'123'}     | ${undefined}  | ${'fixed-send'}
-        ${undefined} | ${'56'}       | ${'fixed-receive'}
+        sendAmount   | receiveAmount | expectedAmount | description
+        ${'123'}     | ${undefined}  | ${'61'}        | ${'fixed-send'}
+        ${undefined} | ${'56'}       | ${'114'}       | ${'fixed-receive'}
       `(
         '$description',
-        async ({ sendAmount, receiveAmount }): Promise<void> => {
+        async ({
+          sendAmount,
+          receiveAmount,
+          expectedAmount
+        }): Promise<void> => {
           options = {
             receivingAccount,
             sendAmount: sendAmount
@@ -412,12 +467,14 @@ describe('Outgoing Payment Routes', (): void => {
             receiveAmount: receiveAmount
               ? {
                   value: receiveAmount,
-                  assetCode: asset.code,
-                  assetScale: asset.scale
+                  assetCode: destinationAsset.code,
+                  assetScale: destinationAsset.scale
                 }
               : undefined
           }
           const ctx = setup({})
+          mockWalletQuote()
+          mockCreateIncomingPayment(options.receiveAmount)
           await expect(
             outgoingPaymentRoutes.create(ctx)
           ).resolves.toBeUndefined()
@@ -431,10 +488,18 @@ describe('Outgoing Payment Routes', (): void => {
           expect(ctx.response.body).toEqual({
             id: `${accountUrl}/outgoing-payments/${outgoingPaymentId}`,
             accountId: accountUrl,
-            receivingAccount,
-            sendAmount: options.sendAmount,
-            receiveAmount: options.receiveAmount,
-            state: OutgoingPaymentState.Pending.toLowerCase()
+            receivingPayment: expect.any(String),
+            sendAmount: {
+              value: sendAmount || expectedAmount,
+              assetCode: asset.code,
+              assetScale: asset.scale
+            },
+            receiveAmount: {
+              value: receiveAmount || expectedAmount,
+              assetCode: destinationAsset.code,
+              assetScale: destinationAsset.scale
+            },
+            state: 'processing'
           })
         }
       )
@@ -446,6 +511,7 @@ describe('Outgoing Payment Routes', (): void => {
           externalRef: '202201'
         }
         const ctx = setup({})
+        mockWalletQuote()
         await expect(outgoingPaymentRoutes.create(ctx)).resolves.toBeUndefined()
         expect(ctx.response.status).toBe(201)
         const outgoingPaymentId = ((ctx.response.body as Record<
@@ -458,9 +524,21 @@ describe('Outgoing Payment Routes', (): void => {
           id: `${accountUrl}/outgoing-payments/${outgoingPaymentId}`,
           accountId: accountUrl,
           receivingPayment,
+          sendAmount: {
+            ...sendAmount,
+            value: Math.ceil(
+              Number(incomingPayment.incomingAmount?.value) *
+                2 *
+                (1 + config.slippage)
+            ).toString()
+          },
+          receiveAmount: {
+            ...incomingPayment.incomingAmount,
+            value: incomingPayment.incomingAmount?.value.toString()
+          },
           description: options.description,
           externalRef: options.externalRef,
-          state: OutgoingPaymentState.Pending.toLowerCase()
+          state: 'processing'
         })
       })
     })

@@ -380,116 +380,142 @@ describe('OutgoingPaymentService', (): void => {
       )
     })
 
-    it('creates an OutgoingPayment to account (FixedSend)', async () => {
-      const options = {
-        accountId,
-        receivingAccount,
-        sendAmount,
-        description: 'rent',
-        externalRef: '202201'
-      }
-      const paymentScope = mockCreateIncomingPayment()
-      const quoteScope = mockWalletQuote()
-      const payment = await outgoingPaymentService.create(options)
-      paymentScope.isDone()
-      quoteScope.isDone()
-      assert.ok(!isOutgoingPaymentError(payment))
-      expect(payment).toMatchObject({
-        id: payment.quote.id,
-        accountId,
-        state: OutgoingPaymentState.Funding,
-        sendAmount,
-        receiveAmount: payment.quote.receiveAmount,
-        receivingPayment: payment.quote.receivingPayment,
-        description: options.description,
-        externalRef: options.externalRef,
-        asset,
-        quote: {
+    // receivingPayment and receivingAccount are defined in `beforeEach`
+    // and unavailable in the `test.each` table
+    test.each`
+      toAccount | toPayment | description
+      ${true}   | ${false}  | ${'account'}
+      ${false}  | ${true}   | ${'incoming payment'}
+    `(
+      'creates a FixedSend OutgoingPayment to an $description',
+      async ({ toPayment, toAccount }): Promise<void> => {
+        const options = {
           accountId,
+          receivingAccount: toAccount ? receivingAccount : undefined,
+          receivingPayment: toPayment ? receivingPayment : undefined,
           sendAmount,
-          receiveAmount: {
-            value: BigInt(
-              Math.ceil(
-                Number(sendAmount.value) *
-                  payment.quote.minExchangeRate.valueOf()
-              )
-            ),
-            assetCode: destinationAsset.code,
-            assetScale: destinationAsset.scale
-          },
-          maxPacketAmount: BigInt('9223372036854775807')
+          description: 'rent',
+          externalRef: '202201'
         }
-      })
-
-      expect(payment.quote.minExchangeRate.valueOf()).toBe(
-        0.5 * (1 - config.slippage)
-      )
-      expect(payment.quote.lowEstimatedExchangeRate.valueOf()).toBe(0.5)
-      expect(payment.quote.highEstimatedExchangeRate.valueOf()).toBe(
-        0.500000000001
-      )
-
-      await expectOutcome(payment, { accountBalance: BigInt(0) })
-
-      await expect(outgoingPaymentService.get(payment.id)).resolves.toEqual(
-        payment
-      )
-      await expect(quoteService.get(payment.id)).resolves.toEqual(payment.quote)
-    })
-
-    it('creates an OutgoingPayment to account (FixedDelivery)', async () => {
-      const options = {
-        accountId,
-        receivingAccount,
-        receiveAmount
-      }
-      const paymentScope = mockCreateIncomingPayment(receiveAmount)
-      const quoteScope = mockWalletQuote()
-      const payment = await outgoingPaymentService.create(options)
-      paymentScope.isDone()
-      quoteScope.isDone()
-      assert.ok(!isOutgoingPaymentError(payment))
-      expect(payment).toMatchObject({
-        id: payment.quote.id,
-        accountId,
-        state: OutgoingPaymentState.Funding,
-        sendAmount: payment.quote.sendAmount,
-        receiveAmount,
-        receivingPayment: payment.quote.receivingPayment,
-        description: null,
-        externalRef: null,
-        asset,
-        quote: {
+        const paymentScope = mockCreateIncomingPayment()
+        const quoteScope = mockWalletQuote()
+        const payment = await outgoingPaymentService.create(options)
+        paymentScope.isDone()
+        quoteScope.isDone()
+        assert.ok(!isOutgoingPaymentError(payment))
+        expect(payment).toMatchObject({
+          id: payment.quote.id,
           accountId,
-          sendAmount: {
-            value: BigInt(
-              Math.ceil(Number(receiveAmount.value) * 2 * (1 + config.slippage))
-            ),
-            assetCode: asset.code,
-            assetScale: asset.scale
-          },
-          receiveAmount,
-          maxPacketAmount: BigInt('9223372036854775807')
+          state: OutgoingPaymentState.Funding,
+          sendAmount,
+          receiveAmount: payment.quote.receiveAmount,
+          receivingPayment: payment.quote.receivingPayment,
+          description: options.description,
+          externalRef: options.externalRef,
+          asset,
+          quote: {
+            accountId,
+            sendAmount,
+            receiveAmount: {
+              value: BigInt(
+                Math.ceil(
+                  Number(sendAmount.value) *
+                    payment.quote.minExchangeRate.valueOf()
+                )
+              ),
+              assetCode: destinationAsset.code,
+              assetScale: destinationAsset.scale
+            },
+            maxPacketAmount: BigInt('9223372036854775807')
+          }
+        })
+
+        expect(payment.quote.minExchangeRate.valueOf()).toBe(
+          0.5 * (1 - config.slippage)
+        )
+        expect(payment.quote.lowEstimatedExchangeRate.valueOf()).toBe(0.5)
+        expect(payment.quote.highEstimatedExchangeRate.valueOf()).toBe(
+          0.500000000001
+        )
+
+        await expectOutcome(payment, { accountBalance: BigInt(0) })
+
+        await expect(outgoingPaymentService.get(payment.id)).resolves.toEqual(
+          payment
+        )
+        await expect(quoteService.get(payment.id)).resolves.toEqual(
+          payment.quote
+        )
+      }
+    )
+
+    // receivingPayment and receivingAccount are defined in `beforeEach`
+    // and unavailable in the `test.each` table
+    test.each`
+      toAccount | toPayment | description
+      ${true}   | ${false}  | ${'account'}
+      ${false}  | ${true}   | ${'incoming payment'}
+    `(
+      'creates a FixedDelivery OutgoingPayment to an $description',
+      async ({ toPayment, toAccount }): Promise<void> => {
+        const options = {
+          accountId,
+          receivingAccount: toAccount ? receivingAccount : undefined,
+          receivingPayment: toPayment ? receivingPayment : undefined,
+          receiveAmount
         }
-      })
+        const paymentScope = mockCreateIncomingPayment(receiveAmount)
+        const quoteScope = mockWalletQuote()
+        const payment = await outgoingPaymentService.create(options)
+        paymentScope.isDone()
+        quoteScope.isDone()
+        assert.ok(!isOutgoingPaymentError(payment))
+        expect(payment).toMatchObject({
+          id: payment.quote.id,
+          accountId,
+          state: OutgoingPaymentState.Funding,
+          sendAmount: payment.quote.sendAmount,
+          receiveAmount,
+          receivingPayment: payment.quote.receivingPayment,
+          description: null,
+          externalRef: null,
+          asset,
+          quote: {
+            accountId,
+            sendAmount: {
+              value: BigInt(
+                Math.ceil(
+                  Number(receiveAmount.value) * 2 * (1 + config.slippage)
+                )
+              ),
+              assetCode: asset.code,
+              assetScale: asset.scale
+            },
+            receiveAmount,
+            maxPacketAmount: BigInt('9223372036854775807')
+          }
+        })
 
-      expect(payment.quote.minExchangeRate.valueOf()).toBe(
-        0.5 * (1 - config.slippage)
-      )
-      expect(payment.quote.lowEstimatedExchangeRate.valueOf()).toBe(0.5)
-      expect(payment.quote.highEstimatedExchangeRate.valueOf()).toBe(
-        0.500000000001
-      )
+        expect(payment.quote.minExchangeRate.valueOf()).toBe(
+          0.5 * (1 - config.slippage)
+        )
+        expect(payment.quote.lowEstimatedExchangeRate.valueOf()).toBe(0.5)
+        expect(payment.quote.highEstimatedExchangeRate.valueOf()).toBe(
+          0.500000000001
+        )
 
-      await expectOutcome(payment, { accountBalance: BigInt(0) })
+        await expectOutcome(payment, { accountBalance: BigInt(0) })
 
-      await expect(outgoingPaymentService.get(payment.id)).resolves.toEqual(
-        payment
-      )
-      await expect(quoteService.get(payment.id)).resolves.toEqual(payment.quote)
-    })
+        await expect(outgoingPaymentService.get(payment.id)).resolves.toEqual(
+          payment
+        )
+        await expect(quoteService.get(payment.id)).resolves.toEqual(
+          payment.quote
+        )
+      }
+    )
 
-    it('creates an OutgoingPayment to incoming payment (FixedDelivery)', async () => {
+    it('creates an OutgoingPayment to incoming payment', async () => {
       const options = {
         accountId,
         receivingPayment
