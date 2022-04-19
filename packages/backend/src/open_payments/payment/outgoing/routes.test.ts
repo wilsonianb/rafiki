@@ -228,7 +228,7 @@ describe('Outgoing Payment Routes', (): void => {
       expect(ctx.body).toEqual({
         id: `${accountUrl}/outgoing-payments/${outgoingPayment.id}`,
         accountId: accountUrl,
-        receivingPayment,
+        receivingPayment: outgoingPayment.receivingPayment,
         sendAmount: {
           ...outgoingPayment.sendAmount,
           value: outgoingPayment.sendAmount.value.toString()
@@ -261,7 +261,7 @@ describe('Outgoing Payment Routes', (): void => {
         expect(ctx.body).toEqual({
           id: `${accountUrl}/outgoing-payments/${outgoingPayment.id}`,
           accountId: accountUrl,
-          receivingPayment,
+          receivingPayment: outgoingPayment.receivingPayment,
           state: [
             OutgoingPaymentState.Funding,
             OutgoingPaymentState.Sending
