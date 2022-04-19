@@ -243,12 +243,13 @@ describe('QuoteService', (): void => {
         }
         const walletScope = mockWalletQuote()
         const quote = await quoteService.create(options)
+        assert.ok(!isQuoteError(quote))
         if (toAccount) {
           assert.ok(paymentScope)
           paymentScope.isDone()
+          receivingPayment = quote.receivingPayment
         }
         walletScope.isDone()
-        assert.ok(!isQuoteError(quote))
         expect(quote).toMatchObject({
           accountId,
           receivingPayment,
@@ -295,12 +296,13 @@ describe('QuoteService', (): void => {
         }
         const walletScope = mockWalletQuote()
         const quote = await quoteService.create(options)
+        assert.ok(!isQuoteError(quote))
         if (toAccount) {
           assert.ok(paymentScope)
           paymentScope.isDone()
+          receivingPayment = quote.receivingPayment
         }
         walletScope.isDone()
-        assert.ok(!isQuoteError(quote))
         expect(quote).toMatchObject({
           accountId,
           receivingPayment,
