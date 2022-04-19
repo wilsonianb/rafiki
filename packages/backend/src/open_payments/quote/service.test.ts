@@ -7,6 +7,7 @@ import { URL } from 'url'
 import { v4 as uuid } from 'uuid'
 
 import { QuoteError, isQuoteError } from './errors'
+import { Quote } from './model'
 import {
   QuoteService,
   CreateQuoteOptions,
@@ -18,21 +19,20 @@ import { IocContract } from '@adonisjs/fold'
 import { initIocContainer } from '../../'
 import { AppServices } from '../../app'
 import { truncateTables } from '../../tests/tableManager'
-import { AccountingService } from '../../accounting/service'
 import { AssetOptions } from '../../asset/service'
 import { Amount } from '../payment/amount'
 import { IncomingPayment } from '../payment/incoming/model'
-// import { Pagination } from '../../shared/baseModel'
-// import { getPageTests } from '../../shared/baseModel.test'
+import { Pagination } from '../../shared/baseModel'
+import { getPageTests } from '../../shared/baseModel.test'
 import { isIncomingPaymentError } from '../payment/incoming/errors'
 
 describe('QuoteService', (): void => {
   let deps: IocContract<AppServices>
   let appContainer: TestContainer
   let quoteService: QuoteService
-  let accountingService: AccountingService
   let knex: Knex
   let accountId: string
+  let assetId: string
   let incomingPayment: IncomingPayment
   let receivingPayment: string
   let accountUrl: string
@@ -105,7 +105,6 @@ describe('QuoteService', (): void => {
         .persist()
       deps = await initIocContainer(Config)
       appContainer = await createTestApp(deps)
-      accountingService = await deps.use('accountingService')
 
       knex = await deps.use('knex')
       config = await deps.use('config')
@@ -117,17 +116,18 @@ describe('QuoteService', (): void => {
     async (): Promise<void> => {
       quoteService = await deps.use('quoteService')
       const accountService = await deps.use('accountService')
-      accountId = (
-        await accountService.create({
-          asset: {
-            code: sendAmount.assetCode,
-            scale: sendAmount.assetScale
-          }
-        })
-      ).id
+      const account = await accountService.create({
+        asset: {
+          code: sendAmount.assetCode,
+          scale: sendAmount.assetScale
+        }
+      })
+      accountId = account.id
+      assetId = account.assetId
       const destinationAccount = await accountService.create({
         asset: destinationAsset
       })
+      const accountingService = await deps.use('accountingService')
       await expect(
         accountingService.createDeposit({
           id: uuid(),
@@ -433,6 +433,35 @@ describe('QuoteService', (): void => {
           receivingPayment
         })
       ).resolves.toEqual(QuoteError.InvalidDestination)
+    })
+  })
+
+  describe('getAccountPage', (): void => {
+    getPageTests({
+      createModel: async () =>
+        Quote.query(knex).insertAndFetch({
+          accountId,
+          assetId,
+          receivingPayment,
+          sendAmount,
+          receiveAmount,
+          maxPacketAmount: BigInt('9223372036854775807'),
+          lowEstimatedExchangeRate: Pay.Ratio.of(
+            Pay.Int.from(500000000000n) as Pay.PositiveInt,
+            Pay.Int.from(1000000000000n) as Pay.PositiveInt
+          ),
+          highEstimatedExchangeRate: Pay.Ratio.of(
+            Pay.Int.from(500000000001n) as Pay.PositiveInt,
+            Pay.Int.from(1000000000000n) as Pay.PositiveInt
+          ),
+          minExchangeRate: Pay.Ratio.of(
+            Pay.Int.from(495n) as Pay.PositiveInt,
+            Pay.Int.from(1000n) as Pay.PositiveInt
+          ),
+          expiresAt: new Date(Date.now() + config.quoteLifespan)
+        }),
+      getPage: (pagination: Pagination) =>
+        quoteService.getAccountPage(accountId, pagination)
     })
   })
 })

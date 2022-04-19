@@ -5,6 +5,7 @@ import { Transaction } from 'knex'
 import { ModelObject, TransactionOrKnex } from 'objection'
 import * as Pay from '@interledger/pay'
 
+import { Pagination } from '../../shared/baseModel'
 import { BaseService } from '../../shared/baseService'
 import { QuoteError, isQuoteError } from './errors'
 import { Quote } from './model'
@@ -22,6 +23,7 @@ export interface QuoteService {
     options: CreateQuoteOptions,
     trx?: Transaction
   ): Promise<Quote | QuoteError>
+  getAccountPage(accountId: string, pagination?: Pagination): Promise<Quote[]>
 }
 
 export interface ServiceDependencies extends BaseService {
@@ -46,7 +48,9 @@ export async function createQuoteService(
   return {
     get: (id) => getQuote(deps, id),
     create: (options: CreateQuoteOptions, trx?: Transaction) =>
-      createQuote(deps, options, trx)
+      createQuote(deps, options, trx),
+    getAccountPage: (accountId, pagination) =>
+      getAccountPage(deps, accountId, pagination)
   }
 }
 
@@ -348,4 +352,15 @@ export function generateQuoteSignature(
   const digest = hmac.digest('hex')
 
   return `t=${timestamp}, v${version}=${digest}`
+}
+
+async function getAccountPage(
+  deps: ServiceDependencies,
+  accountId: string,
+  pagination?: Pagination
+): Promise<Quote[]> {
+  return await Quote.query(deps.knex)
+    .getPage(pagination)
+    .where({ accountId })
+    .withGraphFetched('asset')
 }
