@@ -167,5 +167,5 @@ async function getAccountPage(
   return await OutgoingPayment.query(deps.knex)
     .getPage(pagination)
     .where({ accountId })
-    .withGraphFetched('[asset, quote]')
+    .withGraphFetched('quote.asset')
 }

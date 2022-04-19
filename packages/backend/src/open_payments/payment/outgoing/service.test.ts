@@ -106,7 +106,6 @@ describe('OutgoingPaymentService', (): void => {
     options: CreateQuoteOptions
   ): Promise<OutgoingPayment> {
     const { id: quoteId } = await quoteFactory.build(options)
-    // TODO: mock wallet quote and create incoming payment depending on options...
     const payment = await outgoingPaymentService.create({
       accountId: options.accountId,
       quoteId
@@ -433,26 +432,16 @@ describe('OutgoingPaymentService', (): void => {
           | 'receiveAmount'
         >
       ): Promise<string> {
-        const { id: paymentId } = await createPayment({
+        const payment = await createPayment({
           accountId,
           ...opts
         })
 
-        trackAmountDelivered(paymentId)
+        trackAmountDelivered(payment.id)
 
-        // const scope =
-        //   opts.receivingAccount && mockCreateIncomingPayment(opts.receiveAmount)
-        const payment = await processNext(
-          paymentId,
-          OutgoingPaymentState.Funding
-        )
-        // if (opts.receivingAccount) {
-        //   ;(scope as nock.Scope).isDone()
-        // }
-        assert.ok(payment.sendAmount)
         await expect(
           outgoingPaymentService.fund({
-            id: paymentId,
+            id: payment.id,
             amount: payment.sendAmount.value,
             transferId: uuid()
           })
@@ -460,7 +449,7 @@ describe('OutgoingPaymentService', (): void => {
           state: OutgoingPaymentState.Sending
         })
 
-        return paymentId
+        return payment.id
       }
 
       it('COMPLETED', async (): Promise<void> => {
@@ -613,10 +602,11 @@ describe('OutgoingPaymentService', (): void => {
           paymentId,
           OutgoingPaymentState.Completed
         )
+        const sentAmount = payment.receiveAmount.value * BigInt(2)
         await expectOutcome(payment2, {
-          accountBalance: BigInt(0),
-          amountSent: sendAmount.value,
-          amountDelivered: sendAmount.value / BigInt(2)
+          accountBalance: sendAmount.value - sentAmount,
+          amountSent: sentAmount,
+          amountDelivered: payment.receiveAmount.value
         })
       })
 
@@ -636,10 +626,11 @@ describe('OutgoingPaymentService', (): void => {
           paymentId,
           OutgoingPaymentState.Completed
         )
+        const sentAmount = payment.receiveAmount.value * BigInt(2)
         await expectOutcome(payment, {
-          accountBalance: BigInt(0),
-          amountSent: BigInt(123),
-          amountDelivered: BigInt(123) / BigInt(2)
+          accountBalance: sendAmount.value - sentAmount,
+          amountSent: sentAmount,
+          amountDelivered: payment.receiveAmount.value
         })
       })
 
@@ -692,8 +683,8 @@ describe('OutgoingPaymentService', (): void => {
           receivingPayment: receivingPayment
         })
         // Pretend that the destination asset was initially different.
-        await OutgoingPayment.query(knex)
-          .findById(paymentId)
+        await OutgoingPayment.relatedQuery('quote')
+          .for(paymentId)
           .patch({
             receiveAmount: {
               value: BigInt(56),
@@ -701,7 +692,6 @@ describe('OutgoingPaymentService', (): void => {
               assetScale: 55
             }
           })
-
         await processNext(
           paymentId,
           OutgoingPaymentState.Failed,
