@@ -5,12 +5,19 @@ import { IAppConfig } from '../../../config/app'
 import { OutgoingPaymentService } from './service'
 import { isOutgoingPaymentError, errorToCode, errorToMessage } from './errors'
 import { OutgoingPayment, OutgoingPaymentState } from './model'
+import { QuoteService } from '../../quote/service'
+import {
+  isQuoteError,
+  errorToCode as quoteErrorToCode,
+  errorToMessage as quoteErrorToMessage
+} from '../../quote/errors'
 import { Amount } from '../amount'
 
 interface ServiceDependencies {
   config: IAppConfig
   logger: Logger
   outgoingPaymentService: OutgoingPaymentService
+  quoteService: QuoteService
 }
 
 export interface OutgoingPaymentRoutes {
@@ -97,12 +104,35 @@ async function createOutgoingPayment(
   if (body.externalRef !== undefined && typeof body.externalRef !== 'string')
     return ctx.throw(400, 'invalid externalRef')
 
+  let quoteId: string
+  if (body.quoteId) {
+    if (typeof body.quoteId !== 'string')
+      return ctx.throw(400, 'invalid quoteId')
+    if (body.receivingAccount) return ctx.throw(400, 'invalid receivingAccount')
+    if (body.receivingPayment) return ctx.throw(400, 'invalid receivingPayment')
+    if (body.sendAmount) return ctx.throw(400, 'invalid sendAmount')
+    if (body.receiveAmount) return ctx.throw(400, 'invalid receiveAmount')
+    quoteId = body.quoteId
+  } else {
+    const quoteOrErr = await deps.quoteService.create({
+      accountId,
+      receivingAccount: body.receivingAccount,
+      sendAmount,
+      receiveAmount,
+      receivingPayment: body.receivingPayment
+    })
+    if (isQuoteError(quoteOrErr)) {
+      return ctx.throw(
+        quoteErrorToCode[quoteOrErr],
+        quoteErrorToMessage[quoteOrErr]
+      )
+    }
+    quoteId = quoteOrErr.id
+  }
+
   const paymentOrErr = await deps.outgoingPaymentService.create({
     accountId,
-    receivingAccount: body.receivingAccount,
-    sendAmount,
-    receiveAmount,
-    receivingPayment: body.receivingPayment,
+    quoteId,
     description: body.description,
     externalRef: body.externalRef
   })

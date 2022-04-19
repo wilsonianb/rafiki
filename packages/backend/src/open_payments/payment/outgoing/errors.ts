@@ -1,20 +1,15 @@
 import * as Pay from '@interledger/pay'
 
-import { QuoteError } from '../../quote/errors'
 import { TransferError } from '../../../accounting/errors'
 
-enum CreateError {
+export enum OutgoingPaymentError {
   UnknownAccount = 'UnknownAccount',
   UnknownPayment = 'UnknownPayment',
   UnknownQuote = 'UnknownQuote',
   WrongState = 'WrongState',
   InvalidQuote = 'InvalidQuote',
-  InvalidAmount = 'InvalidAmount',
-  InvalidDestination = 'InvalidDestination'
+  InvalidAmount = 'InvalidAmount'
 }
-
-export const OutgoingPaymentError = { ...CreateError, ...QuoteError }
-export type OutgoingPaymentError = CreateError | QuoteError
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types
 export const isOutgoingPaymentError = (o: any): o is OutgoingPaymentError =>
@@ -28,8 +23,7 @@ export const errorToCode: {
   [OutgoingPaymentError.UnknownQuote]: 404,
   [OutgoingPaymentError.WrongState]: 409,
   [OutgoingPaymentError.InvalidAmount]: 400,
-  [OutgoingPaymentError.InvalidQuote]: 400,
-  [OutgoingPaymentError.InvalidDestination]: 400
+  [OutgoingPaymentError.InvalidQuote]: 400
 }
 
 export const errorToMessage: {
@@ -40,8 +34,7 @@ export const errorToMessage: {
   [OutgoingPaymentError.UnknownQuote]: 'unknown quote',
   [OutgoingPaymentError.WrongState]: 'wrong state',
   [OutgoingPaymentError.InvalidAmount]: 'invalid amount',
-  [OutgoingPaymentError.InvalidQuote]: 'invalid quote',
-  [OutgoingPaymentError.InvalidDestination]: 'invalid destination'
+  [OutgoingPaymentError.InvalidQuote]: 'invalid quote'
 }
 
 export const FundingError = { ...OutgoingPaymentError, ...TransferError }

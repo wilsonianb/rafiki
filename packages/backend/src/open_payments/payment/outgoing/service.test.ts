@@ -1,6 +1,5 @@
 import assert from 'assert'
-import Axios from 'axios'
-import nock, { Definition } from 'nock'
+import nock from 'nock'
 import Knex from 'knex'
 import * as Pay from '@interledger/pay'
 import { URL } from 'url'
@@ -12,13 +11,10 @@ import {
   OutgoingPaymentError,
   isOutgoingPaymentError
 } from './errors'
-import { OutgoingPaymentService, CreateOutgoingPaymentOptions } from './service'
-import {
-  createTestApp,
-  TestContainer,
-  testAccessToken
-} from '../../../tests/app'
+import { OutgoingPaymentService } from './service'
+import { createTestApp, TestContainer } from '../../../tests/app'
 import { IAppConfig, Config } from '../../../config/app'
+import { QuoteFactory } from '../../../tests/quoteFactory'
 import { IocContract } from '@adonisjs/fold'
 import { initIocContainer } from '../../../'
 import { AppServices } from '../../../app'
@@ -47,6 +43,7 @@ describe('OutgoingPaymentService', (): void => {
   let appContainer: TestContainer
   let outgoingPaymentService: OutgoingPaymentService
   let accountingService: AccountingService
+  let quoteFactory: QuoteFactory
   let quoteService: QuoteService
   let knex: Knex
   let accountId: string
@@ -71,12 +68,6 @@ describe('OutgoingPaymentService', (): void => {
   const destinationAsset = {
     scale: 9,
     code: 'XRP'
-  }
-
-  const receiveAmount: Amount = {
-    value: BigInt(56),
-    assetCode: destinationAsset.code,
-    assetScale: destinationAsset.scale
   }
 
   const webhookTypes: {
@@ -112,10 +103,14 @@ describe('OutgoingPaymentService', (): void => {
   }
 
   async function createPayment(
-    options: CreateOutgoingPaymentOptions
+    options: CreateQuoteOptions
   ): Promise<OutgoingPayment> {
+    const { id: quoteId } = await quoteFactory.build(options)
     // TODO: mock wallet quote and create incoming payment depending on options...
-    const payment = await outgoingPaymentService.create(options)
+    const payment = await outgoingPaymentService.create({
+      accountId: options.accountId,
+      quoteId
+    })
     assert.ok(!isOutgoingPaymentError(payment))
     return payment
   }
@@ -139,37 +134,6 @@ describe('OutgoingPaymentService', (): void => {
       ).resolves.not.toHaveLength(0)
     }
     return payment
-  }
-
-  function mockCreateIncomingPayment(receiveAmount?: Amount): nock.Scope {
-    const incomingPaymentsUrl = new URL(`${accountUrl}/incoming-payments`)
-    return nock(incomingPaymentsUrl.origin)
-      .post(incomingPaymentsUrl.pathname, function (this: Definition, body) {
-        expect(body.incomingAmount).toEqual(
-          receiveAmount
-            ? {
-                value: receiveAmount.value.toString(),
-                assetCode: receiveAmount.assetCode,
-                assetScale: receiveAmount.assetScale
-              }
-            : undefined
-        )
-        return true
-      })
-      .matchHeader('Accept', 'application/json')
-      .matchHeader('Content-Type', 'application/json')
-      .reply(201, function (path, requestBody) {
-        return Axios.post(
-          `http://localhost:${appContainer.port}${path}`,
-          requestBody,
-          {
-            headers: Object.assign(
-              { Authorization: `GNAP ${testAccessToken}` },
-              this.req.headers
-            )
-          }
-        ).then((res) => res.data)
-      })
   }
 
   function mockPay(
@@ -282,6 +246,7 @@ describe('OutgoingPaymentService', (): void => {
       appContainer = await createTestApp(deps)
       accountingService = await deps.use('accountingService')
       quoteService = await deps.use('quoteService')
+      quoteFactory = new QuoteFactory(Config.quoteUrl, quoteService)
 
       knex = await deps.use('knex')
       config = await deps.use('config')
@@ -380,196 +345,6 @@ describe('OutgoingPaymentService', (): void => {
       )
     })
 
-    // receivingPayment and receivingAccount are defined in `beforeEach`
-    // and unavailable in the `test.each` table
-    test.each`
-      toAccount | toPayment | description
-      ${true}   | ${false}  | ${'account'}
-      ${false}  | ${true}   | ${'incoming payment'}
-    `(
-      'creates a FixedSend OutgoingPayment to an $description',
-      async ({ toPayment, toAccount }): Promise<void> => {
-        const options = {
-          accountId,
-          receivingAccount: toAccount ? receivingAccount : undefined,
-          receivingPayment: toPayment ? receivingPayment : undefined,
-          sendAmount,
-          description: 'rent',
-          externalRef: '202201'
-        }
-        const paymentScope = mockCreateIncomingPayment()
-        const quoteScope = mockWalletQuote()
-        const payment = await outgoingPaymentService.create(options)
-        paymentScope.isDone()
-        quoteScope.isDone()
-        assert.ok(!isOutgoingPaymentError(payment))
-        expect(payment).toMatchObject({
-          id: payment.quote.id,
-          accountId,
-          state: OutgoingPaymentState.Funding,
-          sendAmount,
-          receiveAmount: payment.quote.receiveAmount,
-          receivingPayment: payment.quote.receivingPayment,
-          description: options.description,
-          externalRef: options.externalRef,
-          asset,
-          quote: {
-            accountId,
-            sendAmount,
-            receiveAmount: {
-              value: BigInt(
-                Math.ceil(
-                  Number(sendAmount.value) *
-                    payment.quote.minExchangeRate.valueOf()
-                )
-              ),
-              assetCode: destinationAsset.code,
-              assetScale: destinationAsset.scale
-            },
-            maxPacketAmount: BigInt('9223372036854775807')
-          }
-        })
-
-        expect(payment.quote.minExchangeRate.valueOf()).toBe(
-          0.5 * (1 - config.slippage)
-        )
-        expect(payment.quote.lowEstimatedExchangeRate.valueOf()).toBe(0.5)
-        expect(payment.quote.highEstimatedExchangeRate.valueOf()).toBe(
-          0.500000000001
-        )
-
-        await expectOutcome(payment, { accountBalance: BigInt(0) })
-
-        await expect(outgoingPaymentService.get(payment.id)).resolves.toEqual(
-          payment
-        )
-        await expect(quoteService.get(payment.id)).resolves.toEqual(
-          payment.quote
-        )
-      }
-    )
-
-    // receivingPayment and receivingAccount are defined in `beforeEach`
-    // and unavailable in the `test.each` table
-    test.each`
-      toAccount | toPayment | description
-      ${true}   | ${false}  | ${'account'}
-      ${false}  | ${true}   | ${'incoming payment'}
-    `(
-      'creates a FixedDelivery OutgoingPayment to an $description',
-      async ({ toPayment, toAccount }): Promise<void> => {
-        const options = {
-          accountId,
-          receivingAccount: toAccount ? receivingAccount : undefined,
-          receivingPayment: toPayment ? receivingPayment : undefined,
-          receiveAmount
-        }
-        const paymentScope = mockCreateIncomingPayment(receiveAmount)
-        const quoteScope = mockWalletQuote()
-        const payment = await outgoingPaymentService.create(options)
-        paymentScope.isDone()
-        quoteScope.isDone()
-        assert.ok(!isOutgoingPaymentError(payment))
-        expect(payment).toMatchObject({
-          id: payment.quote.id,
-          accountId,
-          state: OutgoingPaymentState.Funding,
-          sendAmount: payment.quote.sendAmount,
-          receiveAmount,
-          receivingPayment: payment.quote.receivingPayment,
-          description: null,
-          externalRef: null,
-          asset,
-          quote: {
-            accountId,
-            sendAmount: {
-              value: BigInt(
-                Math.ceil(
-                  Number(receiveAmount.value) * 2 * (1 + config.slippage)
-                )
-              ),
-              assetCode: asset.code,
-              assetScale: asset.scale
-            },
-            receiveAmount,
-            maxPacketAmount: BigInt('9223372036854775807')
-          }
-        })
-
-        expect(payment.quote.minExchangeRate.valueOf()).toBe(
-          0.5 * (1 - config.slippage)
-        )
-        expect(payment.quote.lowEstimatedExchangeRate.valueOf()).toBe(0.5)
-        expect(payment.quote.highEstimatedExchangeRate.valueOf()).toBe(
-          0.500000000001
-        )
-
-        await expectOutcome(payment, { accountBalance: BigInt(0) })
-
-        await expect(outgoingPaymentService.get(payment.id)).resolves.toEqual(
-          payment
-        )
-        await expect(quoteService.get(payment.id)).resolves.toEqual(
-          payment.quote
-        )
-      }
-    )
-
-    it('creates an OutgoingPayment to incoming payment', async () => {
-      const options = {
-        accountId,
-        receivingPayment
-      }
-      const paymentScope = mockCreateIncomingPayment(receiveAmount)
-      const quoteScope = mockWalletQuote()
-      const payment = await outgoingPaymentService.create(options)
-      paymentScope.isDone()
-      quoteScope.isDone()
-      assert.ok(!isOutgoingPaymentError(payment))
-      expect(payment).toMatchObject({
-        id: payment.quote.id,
-        accountId,
-        state: OutgoingPaymentState.Funding,
-        sendAmount: payment.quote.sendAmount,
-        receiveAmount,
-        receivingPayment: payment.quote.receivingPayment,
-        description: null,
-        externalRef: null,
-        asset,
-        quote: {
-          accountId,
-          sendAmount: {
-            value: BigInt(
-              Math.ceil(
-                Number(incomingPayment.incomingAmount?.value) *
-                  2 *
-                  (1 + config.slippage)
-              )
-            ),
-            assetCode: asset.code,
-            assetScale: asset.scale
-          },
-          receiveAmount,
-          maxPacketAmount: BigInt('9223372036854775807')
-        }
-      })
-
-      expect(payment.quote.minExchangeRate.valueOf()).toBe(
-        0.5 * (1 - config.slippage)
-      )
-      expect(payment.quote.lowEstimatedExchangeRate.valueOf()).toBe(0.5)
-      expect(payment.quote.highEstimatedExchangeRate.valueOf()).toBe(
-        0.500000000001
-      )
-
-      await expectOutcome(payment, { accountBalance: BigInt(0) })
-
-      await expect(outgoingPaymentService.get(payment.id)).resolves.toEqual(
-        payment
-      )
-      await expect(quoteService.get(payment.id)).resolves.toEqual(payment.quote)
-    })
-
     it('fails to create on unknown quote', async () => {
       await expect(
         outgoingPaymentService.create({
@@ -592,41 +367,18 @@ describe('OutgoingPaymentService', (): void => {
       ).resolves.toEqual(OutgoingPaymentError.UnknownAccount)
     })
 
-    // it('fails to create on conflicting quote account', async () => {
-    // })
-
-    // receivingPayment and receivingAccount are defined in `beforeEach`
-    // and unavailable in the `test.each` table
-    test.each`
-      toPayment | toAccount | sendAmount                              | receiveAmount                              | error                                      | description
-      ${false}  | ${false}  | ${sendAmount}                           | ${undefined}                               | ${OutgoingPaymentError.InvalidDestination} | ${'without a destination'}
-      ${true}   | ${true}   | ${sendAmount}                           | ${undefined}                               | ${OutgoingPaymentError.InvalidDestination} | ${'with multiple destinations'}
-      ${false}  | ${true}   | ${undefined}                            | ${undefined}                               | ${OutgoingPaymentError.InvalidAmount}      | ${'with missing amount'}
-      ${false}  | ${true}   | ${sendAmount}                           | ${receiveAmount}                           | ${OutgoingPaymentError.InvalidAmount}      | ${'with multiple amounts'}
-      ${false}  | ${true}   | ${{ ...sendAmount, value: BigInt(0) }}  | ${undefined}                               | ${OutgoingPaymentError.InvalidAmount}      | ${'sendAmount of zero'}
-      ${false}  | ${true}   | ${{ ...sendAmount, value: BigInt(-1) }} | ${undefined}                               | ${OutgoingPaymentError.InvalidAmount}      | ${'negative sendAmount'}
-      ${false}  | ${true}   | ${undefined}                            | ${{ ...receiveAmount, value: BigInt(0) }}  | ${OutgoingPaymentError.InvalidAmount}      | ${'receiveAmount of zero'}
-      ${false}  | ${true}   | ${undefined}                            | ${{ ...receiveAmount, value: BigInt(-1) }} | ${OutgoingPaymentError.InvalidAmount}      | ${'negative receiveAmount'}
-    `(
-      'fails to create $description',
-      async ({
-        toPayment,
-        toAccount,
-        sendAmount,
-        receiveAmount,
-        error
-      }): Promise<void> => {
-        await expect(
-          outgoingPaymentService.create({
-            accountId,
-            receivingPayment: toPayment ? receivingPayment : undefined,
-            receivingAccount: toAccount ? receivingAccount : undefined,
-            sendAmount,
-            receiveAmount
-          })
-        ).resolves.toEqual(error)
-      }
-    )
+    it('fails to create on invalid quote account', async () => {
+      const quote = await createQuote({
+        accountId,
+        receivingPayment
+      })
+      await expect(
+        outgoingPaymentService.create({
+          accountId: incomingPayment.accountId,
+          quoteId: quote.id
+        })
+      ).resolves.toEqual(OutgoingPaymentError.InvalidQuote)
+    })
   })
 
   describe('processNext', (): void => {
@@ -674,7 +426,7 @@ describe('OutgoingPaymentService', (): void => {
     describe('SENDING→', (): void => {
       async function setup(
         opts: Pick<
-          CreateOutgoingPaymentOptions,
+          CreateQuoteOptions,
           | 'sendAmount'
           | 'receivingAccount'
           | 'receivingPayment'
@@ -688,15 +440,15 @@ describe('OutgoingPaymentService', (): void => {
 
         trackAmountDelivered(paymentId)
 
-        const scope =
-          opts.receivingAccount && mockCreateIncomingPayment(opts.receiveAmount)
+        // const scope =
+        //   opts.receivingAccount && mockCreateIncomingPayment(opts.receiveAmount)
         const payment = await processNext(
           paymentId,
           OutgoingPaymentState.Funding
         )
-        if (opts.receivingAccount) {
-          ;(scope as nock.Scope).isDone()
-        }
+        // if (opts.receivingAccount) {
+        //   ;(scope as nock.Scope).isDone()
+        // }
         assert.ok(payment.sendAmount)
         await expect(
           outgoingPaymentService.fund({
@@ -964,15 +716,11 @@ describe('OutgoingPaymentService', (): void => {
     let quoteAmount: bigint
 
     beforeEach(async (): Promise<void> => {
-      const quote = await createQuote({
+      payment = await createPayment({
         accountId,
         receivingPayment
       })
-      payment = await createPayment({
-        accountId,
-        quoteId: quote.id
-      })
-      quoteAmount = quote.sendAmount.value
+      quoteAmount = payment.sendAmount.value
       await expectOutcome(payment, { accountBalance: BigInt(0) })
     }, 10_000)
 

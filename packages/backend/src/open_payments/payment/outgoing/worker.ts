@@ -59,7 +59,7 @@ export async function getPendingPayment(
           [RETRY_BACKOFF_SECONDS, now]
         )
     })
-    .withGraphFetched('[account, asset, quote]')
+    .withGraphFetched('[account, quote.asset]')
   return payments[0]
 }
 

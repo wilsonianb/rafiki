@@ -442,13 +442,20 @@ input AmountInput {
   assetScale: Int!
 }
 
-input CreateOutgoingPaymentInput {
+input CreateQuoteInput {
   accountId: String!
   receivingAccount: String
   sendAmount: AmountInput
   receiveAmount: AmountInput
   receivingPayment: String
   authorized: Boolean
+  description: String
+  externalRef: String
+}
+
+input CreateOutgoingPaymentInput {
+  accountId: String!
+  quoteId: String!
   description: String
   externalRef: String
 }

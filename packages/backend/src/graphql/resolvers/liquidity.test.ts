@@ -31,6 +31,7 @@ import {
 import { Peer } from '../../peer/model'
 import { randomAsset } from '../../tests/asset'
 import { PeerFactory } from '../../tests/peerFactory'
+import { QuoteFactory } from '../../tests/quoteFactory'
 import { truncateTables } from '../../tests/tableManager'
 import { WebhookEvent } from '../../webhook/model'
 import {
@@ -1604,13 +1605,26 @@ describe('Liquidity Resolvers', (): void => {
           description: 'description!'
         })) as IncomingPayment
         assert.ok(!isIncomingPaymentEventType(incomingPayment))
-        const outgoingPaymentService = await deps.use('outgoingPaymentService')
+        const { id: receivingAccountId } = await accountService.create({
+          asset: account.asset
+        })
         const config = await deps.use('config')
-        const receivingPayment = `${config.publicHost}/incoming-payments/${incomingPayment.id}`
         // create and then patch quote
+        const quoteService = await deps.use('quoteService')
+        const quoteFactory = new QuoteFactory(config.quoteUrl, quoteService)
+        const { id: quoteId } = await quoteFactory.build({
+          accountId,
+          receivingAccount: `${config.publicHost}/${receivingAccountId}`,
+          sendAmount: {
+            value: BigInt(56),
+            assetCode: account.asset.code,
+            assetScale: account.asset.scale
+          }
+        })
+        const outgoingPaymentService = await deps.use('outgoingPaymentService')
         payment = (await outgoingPaymentService.create({
           accountId,
-          receivingPayment
+          quoteId
         })) as OutgoingPayment
         await payment.$query(knex).patch({
           state: OutgoingPaymentState.Funding,

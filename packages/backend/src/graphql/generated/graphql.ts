@@ -183,11 +183,7 @@ export type CreateAssetLiquidityWithdrawalInput = {
 
 export type CreateOutgoingPaymentInput = {
   accountId: Scalars['String'];
-  receivingAccount?: Maybe<Scalars['String']>;
-  sendAmount?: Maybe<AmountInput>;
-  receiveAmount?: Maybe<AmountInput>;
-  receivingPayment?: Maybe<Scalars['String']>;
-  authorized?: Maybe<Scalars['Boolean']>;
+  quoteId: Scalars['String'];
   description?: Maybe<Scalars['String']>;
   externalRef?: Maybe<Scalars['String']>;
 };
@@ -214,6 +210,17 @@ export type CreatePeerMutationResponse = MutationResponse & {
   success: Scalars['Boolean'];
   message: Scalars['String'];
   peer?: Maybe<Peer>;
+};
+
+export type CreateQuoteInput = {
+  accountId: Scalars['String'];
+  receivingAccount?: Maybe<Scalars['String']>;
+  sendAmount?: Maybe<AmountInput>;
+  receiveAmount?: Maybe<AmountInput>;
+  receivingPayment?: Maybe<Scalars['String']>;
+  authorized?: Maybe<Scalars['Boolean']>;
+  description?: Maybe<Scalars['String']>;
+  externalRef?: Maybe<Scalars['String']>;
 };
 
 export type DeleteAllApiKeysInput = {
@@ -839,6 +846,7 @@ export type ResolversTypes = {
   CreatePeerInput: ResolverTypeWrapper<Partial<CreatePeerInput>>;
   CreatePeerLiquidityWithdrawalInput: ResolverTypeWrapper<Partial<CreatePeerLiquidityWithdrawalInput>>;
   CreatePeerMutationResponse: ResolverTypeWrapper<Partial<CreatePeerMutationResponse>>;
+  CreateQuoteInput: ResolverTypeWrapper<Partial<CreateQuoteInput>>;
   DeleteAllApiKeysInput: ResolverTypeWrapper<Partial<DeleteAllApiKeysInput>>;
   DeleteAllApiKeysMutationResponse: ResolverTypeWrapper<Partial<DeleteAllApiKeysMutationResponse>>;
   DeletePeerMutationResponse: ResolverTypeWrapper<Partial<DeletePeerMutationResponse>>;
@@ -915,6 +923,7 @@ export type ResolversParentTypes = {
   CreatePeerInput: Partial<CreatePeerInput>;
   CreatePeerLiquidityWithdrawalInput: Partial<CreatePeerLiquidityWithdrawalInput>;
   CreatePeerMutationResponse: Partial<CreatePeerMutationResponse>;
+  CreateQuoteInput: Partial<CreateQuoteInput>;
   DeleteAllApiKeysInput: Partial<DeleteAllApiKeysInput>;
   DeleteAllApiKeysMutationResponse: Partial<DeleteAllApiKeysMutationResponse>;
   DeletePeerMutationResponse: Partial<DeletePeerMutationResponse>;

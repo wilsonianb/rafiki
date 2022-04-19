@@ -1,9 +1,8 @@
 import assert from 'assert'
-import Axios from 'axios'
 import * as httpMocks from 'node-mocks-http'
 import Knex from 'knex'
 import { WorkerUtils, makeWorkerUtils } from 'graphile-worker'
-import nock, { Definition } from 'nock'
+import nock from 'nock'
 import { v4 as uuid } from 'uuid'
 
 import { createContext } from '../../../tests/context'
@@ -17,11 +16,13 @@ import { AppServices } from '../../../app'
 import { truncateTables } from '../../../tests/tableManager'
 import { OutgoingPaymentService, CreateOutgoingPaymentOptions } from './service'
 import { isOutgoingPaymentError } from './errors'
-import { OutgoingPaymentState } from './model'
+import { OutgoingPayment, OutgoingPaymentState } from './model'
 import { OutgoingPaymentRoutes } from './routes'
 import { Amount } from '../amount'
 import { IncomingPayment } from '../incoming/model'
 import { isIncomingPaymentError } from '../incoming/errors'
+import { CreateQuoteOptions } from '../../quote/service'
+import { QuoteFactory, mockWalletQuote } from '../../../tests/quoteFactory'
 import { AppContext } from '../../../app'
 
 describe('Outgoing Payment Routes', (): void => {
@@ -37,6 +38,7 @@ describe('Outgoing Payment Routes', (): void => {
   let receivingAccount: string
   let receivingPayment: string
   let incomingPayment: IncomingPayment
+  let quoteFactory: QuoteFactory
 
   const messageProducer = new GraphileProducer()
   const mockMessageProducer = {
@@ -57,46 +59,30 @@ describe('Outgoing Payment Routes', (): void => {
     code: 'XRP'
   }
 
-  function mockCreateIncomingPayment(receiveAmount?: Amount): nock.Scope {
-    const incomingPaymentsUrl = new URL(`${receivingAccount}/incoming-payments`)
-    return nock(incomingPaymentsUrl.origin)
-      .post(incomingPaymentsUrl.pathname, function (this: Definition, body) {
-        expect(body.incomingAmount).toEqual(
-          receiveAmount
-            ? {
-                value: receiveAmount.value.toString(),
-                assetCode: receiveAmount.assetCode,
-                assetScale: receiveAmount.assetScale
-              }
-            : undefined
-        )
-        return true
-      })
-      .matchHeader('Accept', 'application/json')
-      .matchHeader('Content-Type', 'application/json')
-      .reply(201, function (path, requestBody) {
-        return Axios.post(
-          `http://localhost:${appContainer.port}${path}`,
-          requestBody,
-          {
-            headers: this.req.headers
-          }
-        ).then((res) => res.data)
-      })
-  }
-
-  function mockWalletQuote(): nock.Scope {
-    const quoteUrl = new URL(Config.quoteUrl)
-    return nock(quoteUrl.origin)
-      .matchHeader('Accept', 'application/json')
-      .matchHeader('Content-Type', 'application/json')
-      .post(quoteUrl.pathname)
-      .reply(
-        201,
-        function (_path: string, requestBody: Record<string, unknown>) {
-          return requestBody
-        }
-      )
+  const createPayment = async (options: {
+    accountId: string
+    description?: string
+    externalRef?: string
+  }): Promise<OutgoingPayment> => {
+    const accountService = await deps.use('accountService')
+    const { id: receivingAccountId } = await accountService.create({
+      asset: destinationAsset
+    })
+    const { id: quoteId } = await quoteFactory.build({
+      accountId: options.accountId,
+      receivingAccount: `${Config.publicHost}/${receivingAccountId}`,
+      receiveAmount: {
+        value: BigInt(56),
+        assetCode: destinationAsset.code,
+        assetScale: destinationAsset.scale
+      }
+    })
+    const payment = await outgoingPaymentService.create({
+      ...options,
+      quoteId
+    })
+    assert.ok(!isOutgoingPaymentError(payment))
+    return payment
   }
 
   beforeAll(
@@ -123,6 +109,8 @@ describe('Outgoing Payment Routes', (): void => {
       outgoingPaymentService = await deps.use('outgoingPaymentService')
       config = await deps.use('config')
       outgoingPaymentRoutes = await deps.use('outgoingPaymentRoutes')
+      const quoteService = await deps.use('quoteService')
+      quoteFactory = new QuoteFactory(Config.quoteUrl, quoteService)
     }
   )
 
@@ -220,14 +208,11 @@ describe('Outgoing Payment Routes', (): void => {
     })
 
     test('returns 200 with an outgoing payment', async (): Promise<void> => {
-      mockWalletQuote()
-      const outgoingPayment = await outgoingPaymentService.create({
+      const outgoingPayment = await createPayment({
         accountId,
-        receivingPayment,
         description: 'rent',
         externalRef: '202201'
       })
-      assert.ok(!isOutgoingPaymentError(outgoingPayment))
       const ctx = createContext(
         {
           headers: { Accept: 'application/json' }
@@ -260,10 +245,8 @@ describe('Outgoing Payment Routes', (): void => {
 
     Object.values(OutgoingPaymentState).forEach((state) => {
       test(`returns 200 with a(n) ${state} outgoing payment`, async (): Promise<void> => {
-        mockWalletQuote()
-        const outgoingPayment = await outgoingPaymentService.create({
-          accountId,
-          receivingPayment
+        const outgoingPayment = await createPayment({
+          accountId
         })
         assert.ok(!isOutgoingPaymentError(outgoingPayment))
         await outgoingPayment.$query(knex).patch({ state })
@@ -299,7 +282,12 @@ describe('Outgoing Payment Routes', (): void => {
   })
 
   describe('create', (): void => {
-    let options: Omit<CreateOutgoingPaymentOptions, 'accountId'>
+    let options: Omit<
+      CreateOutgoingPaymentOptions & CreateQuoteOptions,
+      'accountId' | 'quoteId'
+    > & {
+      quoteId?: string
+    }
 
     beforeEach(() => {
       options = {
@@ -473,8 +461,7 @@ describe('Outgoing Payment Routes', (): void => {
               : undefined
           }
           const ctx = setup({})
-          mockWalletQuote()
-          mockCreateIncomingPayment(options.receiveAmount)
+          mockWalletQuote(Config.quoteUrl)
           await expect(
             outgoingPaymentRoutes.create(ctx)
           ).resolves.toBeUndefined()
@@ -511,7 +498,7 @@ describe('Outgoing Payment Routes', (): void => {
           externalRef: '202201'
         }
         const ctx = setup({})
-        mockWalletQuote()
+        mockWalletQuote(Config.quoteUrl)
         await expect(outgoingPaymentRoutes.create(ctx)).resolves.toBeUndefined()
         expect(ctx.response.status).toBe(201)
         const outgoingPaymentId = ((ctx.response.body as Record<

@@ -14,9 +14,6 @@ import {
 } from './model'
 import { AccountingService } from '../../../accounting/service'
 import { AccountService } from '../../account/service'
-import { QuoteService } from '../../quote/service'
-import { isQuoteError } from '../../quote/errors'
-import { Amount } from '../amount'
 import { IlpPlugin, IlpPluginOptions } from '../../shared/ilp_plugin'
 import { sendWebhookEvent } from './lifecycle'
 import * as worker from './worker'
@@ -40,7 +37,6 @@ export interface ServiceDependencies extends BaseService {
   knex: TransactionOrKnex
   accountingService: AccountingService
   accountService: AccountService
-  quoteService: QuoteService
   makeIlpPlugin: (options: IlpPluginOptions) => IlpPlugin
 }
 
@@ -73,11 +69,7 @@ async function getOutgoingPayment(
 
 export interface CreateOutgoingPaymentOptions {
   accountId: string
-  quoteId?: string
-  sendAmount?: Amount
-  receiveAmount?: Amount
-  receivingAccount?: string
-  receivingPayment?: string
+  quoteId: string
   description?: string
   externalRef?: string
 }
@@ -88,21 +80,6 @@ async function createOutgoingPayment(
 ): Promise<OutgoingPayment | OutgoingPaymentError> {
   try {
     return await OutgoingPayment.transaction(deps.knex, async (trx) => {
-      if (options.quoteId) {
-        if (options.receivingAccount || options.receivingPayment) {
-          return OutgoingPaymentError.InvalidDestination
-        } else if (options.sendAmount || options.receiveAmount) {
-          return OutgoingPaymentError.InvalidAmount
-        }
-      } else {
-        // TODO: create quote in transaction
-        const quoteOrErr = await deps.quoteService.create(options)
-        if (isQuoteError(quoteOrErr)) {
-          return quoteOrErr
-        }
-        options.quoteId = quoteOrErr.id
-      }
-
       const payment = await OutgoingPayment.query(trx)
         .insertAndFetch({
           id: options.quoteId,
