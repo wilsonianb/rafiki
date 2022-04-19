@@ -21,6 +21,7 @@ import { OutgoingPaymentRoutes } from './routes'
 import { Amount } from '../amount'
 import { IncomingPayment } from '../incoming/model'
 import { isIncomingPaymentError } from '../incoming/errors'
+import { Quote } from '../../quote/model'
 import { CreateQuoteOptions } from '../../quote/service'
 import { QuoteFactory, mockWalletQuote } from '../../../tests/quoteFactory'
 import { AppContext } from '../../../app'
@@ -59,17 +60,13 @@ describe('Outgoing Payment Routes', (): void => {
     code: 'XRP'
   }
 
-  const createPayment = async (options: {
-    accountId: string
-    description?: string
-    externalRef?: string
-  }): Promise<OutgoingPayment> => {
+  const createQuote = async (accountId: string): Promise<Quote> => {
     const accountService = await deps.use('accountService')
     const { id: receivingAccountId } = await accountService.create({
       asset: destinationAsset
     })
-    const { id: quoteId } = await quoteFactory.build({
-      accountId: options.accountId,
+    return await quoteFactory.build({
+      accountId,
       receivingAccount: `${Config.publicHost}/${receivingAccountId}`,
       receiveAmount: {
         value: BigInt(56),
@@ -77,6 +74,14 @@ describe('Outgoing Payment Routes', (): void => {
         assetScale: destinationAsset.scale
       }
     })
+  }
+
+  const createPayment = async (options: {
+    accountId: string
+    description?: string
+    externalRef?: string
+  }): Promise<OutgoingPayment> => {
+    const { id: quoteId } = await createQuote(accountId)
     const payment = await outgoingPaymentService.create({
       ...options,
       quoteId
@@ -432,6 +437,41 @@ describe('Outgoing Payment Routes', (): void => {
     })
 
     describe('returns the outgoing payment on success', (): void => {
+      test('Quote', async (): Promise<void> => {
+        const quote = await createQuote(accountId)
+        options = {
+          quoteId: quote.id,
+          description: 'rent',
+          externalRef: '202201'
+        }
+        const ctx = setup({})
+        mockWalletQuote(Config.quoteUrl)
+        await expect(outgoingPaymentRoutes.create(ctx)).resolves.toBeUndefined()
+        expect(ctx.response.status).toBe(201)
+        const outgoingPaymentId = ((ctx.response.body as Record<
+          string,
+          unknown
+        >)['id'] as string)
+          .split('/')
+          .pop()
+        expect(ctx.response.body).toEqual({
+          id: `${accountUrl}/outgoing-payments/${outgoingPaymentId}`,
+          accountId: accountUrl,
+          receivingPayment: quote.receivingPayment,
+          sendAmount: {
+            ...quote.sendAmount,
+            value: quote.sendAmount.value.toString()
+          },
+          receiveAmount: {
+            ...quote.receiveAmount,
+            value: quote.receiveAmount.value.toString()
+          },
+          description: options.description,
+          externalRef: options.externalRef,
+          state: 'processing'
+        })
+      })
+
       test.each`
         sendAmount   | receiveAmount | expectedAmount | description
         ${'123'}     | ${undefined}  | ${'61'}        | ${'fixed-send'}
