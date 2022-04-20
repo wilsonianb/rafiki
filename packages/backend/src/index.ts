@@ -99,7 +99,11 @@ export function initIocContainer(
   container.singleton('closeEmitter', async () => new EventEmitter())
   container.singleton('redis', async (deps) => {
     const config = await deps.use('config')
-    return new IORedis(config.redisUrl)
+    return new IORedis({
+      host: config.redisHost,
+      port: config.redisPort,
+      tls: config.redisTls
+    })
   })
   container.singleton('streamServer', async (deps) => {
     const config = await deps.use('config')

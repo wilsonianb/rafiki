@@ -1,4 +1,5 @@
 import * as crypto from 'crypto'
+import { readFileSync } from 'fs'
 
 function envString(name: string, value: string): string {
   const envValue = process.env[name]
@@ -36,7 +37,23 @@ export const Config = {
           'postgresql://postgres:password@localhost:5432/development'
         ),
   env: envString('NODE_ENV', 'development'),
-  redisUrl: envString('REDIS_URL', 'redis://127.0.0.1:6379'),
+  redisHost: envString('REDIS_HOST', '127.0.0.1'),
+  redisPort: envInt('REDIS_PORT', 6379),
+  redisTls:
+    process.env.REDIS_TLS_ENABLED === 'true'
+      ? {
+          rejectUnauthorized: false, // allow self-signed certs
+          ca: readFileSync(
+            envString('REDIS_TLS_CA_FILE_PATH', '/certs/ca.crt')
+          ),
+          key: readFileSync(
+            envString('REDIS_TLS_KEY_FILE_PATH', '/certs/tls.key')
+          ),
+          cert: readFileSync(
+            envString('REDIS_TLS_CERT_FILE_PATH', '/certs/tls.crt')
+          )
+        }
+      : undefined,
   coilApiGrpcUrl: envString('COIL_API_GRPC_URL', 'localhost:6000'),
   nonceRedisKey: envString('NONCE_REDIS_KEY', 'nonceToProject'),
   adminKey: envString('ADMIN_KEY', 'qwertyuiop1234567890'),
