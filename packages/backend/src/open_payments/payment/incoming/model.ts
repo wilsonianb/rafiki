@@ -2,6 +2,7 @@ import { Model } from 'objection'
 import { Amount } from '../../amount'
 import { Asset } from '../../../asset/model'
 import { LiquidityAccount, OnCreditOptions } from '../../../accounting/service'
+import { Config } from '../../../config/app'
 import { ConnectorAccount } from '../../../connector/core/rafiki'
 import { BaseModel } from '../../../shared/baseModel'
 import { WebhookEvent } from '../../../webhook/model'
@@ -92,6 +93,10 @@ export class IncomingPayment
 
   public set incomingAmount(amount: Amount | undefined) {
     this.incomingAmountValue = amount?.value ?? null
+  }
+
+  public get url(): string {
+    return `${Config.publicHost}/${this.accountId}/incoming-payments/${this.id}`
   }
 
   public async onCredit({

@@ -9,7 +9,6 @@ import { BaseService } from '../../shared/baseService'
 import { QuoteError, isQuoteError } from './errors'
 import { Quote } from './model'
 import { Amount } from '../amount'
-import { Account } from '../account/model'
 import { AccountService } from '../account/service'
 import { RatesService } from '../../rates/service'
 import { IlpPlugin, IlpPluginOptions } from '../../shared/ilp_plugin'
@@ -103,48 +102,13 @@ async function createQuote(
     }
   }
 
-  try {
-    return await Quote.transaction(deps.knex, async (trx) => {
-      const ilpQuote = await startQuote(
-        {
-          ...deps,
-          knex: trx
-        },
-        options,
-        account
-      )
-      const quote = await finalizeQuote(
-        {
-          ...deps,
-          knex: trx
-        },
-        ilpQuote,
-        options.sendAmount
-          ? Pay.PaymentType.FixedSend
-          : Pay.PaymentType.FixedDelivery
-      )
-      return quote
-    })
-  } catch (err) {
-    if (isQuoteError(err)) {
-      return err
-    }
-    throw err
-  }
-}
-
-export async function startQuote(
-  deps: ServiceDependencies,
-  options: CreateQuoteOptions,
-  account: Account
-): Promise<Quote> {
   const plugin = deps.makeIlpPlugin({
     sourceAccount: account,
     unfulfillable: true
   })
+
   try {
     await plugin.connect()
-
     const setupOptions: Pay.SetupOptions = { plugin }
     if (options.receivingPayment) {
       setupOptions.destinationPayment = options.receivingPayment
@@ -185,17 +149,19 @@ export async function startQuote(
       prices
     }
     assert.ok(quoteOptions.destination.destinationPaymentDetails)
+    const receivingPaymentAmount = destination.destinationPaymentDetails
+      .incomingAmount
+      ? destination.destinationPaymentDetails.incomingAmount.value -
+        destination.destinationPaymentDetails.receivedAmount.value
+      : undefined
     if (options.sendAmount) {
       quoteOptions.amountToSend = options.sendAmount.value
       quoteOptions.destination.destinationPaymentDetails.incomingAmount = undefined
     } else if (options.receiveAmount) {
       if (options.receivingPayment) {
         quoteOptions.amountToDeliver = options.receiveAmount.value
-        if (destination.destinationPaymentDetails.incomingAmount) {
-          const remainingToReceive =
-            destination.destinationPaymentDetails.incomingAmount.value -
-            destination.destinationPaymentDetails.receivedAmount.value
-          if (remainingToReceive < options.receiveAmount.value) {
+        if (receivingPaymentAmount) {
+          if (receivingPaymentAmount < options.receiveAmount.value) {
             throw QuoteError.InvalidAmount
           }
           quoteOptions.destination.destinationPaymentDetails.incomingAmount = undefined
@@ -211,7 +177,7 @@ export async function startQuote(
         throw QuoteError.InvalidDestination
       }
     }
-    const quote = await Pay.startQuote(quoteOptions).finally(() => {
+    const ilpQuote = await Pay.startQuote(quoteOptions).finally(() => {
       return Pay.closeConnection(plugin, destination).catch((err) => {
         deps.logger.warn(
           {
@@ -223,39 +189,61 @@ export async function startQuote(
       })
     })
 
-    // TODO: check fixed-send's quote.minDeliveryAmount does not exceed receivingPayment's incomingAmount
+    // TODO: check fixed-send's ilpQuote.minDeliveryAmount does not exceed receivingPayment's incomingAmount
     // Should that be here or after wallet sets receiveAmount?
 
     // Pay.startQuote should return PaymentError.InvalidSourceAmount or
     // PaymentError.InvalidDestinationAmount for non-positive amounts.
     // Outgoing payments' sendAmount or receiveAmount should never be
     // zero or negative.
-    assert.ok(quote.maxSourceAmount > BigInt(0))
-    assert.ok(quote.minDeliveryAmount > BigInt(0))
+    assert.ok(ilpQuote.maxSourceAmount > BigInt(0))
+    assert.ok(ilpQuote.minDeliveryAmount > BigInt(0))
 
-    return await Quote.query(deps.knex)
-      .insertAndFetch({
-        accountId: options.accountId,
-        assetId: account.assetId,
-        receivingPayment: destination.destinationPaymentDetails.id,
-        sendAmount: {
-          value: quote.maxSourceAmount,
-          assetCode: account.asset.code,
-          assetScale: account.asset.scale
+    return await Quote.transaction(deps.knex, async (trx) => {
+      assert.ok(destination.destinationPaymentDetails)
+      const pendingQuote = await Quote.query(trx)
+        .insertAndFetch({
+          accountId: options.accountId,
+          assetId: account.assetId,
+          receivingPayment: destination.destinationPaymentDetails.id,
+          sendAmount: {
+            value: ilpQuote.maxSourceAmount,
+            assetCode: account.asset.code,
+            assetScale: account.asset.scale
+          },
+          receiveAmount: {
+            value: ilpQuote.minDeliveryAmount,
+            assetCode: destination.destinationAsset.code,
+            assetScale: destination.destinationAsset.scale
+          },
+          ...ilpQuote,
+          // Cap at MAX_INT64 because of postgres type limits.
+          maxPacketAmount:
+            MAX_INT64 < ilpQuote.maxPacketAmount
+              ? MAX_INT64
+              : ilpQuote.maxPacketAmount,
+          // Patch using createdAt below
+          expiresAt: new Date()
+        })
+        .withGraphFetched('asset')
+      const quote = await finalizeQuote(
+        {
+          ...deps,
+          knex: trx
         },
-        receiveAmount: {
-          value: quote.minDeliveryAmount,
-          assetCode: destination.destinationAsset.code,
-          assetScale: destination.destinationAsset.scale
-        },
-        ...quote,
-        // Cap at MAX_INT64 because of postgres type limits.
-        maxPacketAmount:
-          MAX_INT64 < quote.maxPacketAmount ? MAX_INT64 : quote.maxPacketAmount,
-        // Patch using createdAt below
-        expiresAt: new Date()
-      })
-      .withGraphFetched('asset')
+        pendingQuote,
+        options.sendAmount
+          ? Pay.PaymentType.FixedSend
+          : Pay.PaymentType.FixedDelivery,
+        receivingPaymentAmount
+      )
+      return quote
+    })
+  } catch (err) {
+    if (isQuoteError(err)) {
+      return err
+    }
+    throw err
   } finally {
     plugin.disconnect().catch((err: Error) => {
       deps.logger.warn({ error: err.message }, 'error disconnecting plugin')
@@ -266,7 +254,8 @@ export async function startQuote(
 export async function finalizeQuote(
   deps: ServiceDependencies,
   quote: Quote,
-  paymentType: Pay.PaymentType
+  paymentType: Pay.PaymentType,
+  receivingPaymentAmount?: bigint
 ): Promise<Quote> {
   const requestHeaders = {
     Accept: 'application/json',
@@ -310,6 +299,12 @@ export async function finalizeQuote(
     ) {
       throw QuoteError.InvalidAmount
     }
+    if (
+      receivingPaymentAmount &&
+      receivingPaymentAmount < receiveAmount.value
+    ) {
+      throw QuoteError.InvalidAmount
+    }
   } else {
     if (
       receiveAmount.value !== quote.receiveAmount.value ||
@@ -324,7 +319,6 @@ export async function finalizeQuote(
     receiveAmount,
     expiresAt: new Date(quote.createdAt.getTime() + deps.quoteLifespan)
   })
-  new Date(Date.now() + deps.quoteLifespan)
   return quote
 }
 

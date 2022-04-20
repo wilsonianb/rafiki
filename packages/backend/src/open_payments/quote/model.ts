@@ -14,8 +14,6 @@ export class Quote extends BaseModel {
     return [
       'sendAmount',
       'receiveAmount',
-      // 'maxSourceAmount',
-      // 'minDeliveryAmount',
       'paymentType',
       'minExchangeRate',
       'lowEstimatedExchangeRate',
@@ -176,5 +174,5 @@ export type QuoteJSON = {
   receivingPayment: string
   sendAmount: AmountJSON
   receiveAmount: AmountJSON
-  expiresAt?: string
+  expiresAt: string
 }
