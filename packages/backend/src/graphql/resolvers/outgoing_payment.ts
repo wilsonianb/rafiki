@@ -1,3 +1,4 @@
+import { quoteToGraphql } from './quote'
 import {
   MutationResolvers,
   OutgoingPayment as SchemaOutgoingPayment,
@@ -170,6 +171,7 @@ export function paymentToGraphql(
     receiveAmount: payment.receiveAmount,
     description: payment.description,
     externalRef: payment.externalRef,
-    createdAt: new Date(+payment.createdAt).toISOString()
+    createdAt: new Date(+payment.createdAt).toISOString(),
+    quote: quoteToGraphql(payment.quote)
   }
 }

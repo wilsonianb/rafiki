@@ -26,6 +26,7 @@ import {
 } from '../../open_payments/payment/outgoing/model'
 import { AccountingService } from '../../accounting/service'
 import { AccountService } from '../../open_payments/account/service'
+import { Quote } from '../../open_payments/quote/model'
 import { Amount } from '../../open_payments/payment/amount'
 import {
   OutgoingPayment,
@@ -41,8 +42,6 @@ describe('OutgoingPayment Resolvers', (): void => {
   let outgoingPaymentService: OutgoingPaymentService
   let accountService: AccountService
 
-  const receivingAccount = 'http://wallet2.example/bob'
-  const receivingPayment = 'http://wallet2.example/bob/incoming-payments/123'
   const asset = randomAsset()
   const sendAmount: Amount = {
     value: BigInt(123),
@@ -80,23 +79,28 @@ describe('OutgoingPayment Resolvers', (): void => {
     }
   )
 
+  const createAccountQuote = async (accountId: string): Promise<Quote> => {
+    const receiveAsset = randomAsset()
+    const { id: receivingAccountId } = await accountService.create({
+      asset: receiveAsset
+    })
+    return await createQuote({
+      accountId,
+      receivingAccount: `${Config.publicHost}/${receivingAccountId}`,
+      receiveAmount: {
+        value: BigInt(56),
+        assetCode: receiveAsset.code,
+        assetScale: receiveAsset.scale
+      }
+    })
+  }
+
   const createPayment = async (options: {
     accountId: string
     description?: string
     externalRef?: string
   }): Promise<OutgoingPaymentModel> => {
-    const { id: receivingAccountId } = await accountService.create({
-      asset
-    })
-    const { id: quoteId } = await createQuote({
-      accountId: options.accountId,
-      receivingAccount: `${Config.publicHost}/${receivingAccountId}`,
-      receiveAmount: {
-        value: BigInt(56),
-        assetCode: asset.code,
-        assetScale: asset.scale
-      }
-    })
+    const { id: quoteId } = await createAccountQuote(options.accountId)
     const payment = await outgoingPaymentService.create({
       ...options,
       quoteId
@@ -204,9 +208,9 @@ describe('OutgoingPayment Resolvers', (): void => {
           expect(query.sendAmount).toEqual(
             sendAmount
               ? {
-                  value: sendAmount.value.toString(),
-                  assetCode: sendAmount.assetCode,
-                  assetScale: sendAmount.assetScale,
+                  value: payment.sendAmount.value.toString(),
+                  assetCode: payment.sendAmount.assetCode,
+                  assetScale: payment.sendAmount.assetScale,
                   __typename: 'Amount'
                 }
               : null
@@ -214,14 +218,14 @@ describe('OutgoingPayment Resolvers', (): void => {
           expect(query.receiveAmount).toEqual(
             receiveAmount
               ? {
-                  value: receiveAmount.value.toString(),
-                  assetCode: receiveAmount.assetCode,
-                  assetScale: receiveAmount.assetScale,
+                  value: payment.receiveAmount.value.toString(),
+                  assetCode: payment.receiveAmount.assetCode,
+                  assetScale: payment.receiveAmount.assetScale,
                   __typename: 'Amount'
                 }
               : null
           )
-          expect(query.receivingPayment).toEqual(receivingPayment)
+          expect(query.receivingPayment).toEqual(payment.receivingPayment)
           expect(query.description).toEqual(description ?? null)
           expect(query.externalRef).toEqual(externalRef ?? null)
           expect(query.quote).toEqual({
@@ -230,7 +234,7 @@ describe('OutgoingPayment Resolvers', (): void => {
             lowEstimatedExchangeRate: payment.quote.lowEstimatedExchangeRate.valueOf(),
             highEstimatedExchangeRate: payment.quote.highEstimatedExchangeRate.valueOf(),
             createdAt: payment.quote.createdAt.toISOString(),
-            __typename: 'PaymentQuote'
+            __typename: 'Quote'
           })
           expect(query.outcome).toEqual({
             amountSent: amountSent.toString(),
@@ -262,12 +266,6 @@ describe('OutgoingPayment Resolvers', (): void => {
   })
 
   describe('Mutation.createOutgoingPayment', (): void => {
-    const input = {
-      accountId: uuid(),
-      receivingAccount,
-      sendAmount
-    }
-
     test.each`
       description  | externalRef  | desc
       ${'rent'}    | ${undefined} | ${'description'}
@@ -287,6 +285,11 @@ describe('OutgoingPayment Resolvers', (): void => {
         const createSpy = jest
           .spyOn(outgoingPaymentService, 'create')
           .mockResolvedValueOnce(payment)
+
+        const input = {
+          accountId,
+          quoteId: payment.quote.id
+        }
 
         const query = await appContainer.apolloClient
           .query({
@@ -315,11 +318,20 @@ describe('OutgoingPayment Resolvers', (): void => {
         expect(query.code).toBe('200')
         expect(query.success).toBe(true)
         expect(query.payment?.id).toBe(payment.id)
-        expect(query.payment?.state).toBe(SchemaPaymentState.Pending)
+        expect(query.payment?.state).toBe(SchemaPaymentState.Funding)
       }
     )
 
     test('400', async (): Promise<void> => {
+      const { id: accountId } = await accountService.create({
+        asset
+      })
+      const quote = await createAccountQuote(accountId)
+      const input = {
+        accountId: uuid(),
+        quoteId: quote.id
+      }
+
       const query = await appContainer.apolloClient
         .query({
           query: gql`
@@ -354,6 +366,11 @@ describe('OutgoingPayment Resolvers', (): void => {
       const createSpy = jest
         .spyOn(outgoingPaymentService, 'create')
         .mockRejectedValueOnce(new Error('unexpected'))
+
+      const input = {
+        accountId: uuid(),
+        quoteId: uuid()
+      }
 
       const query = await appContainer.apolloClient
         .query({
