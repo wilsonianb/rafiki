@@ -2,7 +2,7 @@ import assert from 'assert'
 import { Model, Pojo } from 'objection'
 import * as Pay from '@interledger/pay'
 
-import { Amount, AmountJSON } from '../payment/amount'
+import { Amount, AmountJSON } from '../amount'
 import { Account } from '../account/model'
 import { Asset } from '../../asset/model'
 import { BaseModel } from '../../shared/baseModel'

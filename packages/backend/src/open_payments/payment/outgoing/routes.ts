@@ -11,7 +11,7 @@ import {
   errorToCode as quoteErrorToCode,
   errorToMessage as quoteErrorToMessage
 } from '../../quote/errors'
-import { Amount } from '../amount'
+import { Amount } from '../../amount'
 
 interface ServiceDependencies {
   config: IAppConfig

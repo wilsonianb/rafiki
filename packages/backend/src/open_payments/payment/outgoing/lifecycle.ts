@@ -8,7 +8,7 @@ import {
   PaymentEventType
 } from './model'
 import { ServiceDependencies } from './service'
-import { IlpPlugin } from '../../shared/ilp_plugin'
+import { IlpPlugin } from '../../../shared/ilp_plugin'
 
 // "payment" is locked by the "deps.knex" transaction.
 export async function handleSending(

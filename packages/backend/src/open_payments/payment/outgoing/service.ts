@@ -14,7 +14,7 @@ import {
 } from './model'
 import { AccountingService } from '../../../accounting/service'
 import { AccountService } from '../../account/service'
-import { IlpPlugin, IlpPluginOptions } from '../../shared/ilp_plugin'
+import { IlpPlugin, IlpPluginOptions } from '../../../shared/ilp_plugin'
 import { sendWebhookEvent } from './lifecycle'
 import * as worker from './worker'
 

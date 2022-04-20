@@ -8,11 +8,11 @@ import { Pagination } from '../../shared/baseModel'
 import { BaseService } from '../../shared/baseService'
 import { QuoteError, isQuoteError } from './errors'
 import { Quote } from './model'
-import { Amount } from '../payment/amount'
+import { Amount } from '../amount'
 import { Account } from '../account/model'
 import { AccountService } from '../account/service'
 import { RatesService } from '../../rates/service'
-import { IlpPlugin, IlpPluginOptions } from '../shared/ilp_plugin'
+import { IlpPlugin, IlpPluginOptions } from '../../shared/ilp_plugin'
 
 const MAX_INT64 = BigInt('9223372036854775807')
 

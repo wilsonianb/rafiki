@@ -32,7 +32,7 @@ import { IncomingPayment } from '../incoming/model'
 import { CreateQuoteOptions } from '../../quote/service'
 import { Pagination } from '../../../shared/baseModel'
 import { getPageTests } from '../../../shared/baseModel.test'
-import { Amount } from '../amount'
+import { Amount } from '../../amount'
 import { isIncomingPaymentError } from '../incoming/errors'
 
 describe('OutgoingPaymentService', (): void => {

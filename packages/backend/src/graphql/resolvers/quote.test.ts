@@ -17,7 +17,7 @@ import { QuoteService } from '../../open_payments/quote/service'
 import { Quote as QuoteModel } from '../../open_payments/quote/model'
 import { AccountService } from '../../open_payments/account/service'
 import { isIncomingPaymentError } from '../../open_payments/payment/incoming/errors'
-import { Amount } from '../../open_payments/payment/amount'
+import { Amount } from '../../open_payments/amount'
 import { Quote, QuoteResponse } from '../generated/graphql'
 
 describe('Quote Resolvers', (): void => {

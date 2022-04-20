@@ -19,7 +19,7 @@ import {
   createIlpPlugin,
   IlpPlugin,
   IlpPluginOptions
-} from './open_payments/shared/ilp_plugin'
+} from './shared/ilp_plugin'
 import { createHttpTokenService } from './httpToken/service'
 import { createAssetService } from './asset/service'
 import { createAccountingService } from './accounting/service'

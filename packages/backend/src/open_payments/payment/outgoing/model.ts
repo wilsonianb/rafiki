@@ -5,7 +5,7 @@ import { Asset } from '../../../asset/model'
 import { ConnectorAccount } from '../../../connector/core/rafiki'
 import { Account } from '../../account/model'
 import { Quote } from '../../quote/model'
-import { Amount, AmountJSON } from '../amount'
+import { Amount, AmountJSON } from '../../amount'
 import { BaseModel } from '../../../shared/baseModel'
 import { WebhookEvent } from '../../../webhook/model'
 

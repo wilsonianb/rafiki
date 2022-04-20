@@ -27,7 +27,7 @@ import {
 import { AccountingService } from '../../accounting/service'
 import { AccountService } from '../../open_payments/account/service'
 import { Quote } from '../../open_payments/quote/model'
-import { Amount } from '../../open_payments/payment/amount'
+import { Amount } from '../../open_payments/amount'
 import {
   OutgoingPayment,
   OutgoingPaymentResponse,
