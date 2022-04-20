@@ -22,8 +22,8 @@ import { Amount } from '../amount'
 import { IncomingPayment } from '../incoming/model'
 import { isIncomingPaymentError } from '../incoming/errors'
 import { Quote } from '../../quote/model'
-import { CreateQuoteOptions } from '../../quote/service'
-import { QuoteFactory, mockWalletQuote } from '../../../tests/quoteFactory'
+import { CreateQuoteOptions, QuoteService } from '../../quote/service'
+import { createQuote } from '../../../tests/quote'
 import { AppContext } from '../../../app'
 
 describe('Outgoing Payment Routes', (): void => {
@@ -34,12 +34,12 @@ describe('Outgoing Payment Routes', (): void => {
   let outgoingPaymentService: OutgoingPaymentService
   let config: IAppConfig
   let outgoingPaymentRoutes: OutgoingPaymentRoutes
+  let quoteService: QuoteService
   let accountId: string
   let accountUrl: string
   let receivingAccount: string
   let receivingPayment: string
   let incomingPayment: IncomingPayment
-  let quoteFactory: QuoteFactory
 
   const messageProducer = new GraphileProducer()
   const mockMessageProducer = {
@@ -60,12 +60,12 @@ describe('Outgoing Payment Routes', (): void => {
     code: 'XRP'
   }
 
-  const createQuote = async (accountId: string): Promise<Quote> => {
+  const createAccountQuote = async (accountId: string): Promise<Quote> => {
     const accountService = await deps.use('accountService')
     const { id: receivingAccountId } = await accountService.create({
       asset: destinationAsset
     })
-    return await quoteFactory.build({
+    return await createQuote({
       accountId,
       receivingAccount: `${Config.publicHost}/${receivingAccountId}`,
       receiveAmount: {
@@ -81,7 +81,7 @@ describe('Outgoing Payment Routes', (): void => {
     description?: string
     externalRef?: string
   }): Promise<OutgoingPayment> => {
-    const { id: quoteId } = await createQuote(accountId)
+    const { id: quoteId } = await createAccountQuote(accountId)
     const payment = await outgoingPaymentService.create({
       ...options,
       quoteId
@@ -114,8 +114,7 @@ describe('Outgoing Payment Routes', (): void => {
       outgoingPaymentService = await deps.use('outgoingPaymentService')
       config = await deps.use('config')
       outgoingPaymentRoutes = await deps.use('outgoingPaymentRoutes')
-      const quoteService = await deps.use('quoteService')
-      quoteFactory = new QuoteFactory(Config.quoteUrl, quoteService)
+      quoteService = await deps.use('quoteService')
     }
   )
 
@@ -438,14 +437,13 @@ describe('Outgoing Payment Routes', (): void => {
 
     describe('returns the outgoing payment on success', (): void => {
       test('Quote', async (): Promise<void> => {
-        const quote = await createQuote(accountId)
+        const quote = await createAccountQuote(accountId)
         options = {
           quoteId: quote.id,
           description: 'rent',
           externalRef: '202201'
         }
         const ctx = setup({})
-        mockWalletQuote(Config.quoteUrl)
         await expect(outgoingPaymentRoutes.create(ctx)).resolves.toBeUndefined()
         expect(ctx.response.status).toBe(201)
         const outgoingPaymentId = ((ctx.response.body as Record<
@@ -501,10 +499,13 @@ describe('Outgoing Payment Routes', (): void => {
               : undefined
           }
           const ctx = setup({})
-          mockWalletQuote(Config.quoteUrl)
+          const quoteSpy = jest
+            .spyOn(quoteService, 'create')
+            .mockImplementationOnce(createQuote)
           await expect(
             outgoingPaymentRoutes.create(ctx)
           ).resolves.toBeUndefined()
+          expect(quoteSpy).toHaveBeenCalled
           expect(ctx.response.status).toBe(201)
           const outgoingPaymentId = ((ctx.response.body as Record<
             string,
@@ -538,8 +539,11 @@ describe('Outgoing Payment Routes', (): void => {
           externalRef: '202201'
         }
         const ctx = setup({})
-        mockWalletQuote(Config.quoteUrl)
+        const quoteSpy = jest
+          .spyOn(quoteService, 'create')
+          .mockImplementationOnce(createQuote)
         await expect(outgoingPaymentRoutes.create(ctx)).resolves.toBeUndefined()
+        expect(quoteSpy).toHaveBeenCalled
         expect(ctx.response.status).toBe(201)
         const outgoingPaymentId = ((ctx.response.body as Record<
           string,

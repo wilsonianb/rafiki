@@ -31,7 +31,7 @@ import {
 import { Peer } from '../../peer/model'
 import { randomAsset } from '../../tests/asset'
 import { PeerFactory } from '../../tests/peerFactory'
-import { QuoteFactory } from '../../tests/quoteFactory'
+import { createQuote } from '../../tests/quote'
 import { truncateTables } from '../../tests/tableManager'
 import { WebhookEvent } from '../../webhook/model'
 import {
@@ -1609,10 +1609,7 @@ describe('Liquidity Resolvers', (): void => {
           asset: account.asset
         })
         const config = await deps.use('config')
-        // create and then patch quote
-        const quoteService = await deps.use('quoteService')
-        const quoteFactory = new QuoteFactory(config.quoteUrl, quoteService)
-        const { id: quoteId } = await quoteFactory.build({
+        const { id: quoteId } = await createQuote({
           accountId,
           receivingAccount: `${config.publicHost}/${receivingAccountId}`,
           sendAmount: {

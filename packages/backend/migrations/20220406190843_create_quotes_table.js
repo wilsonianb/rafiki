@@ -12,10 +12,10 @@ exports.up = function (knex) {
 
     table.bigInteger('minExchangeRateNumerator').notNullable()
     table.bigInteger('minExchangeRateDenominator').notNullable()
-    table.bigInteger('lowExchangeRateEstimateNumerator').notNullable()
-    table.bigInteger('lowExchangeRateEstimateDenominator').notNullable()
-    table.bigInteger('highExchangeRateEstimateNumerator').notNullable()
-    table.bigInteger('highExchangeRateEstimateDenominator').notNullable()
+    table.bigInteger('lowEstimatedExchangeRateNumerator').notNullable()
+    table.bigInteger('lowEstimatedExchangeRateDenominator').notNullable()
+    table.bigInteger('highEstimatedExchangeRateNumerator').notNullable()
+    table.bigInteger('highEstimatedExchangeRateDenominator').notNullable()
 
     table.timestamp('expiresAt').notNullable()
 

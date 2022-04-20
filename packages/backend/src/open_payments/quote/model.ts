@@ -89,10 +89,10 @@ export class Quote extends BaseModel {
   public maxPacketAmount!: bigint
   private minExchangeRateNumerator!: bigint
   private minExchangeRateDenominator!: bigint
-  private lowExchangeRateEstimateNumerator!: bigint
-  private lowExchangeRateEstimateDenominator!: bigint
-  private highExchangeRateEstimateNumerator!: bigint
-  private highExchangeRateEstimateDenominator!: bigint
+  private lowEstimatedExchangeRateNumerator!: bigint
+  private lowEstimatedExchangeRateDenominator!: bigint
+  private highEstimatedExchangeRateNumerator!: bigint
+  private highEstimatedExchangeRateDenominator!: bigint
 
   public get paymentType(): Pay.PaymentType {
     return Pay.PaymentType.FixedDelivery
@@ -120,29 +120,29 @@ export class Quote extends BaseModel {
 
   public get lowEstimatedExchangeRate(): Pay.Ratio {
     return Pay.Ratio.of(
-      Pay.Int.from(this.lowExchangeRateEstimateNumerator) as Pay.PositiveInt,
-      Pay.Int.from(this.lowExchangeRateEstimateDenominator) as Pay.PositiveInt
+      Pay.Int.from(this.lowEstimatedExchangeRateNumerator) as Pay.PositiveInt,
+      Pay.Int.from(this.lowEstimatedExchangeRateDenominator) as Pay.PositiveInt
     )
   }
 
   public set lowEstimatedExchangeRate(value: Pay.Ratio) {
-    this.lowExchangeRateEstimateNumerator = value.a.value
-    this.lowExchangeRateEstimateDenominator = value.b.value
+    this.lowEstimatedExchangeRateNumerator = value.a.value
+    this.lowEstimatedExchangeRateDenominator = value.b.value
   }
 
   // Note that the upper exchange rate bound is *exclusive*.
   public get highEstimatedExchangeRate(): Pay.PositiveRatio {
     const highEstimatedExchangeRate = Pay.Ratio.of(
-      Pay.Int.from(this.highExchangeRateEstimateNumerator) as Pay.PositiveInt,
-      Pay.Int.from(this.highExchangeRateEstimateDenominator) as Pay.PositiveInt
+      Pay.Int.from(this.highEstimatedExchangeRateNumerator) as Pay.PositiveInt,
+      Pay.Int.from(this.highEstimatedExchangeRateDenominator) as Pay.PositiveInt
     )
     assert.ok(highEstimatedExchangeRate.isPositive())
     return highEstimatedExchangeRate
   }
 
   public set highEstimatedExchangeRate(value: Pay.PositiveRatio) {
-    this.highExchangeRateEstimateNumerator = value.a.value
-    this.highExchangeRateEstimateDenominator = value.b.value
+    this.highEstimatedExchangeRateNumerator = value.a.value
+    this.highEstimatedExchangeRateDenominator = value.b.value
   }
 
   $formatJson(json: Pojo): Pojo {

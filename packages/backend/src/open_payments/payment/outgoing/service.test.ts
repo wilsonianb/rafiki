@@ -2,7 +2,6 @@ import assert from 'assert'
 import nock from 'nock'
 import Knex from 'knex'
 import * as Pay from '@interledger/pay'
-import { URL } from 'url'
 import { v4 as uuid } from 'uuid'
 
 import {
@@ -14,7 +13,7 @@ import {
 import { OutgoingPaymentService } from './service'
 import { createTestApp, TestContainer } from '../../../tests/app'
 import { IAppConfig, Config } from '../../../config/app'
-import { QuoteFactory } from '../../../tests/quoteFactory'
+import { createQuote } from '../../../tests/quote'
 import { IocContract } from '@adonisjs/fold'
 import { initIocContainer } from '../../../'
 import { AppServices } from '../../../app'
@@ -30,9 +29,7 @@ import { isTransferError } from '../../../accounting/errors'
 import { AccountingService, TransferOptions } from '../../../accounting/service'
 import { AssetOptions } from '../../../asset/service'
 import { IncomingPayment } from '../incoming/model'
-import { QuoteService, CreateQuoteOptions } from '../../quote/service'
-import { isQuoteError } from '../../quote/errors'
-import { Quote } from '../../quote/model'
+import { CreateQuoteOptions } from '../../quote/service'
 import { Pagination } from '../../../shared/baseModel'
 import { getPageTests } from '../../../shared/baseModel.test'
 import { Amount } from '../amount'
@@ -43,8 +40,6 @@ describe('OutgoingPaymentService', (): void => {
   let appContainer: TestContainer
   let outgoingPaymentService: OutgoingPaymentService
   let accountingService: AccountingService
-  let quoteFactory: QuoteFactory
-  let quoteService: QuoteService
   let knex: Knex
   let accountId: string
   let incomingPayment: IncomingPayment
@@ -80,32 +75,10 @@ describe('OutgoingPaymentService', (): void => {
     [OutgoingPaymentState.Completed]: PaymentEventType.PaymentCompleted
   }
 
-  function mockWalletQuote(): nock.Scope {
-    const quoteUrl = new URL(Config.quoteUrl)
-    return nock(quoteUrl.origin)
-      .matchHeader('Accept', 'application/json')
-      .matchHeader('Content-Type', 'application/json')
-      .post(quoteUrl.pathname)
-      .reply(
-        201,
-        function (_path: string, requestBody: Record<string, unknown>) {
-          return requestBody
-        }
-      )
-  }
-
-  async function createQuote(options: CreateQuoteOptions): Promise<Quote> {
-    const scope = mockWalletQuote()
-    const quote = await quoteService.create(options)
-    scope.isDone()
-    assert.ok(!isQuoteError(quote))
-    return quote
-  }
-
   async function createPayment(
     options: CreateQuoteOptions
   ): Promise<OutgoingPayment> {
-    const { id: quoteId } = await quoteFactory.build(options)
+    const { id: quoteId } = await createQuote(options)
     const payment = await outgoingPaymentService.create({
       accountId: options.accountId,
       quoteId
@@ -244,8 +217,6 @@ describe('OutgoingPaymentService', (): void => {
       deps = await initIocContainer(Config)
       appContainer = await createTestApp(deps)
       accountingService = await deps.use('accountingService')
-      quoteService = await deps.use('quoteService')
-      quoteFactory = new QuoteFactory(Config.quoteUrl, quoteService)
 
       knex = await deps.use('knex')
       config = await deps.use('config')

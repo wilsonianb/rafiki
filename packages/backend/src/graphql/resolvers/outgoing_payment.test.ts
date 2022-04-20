@@ -12,7 +12,7 @@ import { AppServices } from '../../app'
 import { initIocContainer } from '../..'
 import { Config } from '../../config/app'
 import { randomAsset } from '../../tests/asset'
-import { QuoteFactory } from '../../tests/quoteFactory'
+import { createQuote } from '../../tests/quote'
 import { truncateTables } from '../../tests/tableManager'
 import {
   OutgoingPaymentError,
@@ -30,8 +30,7 @@ import { Amount } from '../../open_payments/payment/amount'
 import {
   OutgoingPayment,
   OutgoingPaymentResponse,
-  OutgoingPaymentState as SchemaPaymentState,
-  PaymentType as SchemaPaymentType
+  OutgoingPaymentState as SchemaPaymentState
 } from '../generated/graphql'
 
 describe('OutgoingPayment Resolvers', (): void => {
@@ -41,7 +40,6 @@ describe('OutgoingPayment Resolvers', (): void => {
   let accountingService: AccountingService
   let outgoingPaymentService: OutgoingPaymentService
   let accountService: AccountService
-  let quoteFactory: QuoteFactory
 
   const receivingAccount = 'http://wallet2.example/bob'
   const receivingPayment = 'http://wallet2.example/bob/incoming-payments/123'
@@ -65,8 +63,6 @@ describe('OutgoingPayment Resolvers', (): void => {
       accountingService = await deps.use('accountingService')
       outgoingPaymentService = await deps.use('outgoingPaymentService')
       accountService = await deps.use('accountService')
-      const quoteService = await deps.use('quoteService')
-      quoteFactory = new QuoteFactory(Config.quoteUrl, quoteService)
     }
   )
 
@@ -92,7 +88,7 @@ describe('OutgoingPayment Resolvers', (): void => {
     const { id: receivingAccountId } = await accountService.create({
       asset
     })
-    const { id: quoteId } = await quoteFactory.build({
+    const { id: quoteId } = await createQuote({
       accountId: options.accountId,
       receivingAccount: `${Config.publicHost}/${receivingAccountId}`,
       receiveAmount: {
@@ -229,7 +225,6 @@ describe('OutgoingPayment Resolvers', (): void => {
           expect(query.description).toEqual(description ?? null)
           expect(query.externalRef).toEqual(externalRef ?? null)
           expect(query.quote).toEqual({
-            targetType: SchemaPaymentType.FixedSend,
             maxPacketAmount: payment.quote.maxPacketAmount.toString(),
             minExchangeRate: payment.quote.minExchangeRate.valueOf(),
             lowEstimatedExchangeRate: payment.quote.lowEstimatedExchangeRate.valueOf(),
