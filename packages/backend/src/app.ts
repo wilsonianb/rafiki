@@ -33,6 +33,7 @@ import { AccountRoutes } from './open_payments/account/routes'
 import { IncomingPaymentService } from './open_payments/payment/incoming/service'
 import { StreamServer } from '@interledger/stream-receiver'
 import { WebhookService } from './webhook/service'
+import { QuoteRoutes } from './open_payments/quote/routes'
 import { QuoteService } from './open_payments/quote/service'
 import { OutgoingPaymentRoutes } from './open_payments/payment/outgoing/routes'
 import { OutgoingPaymentService } from './open_payments/payment/outgoing/service'
@@ -75,6 +76,7 @@ export interface AppServices {
   spspRoutes: Promise<SPSPRoutes>
   incomingPaymentRoutes: Promise<IncomingPaymentRoutes>
   outgoingPaymentRoutes: Promise<OutgoingPaymentRoutes>
+  quoteRoutes: Promise<QuoteRoutes>
   accountRoutes: Promise<AccountRoutes>
   incomingPaymentService: Promise<IncomingPaymentService>
   streamServer: Promise<StreamServer>
@@ -250,6 +252,7 @@ export class App {
     const outgoingPaymentRoutes = await this.container.use(
       'outgoingPaymentRoutes'
     )
+    const quoteRoutes = await this.container.use('quoteRoutes')
     this.publicRouter.get(
       '/:accountId',
       async (ctx: AppContext): Promise<void> => {
@@ -302,6 +305,23 @@ export class App {
         action: AccessAction.Create
       }),
       outgoingPaymentRoutes.create
+    )
+
+    this.publicRouter.get(
+      '/:accountId/quotes/:quoteId',
+      createAuthMiddleware({
+        type: AccessType.Quote,
+        action: AccessAction.Read
+      }),
+      quoteRoutes.get
+    )
+    this.publicRouter.post(
+      '/:accountId/quotes',
+      createAuthMiddleware({
+        type: AccessType.Quote,
+        action: AccessAction.Create
+      }),
+      quoteRoutes.create
     )
 
     this.koa.use(this.publicRouter.middleware())
