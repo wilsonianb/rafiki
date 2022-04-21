@@ -33,6 +33,7 @@ export async function createQuote(
     scale: account.asset.scale
   })
   assert.ok(asset)
+  let completeReceivingPayment = false
 
   const config = await deps.use('config')
   const incomingPaymentService = await deps.use('incomingPaymentService')
@@ -55,6 +56,7 @@ export async function createQuote(
         code: account.asset.code,
         scale: account.asset.scale
       }
+      completeReceivingPayment = true
     }
 
     const incomingPayment = await incomingPaymentService.create({
@@ -131,6 +133,7 @@ export async function createQuote(
         Pay.Int.from(495n) as Pay.PositiveInt,
         Pay.Int.from(1000n) as Pay.PositiveInt
       ),
+      completeReceivingPayment,
       expiresAt: new Date(Date.now() + config.quoteLifespan)
     })
     .withGraphFetched('asset')

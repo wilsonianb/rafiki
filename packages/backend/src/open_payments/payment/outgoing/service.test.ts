@@ -1,5 +1,6 @@
 import assert from 'assert'
-import nock from 'nock'
+import axios from 'axios'
+import nock, { Definition } from 'nock'
 import Knex from 'knex'
 import * as Pay from '@interledger/pay'
 import { v4 as uuid } from 'uuid'
@@ -11,7 +12,11 @@ import {
   isOutgoingPaymentError
 } from './errors'
 import { OutgoingPaymentService } from './service'
-import { createTestApp, TestContainer } from '../../../tests/app'
+import {
+  createTestApp,
+  TestContainer,
+  testAccessToken
+} from '../../../tests/app'
 import { IAppConfig, Config } from '../../../config/app'
 import { createQuote } from '../../../tests/quote'
 import { IocContract } from '@adonisjs/fold'
@@ -28,6 +33,7 @@ import { RETRY_BACKOFF_SECONDS } from './worker'
 import { isTransferError } from '../../../accounting/errors'
 import { AccountingService, TransferOptions } from '../../../accounting/service'
 import { AssetOptions } from '../../../asset/service'
+import { IncomingPaymentState } from '../incoming/model'
 import { CreateQuoteOptions } from '../../quote/service'
 import { Pagination } from '../../../shared/baseModel'
 import { getPageTests } from '../../../shared/baseModel.test'
@@ -117,6 +123,30 @@ describe('OutgoingPaymentService', (): void => {
         })
         if (error) res.error = error
         return res
+      })
+  }
+
+  function mockUpdateIncomingPayment(receivingPayment: string): nock.Scope {
+    const incomingPaymentUrl = new URL(receivingPayment)
+    return nock(incomingPaymentUrl.origin)
+      .put(incomingPaymentUrl.pathname, function (this: Definition, body) {
+        expect(body).toEqual({
+          state: IncomingPaymentState.Completed.toLowerCase()
+        })
+        return true
+      })
+      .matchHeader('Accept', 'application/json')
+      .matchHeader('Content-Type', 'application/json')
+      .reply(201, function (path, requestBody) {
+        const headers = this.req.headers
+        if (!headers['authorization']) {
+          headers.authorization = `GNAP ${testAccessToken}`
+        }
+        return axios
+          .put(`http://localhost:${appContainer.port}${path}`, requestBody, {
+            headers
+          })
+          .then((res) => res.data)
       })
   }
 
@@ -356,31 +386,13 @@ describe('OutgoingPaymentService', (): void => {
   })
 
   describe('processNext', (): void => {
-    // it('FAILED (source asset changed)', async (): Promise<void> => {
-    //   const { id: paymentId } = await createPayment({
-    //     accountId,
-    //     receivingAccount,
-    //     sendAmount
-    //   })
-    //   const assetService = await deps.use('assetService')
-    //   const { id: assetId } = await assetService.getOrCreate({
-    //     code: asset.code,
-    //     scale: asset.scale + 1
-    //   })
-    //   await OutgoingPayment.relatedQuery('account').for(paymentId).patch({
-    //     assetId
-    //   })
-
-    //   const scope = mockCreateIncomingPayment()
-    //   await processNext(
-    //     paymentId,
-    //     OutgoingPaymentState.Failed,
-    //     LifecycleError.SourceAssetConflict
-    //   )
-    //   scope.isDone()
-    // })
-
     describe('SENDING→', (): void => {
+      const receiveAmount = {
+        value: BigInt(123),
+        assetCode: destinationAsset.code,
+        assetScale: destinationAsset.scale
+      }
+
       async function setup(
         opts: Omit<CreateQuoteOptions, 'accountId'>
       ): Promise<string> {
@@ -404,33 +416,48 @@ describe('OutgoingPaymentService', (): void => {
         return payment.id
       }
 
-      it('COMPLETED', async (): Promise<void> => {
-        const paymentId = await setup({
-          receivingAccount,
-          sendAmount
-        })
+      test.each`
+        sendAmount    | receiveAmount    | completeReceivingPayment
+        ${sendAmount} | ${undefined}     | ${true}
+        ${undefined}  | ${receiveAmount} | ${false}
+      `(
+        'COMPLETED (completeReceivingPayment: $completeReceivingPayment)',
+        async ({
+          sendAmount,
+          receiveAmount,
+          completeReceivingPayment
+        }): Promise<void> => {
+          const paymentId = await setup({
+            receivingAccount,
+            sendAmount,
+            receiveAmount
+          })
 
-        const payment = await processNext(
-          paymentId,
-          OutgoingPaymentState.Completed
-        )
-        if (!payment.sendAmount) throw 'no sendAmount'
-        const amountSent = payment.receiveAmount.value * BigInt(2)
-        await expectOutcome(payment, {
-          accountBalance: payment.sendAmount.value - amountSent,
-          amountSent,
-          amountDelivered: payment.receiveAmount.value,
-          incomingPaymentReceived: payment.receiveAmount.value,
-          withdrawAmount: payment.sendAmount.value - amountSent
-        })
-      })
+          let scope: nock.Scope | undefined
+          if (completeReceivingPayment) {
+            const payment = (await outgoingPaymentService.get(
+              paymentId
+            )) as OutgoingPayment
+            scope = mockUpdateIncomingPayment(payment.receivingPayment)
+          }
+          const payment = await processNext(
+            paymentId,
+            OutgoingPaymentState.Completed
+          )
+          scope?.isDone()
+          if (!payment.sendAmount) throw 'no sendAmount'
+          const amountSent = payment.receiveAmount.value * BigInt(2)
+          await expectOutcome(payment, {
+            accountBalance: payment.sendAmount.value - amountSent,
+            amountSent,
+            amountDelivered: payment.receiveAmount.value,
+            incomingPaymentReceived: payment.receiveAmount.value,
+            withdrawAmount: payment.sendAmount.value - amountSent
+          })
+        }
+      )
 
       it('COMPLETED (with incoming payment initially partially paid)', async (): Promise<void> => {
-        const receiveAmount = {
-          value: BigInt(123),
-          assetCode: destinationAsset.code,
-          assetScale: destinationAsset.scale
-        }
         const paymentId = await setup({
           receivingAccount,
           receiveAmount
@@ -540,7 +567,7 @@ describe('OutgoingPaymentService', (): void => {
         )
         const paymentId = await setup({
           receivingAccount,
-          sendAmount
+          receiveAmount
         })
 
         const payment = await processNext(
@@ -550,7 +577,7 @@ describe('OutgoingPaymentService', (): void => {
         mockFn.mockRestore()
         fastForwardToAttempt(1)
         await expectOutcome(payment, {
-          accountBalance: BigInt(123 - 10),
+          accountBalance: payment.sendAmount.value - BigInt(10),
           amountSent: BigInt(10),
           amountDelivered: BigInt(5)
         })
@@ -562,7 +589,7 @@ describe('OutgoingPaymentService', (): void => {
         )
         const sentAmount = payment.receiveAmount.value * BigInt(2)
         await expectOutcome(payment2, {
-          accountBalance: sendAmount.value - sentAmount,
+          accountBalance: payment.sendAmount.value - sentAmount,
           amountSent: sentAmount,
           amountDelivered: payment.receiveAmount.value
         })
@@ -572,7 +599,7 @@ describe('OutgoingPaymentService', (): void => {
       it('COMPLETED (FixedSend, already fully paid)', async (): Promise<void> => {
         const paymentId = await setup({
           receivingAccount,
-          sendAmount
+          receiveAmount
         })
 
         await processNext(paymentId, OutgoingPaymentState.Completed)
@@ -586,7 +613,7 @@ describe('OutgoingPaymentService', (): void => {
         )
         const sentAmount = payment.receiveAmount.value * BigInt(2)
         await expectOutcome(payment, {
-          accountBalance: sendAmount.value - sentAmount,
+          accountBalance: payment.sendAmount.value - sentAmount,
           amountSent: sentAmount,
           amountDelivered: payment.receiveAmount.value
         })
@@ -594,11 +621,6 @@ describe('OutgoingPaymentService', (): void => {
 
       // Caused by retry after failed SENDING→COMPLETED transition commit.
       it('COMPLETED (already fully paid)', async (): Promise<void> => {
-        const receiveAmount = {
-          value: BigInt(123),
-          assetCode: destinationAsset.code,
-          assetScale: destinationAsset.scale
-        }
         const paymentId = await setup({
           receivingAccount,
           receiveAmount
@@ -657,8 +679,7 @@ describe('OutgoingPaymentService', (): void => {
           .for(paymentId)
           .patch({
             receiveAmount: {
-              value: BigInt(56),
-              assetCode: destinationAsset.code,
+              ...receiveAmount,
               assetScale: 55
             }
           })

@@ -240,6 +240,9 @@ async function createQuote(
           minExchangeRate: ilpQuote.minExchangeRate,
           lowEstimatedExchangeRate: ilpQuote.lowEstimatedExchangeRate,
           highEstimatedExchangeRate: ilpQuote.highEstimatedExchangeRate,
+          completeReceivingPayment: !!(
+            options.receivingAccount && options.sendAmount
+          ),
           // Patch using createdAt below
           expiresAt: new Date()
         })

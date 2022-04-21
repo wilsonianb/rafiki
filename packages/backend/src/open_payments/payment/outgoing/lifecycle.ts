@@ -1,3 +1,4 @@
+import axios from 'axios'
 import * as Pay from '@interledger/pay'
 
 import { LifecycleError } from './errors'
@@ -8,6 +9,7 @@ import {
   PaymentEventType
 } from './model'
 import { ServiceDependencies } from './service'
+import { IncomingPaymentState } from '../incoming/model'
 import { IlpPlugin } from '../../../shared/ilp_plugin'
 
 // "payment" is locked by the "deps.knex" transaction.
@@ -143,6 +145,20 @@ const handleCompleted = async (
   deps: ServiceDependencies,
   payment: OutgoingPayment
 ): Promise<void> => {
+  if (payment.quote.completeReceivingPayment) {
+    await axios.put(
+      payment.receivingPayment,
+      {
+        state: IncomingPaymentState.Completed.toLowerCase()
+      },
+      {
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json'
+        }
+      }
+    )
+  }
   await payment.$query(deps.knex).patch({
     state: OutgoingPaymentState.Completed
   })

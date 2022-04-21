@@ -282,7 +282,8 @@ describe('QuoteService', (): void => {
               assetCode: destinationAsset.code,
               assetScale: destinationAsset.scale
             },
-            maxPacketAmount: BigInt('9223372036854775807')
+            maxPacketAmount: BigInt('9223372036854775807'),
+            completeReceivingPayment: !!(toAccount && sendAmount)
           })
           expect(quote.minExchangeRate.valueOf()).toBe(
             0.5 * (1 - config.slippage)
@@ -314,7 +315,8 @@ describe('QuoteService', (): void => {
           expect(quote).toMatchObject({
             ...options,
             receiveAmount,
-            maxPacketAmount: BigInt('9223372036854775807')
+            maxPacketAmount: BigInt('9223372036854775807'),
+            completeReceivingPayment: false
           })
           expect(quote.minExchangeRate.valueOf()).toBe(
             0.5 * (1 - config.slippage)
@@ -363,7 +365,8 @@ describe('QuoteService', (): void => {
           expect(quote).toMatchObject({
             ...options,
             sendAmount,
-            maxPacketAmount: BigInt('9223372036854775807')
+            maxPacketAmount: BigInt('9223372036854775807'),
+            completeReceivingPayment: false
           })
           expect(quote.minExchangeRate.valueOf()).toBe(
             0.5 * (1 - config.slippage)
@@ -434,7 +437,8 @@ describe('QuoteService', (): void => {
         },
         receiveAmount: {
           ...incomingPayment.incomingAmount
-        }
+        },
+        completeReceivingPayment: false
       })
       expect(quote.minExchangeRate.valueOf()).toBe(0.5 * (1 - config.slippage))
       expect(quote.lowEstimatedExchangeRate.valueOf()).toBe(0.5)

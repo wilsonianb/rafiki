@@ -50,6 +50,7 @@ export class Quote extends BaseModel {
   public expiresAt!: Date
 
   public receivingPayment!: string
+  public completeReceivingPayment!: boolean
 
   private sendAmountValue!: bigint
 
