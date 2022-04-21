@@ -308,7 +308,7 @@ export async function finalizeQuote(
   } else {
     if (
       receiveAmount.value !== quote.receiveAmount.value ||
-      sendAmount.value > quote.sendAmount.value
+      sendAmount.value < quote.sendAmount.value
     ) {
       throw QuoteError.InvalidAmount
     }
