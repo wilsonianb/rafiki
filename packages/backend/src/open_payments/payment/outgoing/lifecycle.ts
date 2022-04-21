@@ -99,7 +99,6 @@ export async function handleSending(
     // Adjust quoted amounts to account for prior partial payment.
     maxSourceAmount: newMaxSourceAmount,
     minDeliveryAmount: newMinDeliveryAmount,
-    maxPacketAmount: payment.quote.maxPacketAmount,
     lowEstimatedExchangeRate,
     highEstimatedExchangeRate,
     minExchangeRate

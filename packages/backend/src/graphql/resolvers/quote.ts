@@ -92,9 +92,9 @@ export const getQuotePageInfo: QuoteConnectionResolvers<ApolloContext>['pageInfo
   const firstPayment = await quoteService.get(edges[0].node.id)
   if (!firstPayment) throw 'quote does not exist'
 
-  let hasNextPagePayments, hasPreviousPagePayments
+  let hasNextPageQuotes, hasPreviousPageQuotes
   try {
-    hasNextPagePayments = await quoteService.getAccountPage(
+    hasNextPageQuotes = await quoteService.getAccountPage(
       firstPayment.accountId,
       {
         after: lastEdge,
@@ -102,10 +102,10 @@ export const getQuotePageInfo: QuoteConnectionResolvers<ApolloContext>['pageInfo
       }
     )
   } catch (e) {
-    hasNextPagePayments = []
+    hasNextPageQuotes = []
   }
   try {
-    hasPreviousPagePayments = await quoteService.getAccountPage(
+    hasPreviousPageQuotes = await quoteService.getAccountPage(
       firstPayment.accountId,
       {
         before: firstEdge,
@@ -113,13 +113,13 @@ export const getQuotePageInfo: QuoteConnectionResolvers<ApolloContext>['pageInfo
       }
     )
   } catch (e) {
-    hasPreviousPagePayments = []
+    hasPreviousPageQuotes = []
   }
 
   return {
     endCursor: lastEdge,
-    hasNextPage: hasNextPagePayments.length == 1,
-    hasPreviousPage: hasPreviousPagePayments.length == 1,
+    hasNextPage: hasNextPageQuotes.length == 1,
+    hasPreviousPage: hasPreviousPageQuotes.length == 1,
     startCursor: firstEdge
   }
 }
