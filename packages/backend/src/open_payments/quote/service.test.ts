@@ -33,8 +33,6 @@ describe('QuoteService', (): void => {
   let knex: Knex
   let accountId: string
   let assetId: string
-  let receivingPayment: string
-  let accountUrl: string
   let receivingAccount: string
   let receivingAccountId: string
   let config: IAppConfig
@@ -64,7 +62,7 @@ describe('QuoteService', (): void => {
   }
 
   function mockCreateIncomingPayment(receiveAmount?: Amount): nock.Scope {
-    const incomingPaymentsUrl = new URL(`${accountUrl}/incoming-payments`)
+    const incomingPaymentsUrl = new URL(`${receivingAccount}/incoming-payments`)
     return nock(incomingPaymentsUrl.origin)
       .post(incomingPaymentsUrl.pathname, function (this: Definition, body) {
         expect(body.incomingAmount).toEqual(
@@ -85,10 +83,7 @@ describe('QuoteService', (): void => {
           .post(`http://localhost:${appContainer.port}${path}`, requestBody, {
             headers: this.req.headers
           })
-          .then((res) => {
-            receivingPayment = res.data.id
-            return res.data
-          })
+          .then((res) => res.data)
       })
   }
 
@@ -154,8 +149,7 @@ describe('QuoteService', (): void => {
           amount: BigInt(123)
         })
       ).resolves.toBeUndefined()
-      accountUrl = `${config.publicHost}/${destinationAccount.id}`
-      receivingAccount = accountUrl.replace('https://', '$')
+      receivingAccount = `${config.publicHost}/${destinationAccount.id}`
     }
   )
 
@@ -249,9 +243,10 @@ describe('QuoteService', (): void => {
             receiveAmount
           }
           let paymentScope: nock.Scope | undefined
+          let receivingPayment: string | undefined
           if (toAccount) {
             options.receivingAccount = receivingAccount
-            paymentScope = mockCreateIncomingPayment()
+            paymentScope = mockCreateIncomingPayment(receiveAmount)
           } else {
             const incomingPayment = await createIncomingPayment(incomingAmount)
             receivingPayment = incomingPayment.url
@@ -449,18 +444,50 @@ describe('QuoteService', (): void => {
       await expect(quoteService.get(quote.id)).resolves.toEqual(quote)
     })
 
-    // receivingPayment and receivingAccount are defined in `beforeEach`
-    // and unavailable in the `test.each` table
+    it('fails on unknown account', async (): Promise<void> => {
+      await expect(
+        quoteService.create({
+          accountId: uuid(),
+          receivingAccount,
+          sendAmount
+        })
+      ).resolves.toEqual(QuoteError.UnknownAccount)
+    })
+
+    it('fails on invalid receivingAccount', async (): Promise<void> => {
+      await expect(
+        quoteService.create({
+          accountId,
+          receivingAccount: `${config.publicHost}/${uuid()}`,
+          sendAmount
+        })
+      ).resolves.toEqual(QuoteError.InvalidDestination)
+    })
+
+    it('fails on invalid receivingPayment', async (): Promise<void> => {
+      await expect(
+        quoteService.create({
+          accountId,
+          receivingPayment: `${receivingAccount}/incoming-payments/${uuid()}`,
+          sendAmount
+        })
+      ).resolves.toEqual(QuoteError.InvalidDestination)
+    })
+
+    // receivingAccount is defined in `beforeEach` and unavailable in the `test.each` table
     test.each`
       toPayment | toAccount | sendAmount                              | receiveAmount                              | error                            | description
       ${false}  | ${false}  | ${sendAmount}                           | ${undefined}                               | ${QuoteError.InvalidDestination} | ${'without a destination'}
       ${true}   | ${true}   | ${sendAmount}                           | ${undefined}                               | ${QuoteError.InvalidDestination} | ${'with multiple destinations'}
       ${false}  | ${true}   | ${undefined}                            | ${undefined}                               | ${QuoteError.InvalidAmount}      | ${'with missing amount'}
       ${true}   | ${false}  | ${sendAmount}                           | ${receiveAmount}                           | ${QuoteError.InvalidAmount}      | ${'with multiple amounts'}
-      ${false}  | ${true}   | ${{ ...sendAmount, value: BigInt(0) }}  | ${undefined}                               | ${QuoteError.InvalidAmount}      | ${'sendAmount of zero'}
-      ${false}  | ${true}   | ${{ ...sendAmount, value: BigInt(-1) }} | ${undefined}                               | ${QuoteError.InvalidAmount}      | ${'negative sendAmount'}
-      ${false}  | ${true}   | ${undefined}                            | ${{ ...receiveAmount, value: BigInt(0) }}  | ${QuoteError.InvalidAmount}      | ${'receiveAmount of zero'}
-      ${false}  | ${true}   | ${undefined}                            | ${{ ...receiveAmount, value: BigInt(-1) }} | ${QuoteError.InvalidAmount}      | ${'negative receiveAmount'}
+      ${false}  | ${true}   | ${{ ...sendAmount, value: BigInt(0) }}  | ${undefined}                               | ${QuoteError.InvalidAmount}      | ${'with sendAmount of zero'}
+      ${false}  | ${true}   | ${{ ...sendAmount, value: BigInt(-1) }} | ${undefined}                               | ${QuoteError.InvalidAmount}      | ${'with negative sendAmount'}
+      ${false}  | ${true}   | ${{ ...sendAmount, assetScale: 3 }}     | ${undefined}                               | ${QuoteError.InvalidAmount}      | ${'with wrong sendAmount asset'}
+      ${false}  | ${true}   | ${undefined}                            | ${{ ...receiveAmount, value: BigInt(0) }}  | ${QuoteError.InvalidAmount}      | ${'with receiveAmount of zero'}
+      ${false}  | ${true}   | ${undefined}                            | ${{ ...receiveAmount, value: BigInt(-1) }} | ${QuoteError.InvalidAmount}      | ${'with negative receiveAmount'}
+      ${false}  | ${true}   | ${undefined}                            | ${{ ...receiveAmount, assetScale: 3 }}     | ${QuoteError.InvalidDestination} | ${'with wrong receiveAmount asset (receivingAccount)'}
+      ${true}   | ${false}  | ${undefined}                            | ${{ ...receiveAmount, assetScale: 3 }}     | ${QuoteError.InvalidAmount}      | ${'with wrong receiveAmount asset (receivingPayment)'}
     `(
       'fails to create $description',
       async ({
@@ -473,7 +500,9 @@ describe('QuoteService', (): void => {
         await expect(
           quoteService.create({
             accountId,
-            receivingPayment: toPayment ? receivingPayment : undefined,
+            receivingPayment: toPayment
+              ? (await createIncomingPayment()).url
+              : undefined,
             receivingAccount: toAccount ? receivingAccount : undefined,
             sendAmount,
             receiveAmount
@@ -481,18 +510,6 @@ describe('QuoteService', (): void => {
         ).resolves.toEqual(error)
       }
     )
-
-    it('fails on unknown account', async (): Promise<void> => {
-      await expect(
-        quoteService.create({
-          accountId: uuid(),
-          receivingAccount,
-          sendAmount
-        })
-      ).resolves.toEqual(QuoteError.UnknownAccount)
-    })
-
-    // invalid amount asset
 
     it('fails on rate service error', async (): Promise<void> => {
       const ratesService = await deps.use('ratesService')
@@ -544,7 +561,7 @@ describe('QuoteService', (): void => {
         Quote.query(knex).insertAndFetch({
           accountId,
           assetId,
-          receivingPayment,
+          receivingPayment: `${receivingAccount}/incoming-payments/${uuid()}`,
           sendAmount,
           receiveAmount,
           maxPacketAmount: BigInt('9223372036854775807'),

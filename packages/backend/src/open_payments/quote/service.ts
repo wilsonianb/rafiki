@@ -122,7 +122,15 @@ async function createQuote(
         }
       }
     }
-    const destination = await Pay.setupPayment(setupOptions)
+    let destination: Pay.ResolvedPayment
+    try {
+      destination = await Pay.setupPayment(setupOptions)
+    } catch (err) {
+      if (err === Pay.PaymentError.QueryFailed) {
+        return QuoteError.InvalidDestination
+      }
+      throw err
+    }
     if (!destination.destinationPaymentDetails) {
       deps.logger.warn(
         {
@@ -133,7 +141,15 @@ async function createQuote(
       throw new Error('missing incoming payment')
     }
 
-    // validateAssets(deps, options, destination)
+    if (options.receiveAmount) {
+      if (
+        options.receiveAmount.assetScale !==
+          destination.destinationAsset.scale ||
+        options.receiveAmount.assetCode !== destination.destinationAsset.code
+      ) {
+        return QuoteError.InvalidAmount
+      }
+    }
 
     const prices = await deps.ratesService.prices().catch((_err: Error) => {
       throw new Error('missing prices')
