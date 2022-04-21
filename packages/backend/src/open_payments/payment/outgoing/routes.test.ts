@@ -2,7 +2,6 @@ import assert from 'assert'
 import * as httpMocks from 'node-mocks-http'
 import Knex from 'knex'
 import { WorkerUtils, makeWorkerUtils } from 'graphile-worker'
-import nock from 'nock'
 import { v4 as uuid } from 'uuid'
 
 import { createContext } from '../../../tests/context'
@@ -65,7 +64,7 @@ describe('Outgoing Payment Routes', (): void => {
     const { id: receivingAccountId } = await accountService.create({
       asset: destinationAsset
     })
-    return await createQuote({
+    return await createQuote(deps, {
       accountId,
       receivingAccount: `${Config.publicHost}/${receivingAccountId}`,
       receiveAmount: {
@@ -93,14 +92,6 @@ describe('Outgoing Payment Routes', (): void => {
   beforeAll(
     async (): Promise<void> => {
       config = Config
-      config.pricesUrl = 'https://test.prices'
-      nock(config.pricesUrl)
-        .get('/')
-        .reply(200, () => ({
-          USD: 1.0, // base
-          XRP: 2.0
-        }))
-        .persist()
       config.publicHost = 'https://wallet.example'
       deps = await initIocContainer(config)
       deps.bind('messageProducer', async () => mockMessageProducer)
@@ -501,7 +492,7 @@ describe('Outgoing Payment Routes', (): void => {
           const ctx = setup({})
           const quoteSpy = jest
             .spyOn(quoteService, 'create')
-            .mockImplementationOnce(createQuote)
+            .mockImplementationOnce((opts) => createQuote(deps, opts))
           await expect(
             outgoingPaymentRoutes.create(ctx)
           ).resolves.toBeUndefined()
@@ -541,7 +532,7 @@ describe('Outgoing Payment Routes', (): void => {
         const ctx = setup({})
         const quoteSpy = jest
           .spyOn(quoteService, 'create')
-          .mockImplementationOnce(createQuote)
+          .mockImplementationOnce((opts) => createQuote(deps, opts))
         await expect(outgoingPaymentRoutes.create(ctx)).resolves.toBeUndefined()
         expect(quoteSpy).toHaveBeenCalled
         expect(ctx.response.status).toBe(201)

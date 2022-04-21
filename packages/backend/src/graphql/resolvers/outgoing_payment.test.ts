@@ -84,7 +84,7 @@ describe('OutgoingPayment Resolvers', (): void => {
     const { id: receivingAccountId } = await accountService.create({
       asset: receiveAsset
     })
-    return await createQuote({
+    return await createQuote(deps, {
       accountId,
       receivingAccount: `${Config.publicHost}/${receivingAccountId}`,
       receiveAmount: {

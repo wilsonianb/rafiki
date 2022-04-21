@@ -1,99 +1,92 @@
 import assert from 'assert'
-import axios from 'axios'
+import { IocContract } from '@adonisjs/fold'
 import * as Pay from '@interledger/pay'
 
-import { Asset } from '../asset/model'
+import { AppServices } from '../app'
 import { AssetOptions } from '../asset/service'
-import { Config } from '../config/app'
+import { isIncomingPaymentError } from '../open_payments/payment/incoming/errors'
 import { Quote } from '../open_payments/quote/model'
 import { CreateQuoteOptions } from '../open_payments/quote/service'
 
-export async function createQuote({
-  accountId,
-  receivingAccount,
-  receivingPayment,
-  sendAmount,
-  receiveAmount
-}: CreateQuoteOptions): Promise<Quote> {
+export async function createQuote(
+  deps: IocContract<AppServices>,
+  {
+    accountId,
+    receivingAccount,
+    receivingPayment,
+    sendAmount,
+    receiveAmount
+  }: CreateQuoteOptions
+): Promise<Quote> {
   assert.ok(!receivingAccount !== !receivingPayment)
-  const account = await axios
-    .get(`${Config.publicHost}/${accountId}`)
-    .then((res) => res.data)
+  const accountService = await deps.use('accountService')
+  const account = await accountService.get(accountId)
   assert.ok(account)
   assert.ok(
     !sendAmount ||
-      (account.assetCode === sendAmount.assetCode &&
-        account.assetScale === sendAmount.assetScale)
+      (account.asset.code === sendAmount.assetCode &&
+        account.asset.scale === sendAmount.assetScale)
   )
-  const asset = await Asset.query().findOne({
-    code: account.assetCode,
-    scale: account.assetScale
+  const assetService = await deps.use('assetService')
+  const asset = await assetService.get({
+    code: account.asset.code,
+    scale: account.asset.scale
   })
   assert.ok(asset)
 
+  const config = await deps.use('config')
+  const incomingPaymentService = await deps.use('incomingPaymentService')
   let receiveAsset: AssetOptions | undefined
   if (receivingAccount) {
     assert.ok(!sendAmount !== !receiveAmount)
-    const account = await axios
-      .get(receivingAccount.replace('$', 'https://'))
-      .then((res) => res.data)
+    const accountUrlPrefix = `${config.publicHost}/`
+    assert.ok(receivingAccount.startsWith(accountUrlPrefix))
+    const receivingAccountId = receivingAccount.slice(accountUrlPrefix.length)
+    const account = await accountService.get(receivingAccountId)
     assert.ok(account)
     if (receiveAmount) {
       assert.ok(
-        account.assetCode === receiveAmount.assetCode &&
-          account.assetScale === receiveAmount.assetScale
+        account.asset.code === receiveAmount.assetCode &&
+          account.asset.scale === receiveAmount.assetScale
       )
     } else {
       assert.ok(sendAmount)
       receiveAsset = {
-        code: account.assetCode,
-        scale: account.assetScale
+        code: account.asset.code,
+        scale: account.asset.scale
       }
     }
 
-    const incomingPayment = await axios
-      .post(
-        `${receivingAccount.replace('$', 'https://')}/incoming-payments`,
-        {
-          incomingAmount: receiveAmount && {
-            ...receiveAmount,
-            value: receiveAmount.value.toString()
-          }
-        },
-        {
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json'
-          },
-          validateStatus: (status) => status === 201
-        }
-      )
-      .then((res) => res.data)
-    receivingPayment = incomingPayment.id
+    const incomingPayment = await incomingPaymentService.create({
+      accountId: receivingAccountId,
+      incomingAmount: receiveAmount
+    })
+    assert.ok(!isIncomingPaymentError(incomingPayment))
+    receivingPayment = `${receivingAccount}/incoming-payments/${incomingPayment.id}`
   } else {
     assert.ok(receivingPayment)
-    const payment = await axios.get(receivingPayment).then((res) => res.data)
-    assert.ok(payment)
-    assert.ok(payment.incomingAmount || receiveAmount || sendAmount)
+    assert.ok(receivingPayment.startsWith(config.publicHost))
+    const path = receivingPayment.slice(config.publicHost.length + 1).split('/')
+    assert.ok(path.length === 3)
+    const incomingPayment = await incomingPaymentService.get(path[2])
+    assert.ok(incomingPayment)
+    assert.ok(incomingPayment.incomingAmount || receiveAmount || sendAmount)
     if (receiveAmount) {
       assert.ok(
-        payment.receivedAmount.assetCode === receiveAmount.assetCode &&
-          payment.receivedAmount.assetScale === receiveAmount.assetScale
+        incomingPayment.asset.code === receiveAmount.assetCode &&
+          incomingPayment.asset.scale === receiveAmount.assetScale
       )
       assert.ok(
-        !payment.incomingAmount ||
-          receiveAmount.value <= BigInt(payment.incomingAmount.value)
+        !incomingPayment.incomingAmount ||
+          receiveAmount.value <= incomingPayment.incomingAmount.value
       )
     } else {
       receiveAsset = {
-        code: payment.receivedAmount.assetCode,
-        scale: payment.receivedAmount.assetScale
+        code: incomingPayment.asset.code,
+        scale: incomingPayment.asset.scale
       }
       if (!sendAmount) {
-        receiveAmount = {
-          ...payment.incomingAmount,
-          value: BigInt(payment.incomingAmount.value)
-        }
+        receiveAmount = incomingPayment.incomingAmount
       }
     }
   }
@@ -102,7 +95,7 @@ export async function createQuote({
     assert.ok(receiveAsset)
     receiveAmount = {
       value: BigInt(
-        Math.ceil(Number(sendAmount.value) / (2 * (1 + Config.slippage)))
+        Math.ceil(Number(sendAmount.value) / (2 * (1 + config.slippage)))
       ),
       assetCode: receiveAsset.code,
       assetScale: receiveAsset.scale
@@ -111,10 +104,10 @@ export async function createQuote({
     assert.ok(receiveAmount)
     sendAmount = {
       value: BigInt(
-        Math.ceil(Number(receiveAmount.value) * 2 * (1 + Config.slippage))
+        Math.ceil(Number(receiveAmount.value) * 2 * (1 + config.slippage))
       ),
-      assetCode: account.assetCode,
-      assetScale: account.assetScale
+      assetCode: account.asset.code,
+      assetScale: account.asset.scale
     }
   }
 
@@ -138,7 +131,7 @@ export async function createQuote({
         Pay.Int.from(495n) as Pay.PositiveInt,
         Pay.Int.from(1000n) as Pay.PositiveInt
       ),
-      expiresAt: new Date(Date.now() + Config.quoteLifespan)
+      expiresAt: new Date(Date.now() + config.quoteLifespan)
     })
     .withGraphFetched('asset')
 }

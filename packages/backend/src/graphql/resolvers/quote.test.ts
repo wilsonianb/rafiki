@@ -58,7 +58,7 @@ describe('Quote Resolvers', (): void => {
     const { id: receivingAccountId } = await accountService.create({
       asset: receiveAsset
     })
-    return await createQuote({
+    return await createQuote(deps, {
       accountId,
       receivingAccount: `${Config.publicHost}/${receivingAccountId}`,
       receiveAmount: {
@@ -228,7 +228,7 @@ describe('Quote Resolvers', (): void => {
           receiveAmount,
           receivingPayment
         }
-        const quote = await createQuote(input)
+        const quote = await createQuote(deps, input)
 
         const createSpy = jest
           .spyOn(quoteService, 'create')

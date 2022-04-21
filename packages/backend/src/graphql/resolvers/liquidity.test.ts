@@ -1609,7 +1609,7 @@ describe('Liquidity Resolvers', (): void => {
           asset: account.asset
         })
         const config = await deps.use('config')
-        const { id: quoteId } = await createQuote({
+        const { id: quoteId } = await createQuote(deps, {
           accountId,
           receivingAccount: `${config.publicHost}/${receivingAccountId}`,
           sendAmount: {
