@@ -14,7 +14,6 @@ export class Quote extends BaseModel {
     return [
       'sendAmount',
       'receiveAmount',
-      'paymentType',
       'minExchangeRate',
       'lowEstimatedExchangeRate',
       'highEstimatedExchangeRate'
@@ -92,10 +91,6 @@ export class Quote extends BaseModel {
   private highEstimatedExchangeRateNumerator!: bigint
   private highEstimatedExchangeRateDenominator!: bigint
 
-  public get paymentType(): Pay.PaymentType {
-    return Pay.PaymentType.FixedDelivery
-  }
-
   public get maxSourceAmount(): bigint {
     return this.sendAmountValue
   }
@@ -157,8 +152,7 @@ export class Quote extends BaseModel {
       receiveAmount: {
         ...json.receiveAmount,
         value: json.receiveAmount.value.toString()
-      },
-      paymentType: json.paymentType
+      }
     }
     // if (json.expiresAt) {
     //   data.expiresAt = json.expiresAt.toISOString()

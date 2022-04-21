@@ -232,12 +232,14 @@ async function createQuote(
             assetCode: destination.destinationAsset.code,
             assetScale: destination.destinationAsset.scale
           },
-          ...ilpQuote,
           // Cap at MAX_INT64 because of postgres type limits.
           maxPacketAmount:
             MAX_INT64 < ilpQuote.maxPacketAmount
               ? MAX_INT64
               : ilpQuote.maxPacketAmount,
+          minExchangeRate: ilpQuote.minExchangeRate,
+          lowEstimatedExchangeRate: ilpQuote.lowEstimatedExchangeRate,
+          highEstimatedExchangeRate: ilpQuote.highEstimatedExchangeRate,
           // Patch using createdAt below
           expiresAt: new Date()
         })
@@ -248,9 +250,7 @@ async function createQuote(
           knex: trx
         },
         pendingQuote,
-        options.sendAmount
-          ? Pay.PaymentType.FixedSend
-          : Pay.PaymentType.FixedDelivery,
+        ilpQuote.paymentType,
         receivingPaymentAmount
       )
       return quote

@@ -54,18 +54,12 @@ export async function handleSending(
     newMinDeliveryAmount = payment.receiveAmount.value - amountDelivered
   }
 
-  if (
-    (payment.quote.paymentType === Pay.PaymentType.FixedSend &&
-      newMaxSourceAmount <= BigInt(0)) ||
-    (payment.quote.paymentType === Pay.PaymentType.FixedDelivery &&
-      newMinDeliveryAmount <= BigInt(0))
-  ) {
+  if (newMinDeliveryAmount <= BigInt(0)) {
     // Payment is already (unexpectedly) done. Maybe this is a retry and the previous attempt failed to save the state to Postgres. Or the invoice could have been paid by a totally different payment in the time since the quote.
     deps.logger.warn(
       {
         newMaxSourceAmount,
         newMinDeliveryAmount,
-        paymentType: payment.quote.paymentType,
         amountSent,
         incomingPayment: destination.destinationPaymentDetails
       },
@@ -82,8 +76,7 @@ export async function handleSending(
     deps.logger.error(
       {
         newMaxSourceAmount,
-        newMinDeliveryAmount,
-        paymentType: payment.quote.paymentType
+        newMinDeliveryAmount
       },
       'handleSending bad retry state'
     )
@@ -95,7 +88,7 @@ export async function handleSending(
   const minExchangeRate = payment.quote.minExchangeRate
   const quote: Pay.Quote = {
     ...payment.quote,
-    paymentType: payment.quote.paymentType,
+    paymentType: Pay.PaymentType.FixedDelivery,
     // Adjust quoted amounts to account for prior partial payment.
     maxSourceAmount: newMaxSourceAmount,
     minDeliveryAmount: newMinDeliveryAmount,
@@ -121,7 +114,6 @@ export async function handleSending(
     {
       destination: destination.destinationAddress,
       error: receipt.error,
-      paymentType: payment.quote.paymentType,
       newMaxSourceAmount,
       newMinDeliveryAmount,
       receiptAmountSent: receipt.amountSent,

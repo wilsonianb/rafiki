@@ -264,7 +264,6 @@ describe('QuoteService', (): void => {
           expect(quote).toMatchObject({
             accountId,
             receivingPayment,
-            paymentType: Pay.PaymentType.FixedDelivery,
             sendAmount: sendAmount || {
               value: BigInt(
                 Math.ceil(
@@ -422,7 +421,6 @@ describe('QuoteService', (): void => {
       assert.ok(!isQuoteError(quote))
       expect(quote).toMatchObject({
         ...options,
-        paymentType: Pay.PaymentType.FixedDelivery,
         maxPacketAmount: BigInt('9223372036854775807'),
         sendAmount: {
           value: BigInt(
