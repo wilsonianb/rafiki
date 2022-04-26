@@ -57,7 +57,7 @@ export const createTestApp = async (
     access: [
       {
         type: AccessType.IncomingPayment,
-        actions: [AccessAction.Create, AccessAction.Read]
+        actions: [AccessAction.Create, AccessAction.Update, AccessAction.Read]
       },
       {
         type: AccessType.OutgoingPayment,
@@ -86,6 +86,28 @@ export const createTestApp = async (
       return Axios.get(`http://localhost:${app.getPort()}${path}`, {
         headers
       }).then((res) => res.data)
+    })
+    .persist()
+
+  nock(config.publicHost)
+    .post(/.*/)
+    .matchHeader('Accept', 'application/json')
+    .matchHeader('Content-Type', 'application/json')
+    .reply(201, function (path, requestBody) {
+      const headers = this.req.headers
+      if (!headers['authorization']) {
+        headers.authorization = `GNAP ${testAccessToken}`
+      }
+      return Axios.post(
+        `http://localhost:${app.getPort()}${path}`,
+        requestBody,
+        {
+          headers: Object.assign(
+            { Authorization: `GNAP ${testAccessToken}` },
+            this.req.headers
+          )
+        }
+      ).then((res) => res.data)
     })
     .persist()
 

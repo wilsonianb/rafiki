@@ -3,37 +3,33 @@ import * as httpMocks from 'node-mocks-http'
 import Knex from 'knex'
 import { WorkerUtils, makeWorkerUtils } from 'graphile-worker'
 import { v4 as uuid } from 'uuid'
-
-import { createContext } from '../../../tests/context'
-import { createTestApp, TestContainer } from '../../../tests/app'
-import { resetGraphileDb } from '../../../tests/graphileDb'
-import { GraphileProducer } from '../../../messaging/graphileProducer'
-import { Config, IAppConfig } from '../../../config/app'
 import { IocContract } from '@adonisjs/fold'
-import { initIocContainer } from '../../..'
-import { AppServices } from '../../../app'
-import { truncateTables } from '../../../tests/tableManager'
-import { OutgoingPaymentService, CreateOutgoingPaymentOptions } from './service'
-import { isOutgoingPaymentError } from './errors'
-import { OutgoingPayment, OutgoingPaymentState } from './model'
-import { OutgoingPaymentRoutes } from './routes'
-import { Amount } from '../../amount'
-import { IncomingPayment } from '../incoming/model'
-import { isIncomingPaymentError } from '../incoming/errors'
-import { Quote } from '../../quote/model'
-import { CreateQuoteOptions, QuoteService } from '../../quote/service'
-import { createQuote } from '../../../tests/quote'
-import { AppContext } from '../../../app'
 
-describe('Outgoing Payment Routes', (): void => {
+import { createContext } from '../../tests/context'
+import { createTestApp, TestContainer } from '../../tests/app'
+import { resetGraphileDb } from '../../tests/graphileDb'
+import { GraphileProducer } from '../../messaging/graphileProducer'
+import { Config, IAppConfig } from '../../config/app'
+import { initIocContainer } from '../..'
+import { AppServices } from '../../app'
+import { truncateTables } from '../../tests/tableManager'
+import { QuoteService, CreateQuoteOptions } from './service'
+import { Quote } from './model'
+import { QuoteRoutes } from './routes'
+import { Amount } from '../amount'
+import { IncomingPayment } from '../payment/incoming/model'
+import { isIncomingPaymentError } from '../payment/incoming/errors'
+import { createQuote } from '../../tests/quote'
+import { AppContext } from '../../app'
+
+describe('Quote Routes', (): void => {
   let deps: IocContract<AppServices>
   let appContainer: TestContainer
   let knex: Knex
   let workerUtils: WorkerUtils
-  let outgoingPaymentService: OutgoingPaymentService
-  let config: IAppConfig
-  let outgoingPaymentRoutes: OutgoingPaymentRoutes
   let quoteService: QuoteService
+  let config: IAppConfig
+  let quoteRoutes: QuoteRoutes
   let accountId: string
   let accountUrl: string
   let receivingAccount: string
@@ -75,20 +71,6 @@ describe('Outgoing Payment Routes', (): void => {
     })
   }
 
-  const createPayment = async (options: {
-    accountId: string
-    description?: string
-    externalRef?: string
-  }): Promise<OutgoingPayment> => {
-    const { id: quoteId } = await createAccountQuote(accountId)
-    const payment = await outgoingPaymentService.create({
-      ...options,
-      quoteId
-    })
-    assert.ok(!isOutgoingPaymentError(payment))
-    return payment
-  }
-
   beforeAll(
     async (): Promise<void> => {
       config = Config
@@ -102,9 +84,8 @@ describe('Outgoing Payment Routes', (): void => {
       await workerUtils.migrate()
       messageProducer.setUtils(workerUtils)
       knex = await deps.use('knex')
-      outgoingPaymentService = await deps.use('outgoingPaymentService')
       config = await deps.use('config')
-      outgoingPaymentRoutes = await deps.use('outgoingPaymentRoutes')
+      quoteRoutes = await deps.use('quoteRoutes')
       quoteService = await deps.use('quoteService')
     }
   )
@@ -140,8 +121,7 @@ describe('Outgoing Payment Routes', (): void => {
           value: BigInt(56),
           assetCode: destinationAsset.code,
           assetScale: destinationAsset.scale
-        },
-        description: 'description!'
+        }
       })) as IncomingPayment
       assert.ok(!isIncomingPaymentError(incomingPayment))
       receivingPayment = `${receivingAccount}/incoming-payments/${incomingPayment.id}`
@@ -168,9 +148,9 @@ describe('Outgoing Payment Routes', (): void => {
         {
           headers: { Accept: 'application/json' }
         },
-        { outgoingPaymentId: 'not_a_uuid' }
+        { quoteId: 'not_a_uuid' }
       )
-      await expect(outgoingPaymentRoutes.get(ctx)).rejects.toHaveProperty(
+      await expect(quoteRoutes.get(ctx)).rejects.toHaveProperty(
         'message',
         'invalid id'
       )
@@ -181,108 +161,53 @@ describe('Outgoing Payment Routes', (): void => {
         {
           headers: { Accept: 'test/plain' }
         },
-        { outgoingPaymentId: uuid() }
+        { quoteId: uuid() }
       )
-      await expect(outgoingPaymentRoutes.get(ctx)).rejects.toHaveProperty(
-        'status',
-        406
-      )
+      await expect(quoteRoutes.get(ctx)).rejects.toHaveProperty('status', 406)
     })
 
-    test('returns 404 for nonexistent outgoing payment', async (): Promise<void> => {
+    test('returns 404 for nonexistent quote', async (): Promise<void> => {
       const ctx = createContext(
         {
           headers: { Accept: 'application/json' }
         },
-        { outgoingPaymentId: uuid() }
+        { quoteId: uuid() }
       )
-      await expect(outgoingPaymentRoutes.get(ctx)).rejects.toHaveProperty(
-        'status',
-        404
-      )
+      await expect(quoteRoutes.get(ctx)).rejects.toHaveProperty('status', 404)
     })
 
-    test('returns 200 with an outgoing payment', async (): Promise<void> => {
-      const outgoingPayment = await createPayment({
-        accountId,
-        description: 'rent',
-        externalRef: '202201'
-      })
+    test('returns 200 with a quote', async (): Promise<void> => {
+      const quote = await createAccountQuote(accountId)
       const ctx = createContext(
         {
           headers: { Accept: 'application/json' }
         },
-        { outgoingPaymentId: outgoingPayment.id }
+        { quoteId: quote.id }
       )
-      await expect(outgoingPaymentRoutes.get(ctx)).resolves.toBeUndefined()
+      await expect(quoteRoutes.get(ctx)).resolves.toBeUndefined()
       expect(ctx.status).toBe(200)
       expect(ctx.response.get('Content-Type')).toBe(
         'application/json; charset=utf-8'
       )
 
       expect(ctx.body).toEqual({
-        id: `${accountUrl}/outgoing-payments/${outgoingPayment.id}`,
+        id: `${accountUrl}/quotes/${quote.id}`,
         accountId: accountUrl,
-        receivingPayment: outgoingPayment.receivingPayment,
+        receivingPayment: quote.receivingPayment,
         sendAmount: {
-          ...outgoingPayment.sendAmount,
-          value: outgoingPayment.sendAmount.value.toString()
+          ...quote.sendAmount,
+          value: quote.sendAmount.value.toString()
         },
         receiveAmount: {
-          ...outgoingPayment.receiveAmount,
-          value: outgoingPayment.receiveAmount.value.toString()
-        },
-        state: 'processing',
-        description: outgoingPayment.description,
-        externalRef: outgoingPayment.externalRef
-      })
-    })
-
-    Object.values(OutgoingPaymentState).forEach((state) => {
-      test(`returns 200 with a(n) ${state} outgoing payment`, async (): Promise<void> => {
-        const outgoingPayment = await createPayment({
-          accountId
-        })
-        assert.ok(!isOutgoingPaymentError(outgoingPayment))
-        await outgoingPayment.$query(knex).patch({ state })
-        const ctx = createContext(
-          {
-            headers: { Accept: 'application/json' }
-          },
-          { outgoingPaymentId: outgoingPayment.id }
-        )
-        await expect(outgoingPaymentRoutes.get(ctx)).resolves.toBeUndefined()
-        expect(ctx.status).toBe(200)
-        expect(ctx.body).toEqual({
-          id: `${accountUrl}/outgoing-payments/${outgoingPayment.id}`,
-          accountId: accountUrl,
-          receivingPayment: outgoingPayment.receivingPayment,
-          state: [
-            OutgoingPaymentState.Funding,
-            OutgoingPaymentState.Sending
-          ].includes(state)
-            ? 'processing'
-            : state.toLowerCase(),
-          sendAmount: {
-            ...outgoingPayment.sendAmount,
-            value: outgoingPayment.sendAmount.value.toString()
-          },
-          receiveAmount: {
-            ...outgoingPayment.receiveAmount,
-            value: outgoingPayment.receiveAmount.value.toString()
-          }
-        })
+          ...quote.receiveAmount,
+          value: quote.receiveAmount.value.toString()
+        }
       })
     })
   })
 
   describe('create', (): void => {
-    let options: Omit<
-      CreateOutgoingPaymentOptions & CreateQuoteOptions,
-      'accountId' | 'quoteId'
-    > & {
-      quoteId?: string
-    }
+    let options: Omit<CreateQuoteOptions & CreateQuoteOptions, 'accountId'>
 
     beforeEach(() => {
       options = {
@@ -309,7 +234,7 @@ describe('Outgoing Payment Routes', (): void => {
     test('returns error on invalid id', async (): Promise<void> => {
       const ctx = setup({})
       ctx.params.accountId = 'not_a_uuid'
-      await expect(outgoingPaymentRoutes.create(ctx)).rejects.toMatchObject({
+      await expect(quoteRoutes.create(ctx)).rejects.toMatchObject({
         message: 'invalid account id',
         status: 400
       })
@@ -317,7 +242,7 @@ describe('Outgoing Payment Routes', (): void => {
 
     test('returns 406 on invalid Accept', async (): Promise<void> => {
       const ctx = setup({ headers: { Accept: 'text/plain' } })
-      await expect(outgoingPaymentRoutes.create(ctx)).rejects.toMatchObject({
+      await expect(quoteRoutes.create(ctx)).rejects.toMatchObject({
         message: 'must accept json',
         status: 406
       })
@@ -325,7 +250,7 @@ describe('Outgoing Payment Routes', (): void => {
 
     test('returns error on invalid Content-Type', async (): Promise<void> => {
       const ctx = setup({ headers: { 'Content-Type': 'text/plain' } })
-      await expect(outgoingPaymentRoutes.create(ctx)).rejects.toMatchObject({
+      await expect(quoteRoutes.create(ctx)).rejects.toMatchObject({
         message: 'must send json body',
         status: 400
       })
@@ -337,14 +262,12 @@ describe('Outgoing Payment Routes', (): void => {
       ${'sendAmount'}       | ${123}
       ${'receiveAmount'}    | ${123}
       ${'receivingPayment'} | ${123}
-      ${'description'}      | ${123}
-      ${'externalRef'}      | ${123}
     `(
       'returns error on invalid $field',
       async ({ field, invalidValue }): Promise<void> => {
         const ctx = setup({})
         ctx.request.body[field] = invalidValue
-        await expect(outgoingPaymentRoutes.create(ctx)).rejects.toMatchObject({
+        await expect(quoteRoutes.create(ctx)).rejects.toMatchObject({
           message: `invalid ${field}`,
           status: 400
         })
@@ -363,7 +286,7 @@ describe('Outgoing Payment Routes', (): void => {
           receivingPayment
         }
         const ctx = setup({})
-        await expect(outgoingPaymentRoutes.create(ctx)).rejects.toMatchObject({
+        await expect(quoteRoutes.create(ctx)).rejects.toMatchObject({
           message: 'invalid destination',
           status: 400
         })
@@ -404,7 +327,7 @@ describe('Outgoing Payment Routes', (): void => {
             : undefined
         }
         const ctx = setup({})
-        await expect(outgoingPaymentRoutes.create(ctx)).rejects.toMatchObject({
+        await expect(quoteRoutes.create(ctx)).rejects.toMatchObject({
           message: 'invalid amount',
           status: 400
         })
@@ -420,47 +343,13 @@ describe('Outgoing Payment Routes', (): void => {
         }
       }
       const ctx = setup({})
-      await expect(outgoingPaymentRoutes.create(ctx)).rejects.toMatchObject({
+      await expect(quoteRoutes.create(ctx)).rejects.toMatchObject({
         message: 'invalid amount',
         status: 400
       })
     })
 
-    describe('returns the outgoing payment on success', (): void => {
-      test('Quote', async (): Promise<void> => {
-        const quote = await createAccountQuote(accountId)
-        options = {
-          quoteId: quote.id,
-          description: 'rent',
-          externalRef: '202201'
-        }
-        const ctx = setup({})
-        await expect(outgoingPaymentRoutes.create(ctx)).resolves.toBeUndefined()
-        expect(ctx.response.status).toBe(201)
-        const outgoingPaymentId = ((ctx.response.body as Record<
-          string,
-          unknown
-        >)['id'] as string)
-          .split('/')
-          .pop()
-        expect(ctx.response.body).toEqual({
-          id: `${accountUrl}/outgoing-payments/${outgoingPaymentId}`,
-          accountId: accountUrl,
-          receivingPayment: quote.receivingPayment,
-          sendAmount: {
-            ...quote.sendAmount,
-            value: quote.sendAmount.value.toString()
-          },
-          receiveAmount: {
-            ...quote.receiveAmount,
-            value: quote.receiveAmount.value.toString()
-          },
-          description: options.description,
-          externalRef: options.externalRef,
-          state: 'processing'
-        })
-      })
-
+    describe('returns the quote on success', (): void => {
       test.each`
         sendAmount   | receiveAmount | expectedAmount | description
         ${'123'}     | ${undefined}  | ${'61'}        | ${'fixed-send'}
@@ -493,12 +382,10 @@ describe('Outgoing Payment Routes', (): void => {
           const quoteSpy = jest
             .spyOn(quoteService, 'create')
             .mockImplementationOnce((opts) => createQuote(deps, opts))
-          await expect(
-            outgoingPaymentRoutes.create(ctx)
-          ).resolves.toBeUndefined()
+          await expect(quoteRoutes.create(ctx)).resolves.toBeUndefined()
           expect(quoteSpy).toHaveBeenCalledWith({
+            ...options,
             accountId,
-            receivingAccount,
             sendAmount: options.sendAmount && {
               ...options.sendAmount,
               value: BigInt(options.sendAmount.value)
@@ -509,14 +396,13 @@ describe('Outgoing Payment Routes', (): void => {
             }
           })
           expect(ctx.response.status).toBe(201)
-          const outgoingPaymentId = ((ctx.response.body as Record<
-            string,
-            unknown
-          >)['id'] as string)
+          const quoteId = ((ctx.response.body as Record<string, unknown>)[
+            'id'
+          ] as string)
             .split('/')
             .pop()
           expect(ctx.response.body).toEqual({
-            id: `${accountUrl}/outgoing-payments/${outgoingPaymentId}`,
+            id: `${accountUrl}/quotes/${quoteId}`,
             accountId: accountUrl,
             receivingPayment: expect.any(String),
             sendAmount: {
@@ -528,36 +414,32 @@ describe('Outgoing Payment Routes', (): void => {
               value: receiveAmount || expectedAmount,
               assetCode: destinationAsset.code,
               assetScale: destinationAsset.scale
-            },
-            state: 'processing'
+            }
           })
         }
       )
 
       test('IncomingPayment', async (): Promise<void> => {
         options = {
-          receivingPayment,
-          description: 'rent',
-          externalRef: '202201'
+          receivingPayment
         }
         const ctx = setup({})
         const quoteSpy = jest
           .spyOn(quoteService, 'create')
           .mockImplementationOnce((opts) => createQuote(deps, opts))
-        await expect(outgoingPaymentRoutes.create(ctx)).resolves.toBeUndefined()
+        await expect(quoteRoutes.create(ctx)).resolves.toBeUndefined()
         expect(quoteSpy).toHaveBeenCalledWith({
           accountId,
           receivingPayment
         })
         expect(ctx.response.status).toBe(201)
-        const outgoingPaymentId = ((ctx.response.body as Record<
-          string,
-          unknown
-        >)['id'] as string)
+        const quoteId = ((ctx.response.body as Record<string, unknown>)[
+          'id'
+        ] as string)
           .split('/')
           .pop()
         expect(ctx.response.body).toEqual({
-          id: `${accountUrl}/outgoing-payments/${outgoingPaymentId}`,
+          id: `${accountUrl}/quotes/${quoteId}`,
           accountId: accountUrl,
           receivingPayment,
           sendAmount: {
@@ -571,10 +453,7 @@ describe('Outgoing Payment Routes', (): void => {
           receiveAmount: {
             ...incomingPayment.incomingAmount,
             value: incomingPayment.incomingAmount?.value.toString()
-          },
-          description: options.description,
-          externalRef: options.externalRef,
-          state: 'processing'
+          }
         })
       })
     })
