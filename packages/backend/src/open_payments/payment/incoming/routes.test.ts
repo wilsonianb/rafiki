@@ -221,7 +221,7 @@ describe('Incoming Payment Routes', (): void => {
       }
     )
 
-    test('returns error on distant-future expiresAt', async (): Promise<void> => {
+    test.only('returns error on distant-future expiresAt', async (): Promise<void> => {
       const ctx = setup({}, { accountId: account.id })
       ctx.request.body['expiresAt'] = new Date(
         Date.now() + MAX_EXPIRY + 1000

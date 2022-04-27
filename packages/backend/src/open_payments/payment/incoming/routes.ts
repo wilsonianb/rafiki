@@ -9,6 +9,7 @@ import { IncomingPaymentService } from './service'
 import { IncomingPayment, IncomingPaymentState } from './model'
 import { errorToCode, errorToMessage, isIncomingPaymentError } from './errors'
 import { Amount } from '../amount'
+import Enforcer from 'openapi-enforcer'
 
 // Don't allow creating an incoming payment too far out. Incoming payments with no payments before they expire are cleaned up, since incoming payments creation is unauthenticated.
 // TODO what is a good default value for this?
@@ -89,6 +90,31 @@ async function createIncomingPayment(
     400,
     'must send json body'
   )
+
+  // const openapi = await Enforcer('./packages/backend/src/open_payments/open-api-spec.yaml')
+  const [warning, error] = await Enforcer(
+    './packages/backend/src/open_payments/open-api-spec.yaml',
+    {
+      fullResult: true
+    }
+  )
+  console.log(warning)
+  console.log(error)
+  // const [ req, error ] = openapi.request(ctx.request
+  // // {
+  // //   method: 'POST',
+  // //   path: '/tasks',
+  // //   // the body should be parsed by a JSON.parse() prior to passing in (if applicable).
+  // //   body: { task: 'Buy Milk', quantity: 2 }
+  // // }
+  // )
+
+  // if (error) {
+  //   console.log(error)
+  //   ctx.throw(400, 'Invalid request')
+  // } else {
+  //   console.log(req)
+  // }
 
   const { body } = ctx.request
   if (typeof body !== 'object') return ctx.throw(400, 'json body required')

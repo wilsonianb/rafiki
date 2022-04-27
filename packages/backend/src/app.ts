@@ -26,6 +26,7 @@ import { PeerService } from './peer/service'
 import { AccountService } from './open_payments/account/service'
 import { AccessType, AccessAction, Grant } from './open_payments/auth/grant'
 import { createAuthMiddleware } from './open_payments/auth/middleware'
+import { createValidationMiddleware } from './open_payments/middleware'
 import { RatesService } from './rates/service'
 import { SPSPRoutes } from './spsp/routes'
 import { IncomingPaymentRoutes } from './open_payments/payment/incoming/routes'
@@ -265,6 +266,7 @@ export class App {
 
     this.publicRouter.get(
       '/:accountId/incoming-payments/:incomingPaymentId',
+      createValidationMiddleware(),
       createAuthMiddleware({
         type: AccessType.IncomingPayment,
         action: AccessAction.Read
