@@ -1,6 +1,7 @@
 import { join } from 'path'
 import { Server } from 'http'
 import { EventEmitter } from 'events'
+import { initialize } from 'koa-openapi'
 
 import { IocContract } from '@adonisjs/fold'
 import Knex from 'knex'
@@ -241,6 +242,15 @@ export class App {
     this.publicRouter.use(bodyParser())
     this.publicRouter.get('/healthz', (ctx: AppContext): void => {
       ctx.status = 200
+    })
+
+    initialize({
+      router: this.publicRouter,
+      apiDoc: './open-api-spec.yaml',
+      // dependencies: {
+      //   worldsService: v1WorldsService
+      // },
+      paths: './api-v1/paths'
     })
 
     const spspRoutes = await this.container.use('spspRoutes')

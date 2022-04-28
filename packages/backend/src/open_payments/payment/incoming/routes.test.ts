@@ -1,3 +1,4 @@
+import Axios, { AxiosInstance } from 'axios'
 import * as httpMocks from 'node-mocks-http'
 import base64url from 'base64url'
 import Knex from 'knex'
@@ -31,6 +32,7 @@ describe('Incoming Payment Routes', (): void => {
   let incomingPaymentService: IncomingPaymentService
   let config: IAppConfig
   let incomingPaymentRoutes: IncomingPaymentRoutes
+  let axios: AxiosInstance
   const messageProducer = new GraphileProducer()
   const mockMessageProducer = {
     send: jest.fn()
@@ -81,6 +83,8 @@ describe('Incoming Payment Routes', (): void => {
       await workerUtils.migrate()
       messageProducer.setUtils(workerUtils)
       knex = await deps.use('knex')
+      // axios = Axios.create({ baseURL: `http://127.0.0.1:${appContainer.port}` })
+      axios = Axios.create({ baseURL: config.publicHost })
     }
   )
 
@@ -232,19 +236,26 @@ describe('Incoming Payment Routes', (): void => {
       )
     })
 
-    test('returns the incoming payment on success', async (): Promise<void> => {
+    test.only('returns the incoming payment on success', async (): Promise<void> => {
       const ctx = setup({}, { accountId: account.id })
       await expect(incomingPaymentRoutes.create(ctx)).resolves.toBeUndefined()
-      expect(ctx.response.status).toBe(201)
-      const sharedSecret = (ctx.response.body as Record<string, unknown>)[
-        'sharedSecret'
-      ]
-      const incomingPaymentId = ((ctx.response.body as Record<string, unknown>)[
+
+      const res = await axios.post(`/${accountId}/incoming-payments`)
+      expect(res.status).toBe(201)
+      expect(res.headers['content-type']).toBe(
+        'application/json; charset=utf-8'
+      )
+      expect(res.data).toEqual({
+        success: true
+      })
+      // expect(ctx.response.status).toBe(201)
+      const sharedSecret = (res.data as Record<string, unknown>)['sharedSecret']
+      const incomingPaymentId = ((res.data as Record<string, unknown>)[
         'id'
       ] as string)
         .split('/')
         .pop()
-      expect(ctx.response.body).toEqual({
+      expect(res.data).toEqual({
         id: `${accountId}/incoming-payments/${incomingPaymentId}`,
         accountId,
         incomingAmount: {
