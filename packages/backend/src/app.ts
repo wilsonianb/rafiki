@@ -1,6 +1,7 @@
 import { join } from 'path'
 import { Server } from 'http'
 import { EventEmitter } from 'events'
+import OpenAPIBackend, { Request } from 'openapi-backend'
 
 import { IocContract } from '@adonisjs/fold'
 import Knex from 'knex'
@@ -242,6 +243,11 @@ export class App {
     this.publicRouter.get('/healthz', (ctx: AppContext): void => {
       ctx.status = 200
     })
+
+    const api = new OpenAPIBackend({ definition: './open-api-spec.yaml' })
+    this.publicRouter.use((ctx) =>
+      api.handleRequest(ctx.request as Request, ctx)
+    )
 
     const spspRoutes = await this.container.use('spspRoutes')
     const accountRoutes = await this.container.use('accountRoutes')

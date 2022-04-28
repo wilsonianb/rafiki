@@ -3,6 +3,7 @@ import base64url from 'base64url'
 import Knex from 'knex'
 import { WorkerUtils, makeWorkerUtils } from 'graphile-worker'
 import { v4 as uuid } from 'uuid'
+import OpenAPIBackend, { Request } from 'openapi-backend'
 
 import { createContext } from '../../../tests/context'
 import { AccountService } from '../../account/service'
@@ -81,6 +82,18 @@ describe('Incoming Payment Routes', (): void => {
       await workerUtils.migrate()
       messageProducer.setUtils(workerUtils)
       knex = await deps.use('knex')
+
+      const api = new OpenAPIBackend({ definition: './open-api-spec.yaml' })
+      incomingPaymentRoutes = await deps.use('incomingPaymentRoutes')
+      jest
+        .spyOn(incomingPaymentRoutes, 'create')
+        .mockImplementation((ctx) =>
+          api.handleRequest(
+            ctx.request as Request,
+            ctx,
+            incomingPaymentRoutes.create
+          )
+        )
     }
   )
 
@@ -95,7 +108,6 @@ describe('Incoming Payment Routes', (): void => {
       accountService = await deps.use('accountService')
       incomingPaymentService = await deps.use('incomingPaymentService')
       config = await deps.use('config')
-      incomingPaymentRoutes = await deps.use('incomingPaymentRoutes')
 
       asset = randomAsset()
       expiresAt = new Date(Date.now() + 30_000)
@@ -232,7 +244,7 @@ describe('Incoming Payment Routes', (): void => {
       )
     })
 
-    test('returns the incoming payment on success', async (): Promise<void> => {
+    test.only('returns the incoming payment on success', async (): Promise<void> => {
       const ctx = setup({}, { accountId: account.id })
       await expect(incomingPaymentRoutes.create(ctx)).resolves.toBeUndefined()
       expect(ctx.response.status).toBe(201)
