@@ -1,8 +1,10 @@
+import $RefParser from '@apidevtools/json-schema-ref-parser'
 import { EventEmitter } from 'events'
 import { Server } from 'http'
 import createLogger from 'pino'
 import Knex from 'knex'
 import { Model } from 'objection'
+import { OpenAPIV3_1 } from 'openapi-types'
 import { makeWorkerUtils } from 'graphile-worker'
 import { Ioc, IocContract } from '@adonisjs/fold'
 import IORedis from 'ioredis'
@@ -120,6 +122,12 @@ export function initIocContainer(
       replica_addresses: config.tigerbeetleReplicaAddresses
     })
   })
+  container.singleton('openApi', async (deps) => {
+    const config = await deps.use('config')
+    return (await $RefParser.dereference(
+      config.openPaymentsSpec
+    )) as OpenAPIV3_1.Document
+  })
 
   /**
    * Add services to the container.
@@ -201,7 +209,8 @@ export function initIocContainer(
       config: await deps.use('config'),
       logger: await deps.use('logger'),
       incomingPaymentService: await deps.use('incomingPaymentService'),
-      streamServer: await deps.use('streamServer')
+      streamServer: await deps.use('streamServer'),
+      openApi: await deps.use('openApi')
     })
   })
   container.singleton('accountRoutes', async (deps) => {
@@ -253,7 +262,8 @@ export function initIocContainer(
     return createQuoteRoutes({
       config: await deps.use('config'),
       logger: await deps.use('logger'),
-      quoteService: await deps.use('quoteService')
+      quoteService: await deps.use('quoteService'),
+      openApi: await deps.use('openApi')
     })
   })
   container.singleton('outgoingPaymentService', async (deps) => {
@@ -269,7 +279,8 @@ export function initIocContainer(
     return createOutgoingPaymentRoutes({
       config: await deps.use('config'),
       logger: await deps.use('logger'),
-      outgoingPaymentService: await deps.use('outgoingPaymentService')
+      outgoingPaymentService: await deps.use('outgoingPaymentService'),
+      openApi: await deps.use('openApi')
     })
   })
 
