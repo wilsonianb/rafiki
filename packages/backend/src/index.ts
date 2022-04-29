@@ -1,3 +1,7 @@
+import $RefParser from '@apidevtools/json-schema-ref-parser'
+import Ajv2020 from 'ajv/dist/2020'
+import addFormats from 'ajv-formats'
+import { OpenAPIV3_1 } from 'openapi-types'
 import { EventEmitter } from 'events'
 import { Server } from 'http'
 import createLogger from 'pino'
@@ -115,6 +119,25 @@ export function initIocContainer(
       replica_addresses: config.tigerbeetleReplicaAddresses
     })
   })
+  container.singleton('ajv', async () => {
+    const ajv = new Ajv2020()
+    addFormats(ajv)
+    ajv.addFormat('uint64', (x) => {
+      try {
+        const value = BigInt(x)
+        return value > BigInt(0)
+      } catch (e) {
+        return false
+      }
+    })
+    // ajv.addSchema(spec, 'openpayments')
+    return ajv
+  })
+  container.singleton('openPaymentsSpec', async () => {
+    return (await $RefParser.dereference(
+      './open-api-spec.yaml'
+    )) as OpenAPIV3_1.Document
+  })
 
   /**
    * Add services to the container.
@@ -195,6 +218,8 @@ export function initIocContainer(
     return createIncomingPaymentRoutes({
       config: await deps.use('config'),
       logger: await deps.use('logger'),
+      ajv: await deps.use('ajv'),
+      openPaymentsSpec: await deps.use('openPaymentsSpec'),
       accountingService: await deps.use('accountingService'),
       incomingPaymentService: await deps.use('incomingPaymentService'),
       streamServer: await deps.use('streamServer')

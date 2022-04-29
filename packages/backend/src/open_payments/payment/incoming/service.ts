@@ -20,6 +20,7 @@ export const POSITIVE_SLIPPAGE = BigInt(1)
 // Second retry waits 20 (more) seconds
 // Third retry waits 30 (more) seconds, etc. up to 60 seconds
 export const RETRY_BACKOFF_MS = 10_000
+// Don't allow creating an incoming payment too far out. Incoming payments with no payments before they expire are cleaned up, since incoming payments creation is unauthenticated.
 // TODO: make expiry date configurable
 export const EXPIRY = parse('P90D') // 90 days in future
 
@@ -96,6 +97,13 @@ async function createIncomingPayment(
   }: CreateIncomingPaymentOptions,
   trx?: Transaction
 ): Promise<IncomingPayment | IncomingPaymentError> {
+  if (expiresAt && expiresAt.getTime() <= Date.now()) {
+    return IncomingPaymentError.InvalidExpiry
+  }
+  const maxExpiresAt = end(EXPIRY)
+  if (!expiresAt || maxExpiresAt.getTime() < expiresAt.getTime()) {
+    expiresAt = maxExpiresAt
+  }
   const account = await deps.accountService.get(accountId)
   if (!account) {
     return IncomingPaymentError.UnknownAccount
@@ -120,11 +128,11 @@ async function createIncomingPayment(
         accountId,
         assetId: account.asset.id,
         description,
-        expiresAt: expiresAt || end(EXPIRY),
+        expiresAt,
         incomingAmount,
         externalRef,
         state: IncomingPaymentState.Pending,
-        processAt: expiresAt ?? end(EXPIRY)
+        processAt: expiresAt
       })
       .withGraphFetched('asset')
 

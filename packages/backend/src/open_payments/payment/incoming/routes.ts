@@ -1,3 +1,4 @@
+import assert from 'assert'
 import base64url from 'base64url'
 import { StreamServer } from '@interledger/stream-receiver'
 import { Logger } from 'pino'
@@ -9,6 +10,8 @@ import { IncomingPaymentService } from './service'
 import { IncomingPayment, IncomingPaymentState } from './model'
 import { errorToCode, errorToMessage, isIncomingPaymentError } from './errors'
 import { Amount } from '../amount'
+import Ajv2020, { ValidateFunction } from 'ajv/dist/2020'
+import { OpenAPIV3_1 } from 'openapi-types'
 
 // Don't allow creating an incoming payment too far out. Incoming payments with no payments before they expire are cleaned up, since incoming payments creation is unauthenticated.
 // TODO what is a good default value for this?
@@ -17,6 +20,8 @@ export const MAX_EXPIRY = 24 * 60 * 60 * 1000 // milliseconds
 interface ServiceDependencies {
   config: IAppConfig
   logger: Logger
+  ajv: Ajv2020
+  openPaymentsSpec: OpenAPIV3_1.Document
   accountingService: AccountingService
   incomingPaymentService: IncomingPaymentService
   streamServer: StreamServer
@@ -35,9 +40,22 @@ export function createIncomingPaymentRoutes(
     service: 'IncomingPaymentRoutes'
   })
   const deps = { ...deps_, logger }
+
+  assert.ok(
+    deps.openPaymentsSpec.paths?.['/incoming-payments']?.post?.requestBody
+  )
+  const createBody = deps.openPaymentsSpec.paths['/incoming-payments'].post
+    .requestBody as OpenAPIV3_1.RequestBodyObject
+  assert.ok(createBody.content['application/json'].schema)
+
+  const validateCreate = deps.ajv.compile<CreateIncomingPaymentBody>(
+    createBody.content['application/json'].schema
+  )
+
   return {
     get: (ctx: AppContext) => getIncomingPayment(deps, ctx),
-    create: (ctx: AppContext) => createIncomingPayment(deps, ctx),
+    create: (ctx: AppContext) =>
+      createIncomingPayment(deps, ctx, validateCreate),
     update: (ctx: AppContext) => updateIncomingPayment(deps, ctx)
   }
 }
@@ -77,9 +95,23 @@ async function getIncomingPayment(
   ctx.body = body
 }
 
+export interface AmountBody {
+  value: string
+  assetCode: string
+  assetScale: number
+}
+
+export interface CreateIncomingPaymentBody {
+  description?: string
+  expiresAt?: string
+  incomingAmount?: AmountBody
+  externalRef?: string
+}
+
 async function createIncomingPayment(
   deps: ServiceDependencies,
-  ctx: AppContext
+  ctx: AppContext,
+  validate: ValidateFunction<CreateIncomingPaymentBody>
 ): Promise<void> {
   const { accountId } = ctx.params
   ctx.assert(validateId(accountId), 400, 'invalid account id')
@@ -91,33 +123,21 @@ async function createIncomingPayment(
   )
 
   const { body } = ctx.request
-  if (typeof body !== 'object') return ctx.throw(400, 'json body required')
-  let incomingAmount: Amount | undefined
-  try {
-    incomingAmount = parseAmount(body['incomingAmount'])
-  } catch (_) {
-    return ctx.throw(400, 'invalid incomingAmount')
+
+  if (!validate(body)) {
+    const error = validate.errors?.[0]
+    ctx.throw(
+      400,
+      `${error?.instancePath.slice(1).replace('/', '.')} ${error?.message}`
+    )
   }
-  let expiresAt: Date | undefined
-  if (body.expiresAt !== undefined) {
-    const expiry = Date.parse(body['expiresAt'] as string)
-    if (!expiry) return ctx.throw(400, 'invalid expiresAt')
-    if (Date.now() + MAX_EXPIRY < expiry)
-      return ctx.throw(400, 'expiry too high')
-    if (expiry < Date.now()) return ctx.throw(400, 'already expired')
-    expiresAt = new Date(expiry)
-  }
-  if (body.description !== undefined && typeof body.description !== 'string')
-    return ctx.throw(400, 'invalid description')
-  if (body.externalRef !== undefined && typeof body.externalRef !== 'string')
-    return ctx.throw(400, 'invalid externalRef')
 
   const incomingPaymentOrError = await deps.incomingPaymentService.create({
     accountId,
     description: body.description,
     externalRef: body.externalRef,
-    expiresAt,
-    incomingAmount
+    expiresAt: body.expiresAt ? new Date(body.expiresAt) : undefined,
+    incomingAmount: parseAmount(body.incomingAmount)
   })
 
   if (isIncomingPaymentError(incomingPaymentOrError)) {
@@ -223,18 +243,8 @@ function incomingPaymentToBody(
   return body
 }
 
-function parseAmount(amount: unknown): Amount | undefined {
+function parseAmount(amount: AmountBody | undefined): Amount | undefined {
   if (amount === undefined) return amount
-  if (
-    typeof amount !== 'object' ||
-    amount === null ||
-    (amount['assetCode'] && typeof amount['assetCode'] !== 'string') ||
-    (amount['assetScale'] !== undefined &&
-      typeof amount['assetScale'] !== 'number') ||
-    amount['assetScale'] < 0
-  ) {
-    throw new Error('invalid amount')
-  }
   return {
     value: BigInt(amount['value']),
     assetCode: amount['assetCode'],
