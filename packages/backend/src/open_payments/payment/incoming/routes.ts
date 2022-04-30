@@ -1,4 +1,3 @@
-import assert from 'assert'
 import base64url from 'base64url'
 import { StreamServer } from '@interledger/stream-receiver'
 import { Logger } from 'pino'
@@ -10,8 +9,8 @@ import { IncomingPaymentService } from './service'
 import { IncomingPayment, IncomingPaymentState } from './model'
 import { errorToCode, errorToMessage, isIncomingPaymentError } from './errors'
 import { Amount } from '../amount'
-import Ajv2020, { ValidateFunction } from 'ajv/dist/2020'
-import { OpenAPIV3_1 } from 'openapi-types'
+import { ValidatorService } from '../../validator'
+import { ValidateFunction } from 'ajv/dist/2020'
 
 // Don't allow creating an incoming payment too far out. Incoming payments with no payments before they expire are cleaned up, since incoming payments creation is unauthenticated.
 // TODO what is a good default value for this?
@@ -20,11 +19,10 @@ export const MAX_EXPIRY = 24 * 60 * 60 * 1000 // milliseconds
 interface ServiceDependencies {
   config: IAppConfig
   logger: Logger
-  ajv: Ajv2020
-  openPaymentsSpec: OpenAPIV3_1.Document
   accountingService: AccountingService
   incomingPaymentService: IncomingPaymentService
   streamServer: StreamServer
+  validatorService: ValidatorService
 }
 
 export interface IncomingPaymentRoutes {
@@ -41,21 +39,18 @@ export function createIncomingPaymentRoutes(
   })
   const deps = { ...deps_, logger }
 
-  assert.ok(
-    deps.openPaymentsSpec.paths?.['/incoming-payments']?.post?.requestBody
-  )
-  const createBody = deps.openPaymentsSpec.paths['/incoming-payments'].post
-    .requestBody as OpenAPIV3_1.RequestBodyObject
-  assert.ok(createBody.content['application/json'].schema)
-
-  const validateCreate = deps.ajv.compile<CreateIncomingPaymentBody>(
-    createBody.content['application/json'].schema
-  )
+  // expose this to use in app?
+  // or pass validate functions from app to routes methods?
+  const path = '/incoming-payments'
 
   return {
     get: (ctx: AppContext) => getIncomingPayment(deps, ctx),
     create: (ctx: AppContext) =>
-      createIncomingPayment(deps, ctx, validateCreate),
+      createIncomingPayment(
+        deps,
+        ctx,
+        deps.validatorService.create<CreateIncomingPaymentBody>(path, 'post')
+      ),
     update: (ctx: AppContext) => updateIncomingPayment(deps, ctx)
   }
 }
