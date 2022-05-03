@@ -4775,6 +4775,7 @@ __metadata:
     objection: ^2.2.15
     objection-db-errors: ^1.1.2
     oer-utils: ^5.1.2
+    openapi-jsonschema-parameters: ^11.0.0
     openapi-types: ^11.0.0
     pg: ^8.6.0
     pino: ^6.11.3
@@ -11545,6 +11546,15 @@ __metadata:
   version: 0.0.2
   resolution: "only@npm:0.0.2"
   checksum: d399710db867a1ef436dd3ce74499c87ece794aa81ab0370b5d153968766ee4aed2f98d3f92fc87c963e45b7a74d400d6f463ef651a5e7cfb861b15e88e9efe6
+  languageName: node
+  linkType: hard
+
+"openapi-jsonschema-parameters@npm:^11.0.0":
+  version: 11.0.0
+  resolution: "openapi-jsonschema-parameters@npm:11.0.0"
+  dependencies:
+    openapi-types: ^11.0.0
+  checksum: c73d0d91249910898e2b6ee4255cf6036414b0146fb04161dc5b97871054ba6ec622aa5a273132f588830c3011c603c19cdd145e1fc498904090fa238150ae59
   languageName: node
   linkType: hard
 

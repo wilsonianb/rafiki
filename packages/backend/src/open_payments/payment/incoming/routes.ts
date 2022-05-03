@@ -1,7 +1,7 @@
+import assert from 'assert'
 import base64url from 'base64url'
 import { StreamServer } from '@interledger/stream-receiver'
 import { Logger } from 'pino'
-import { validateId } from '../../../shared/utils'
 import { AppContext } from '../../../app'
 import { IAppConfig } from '../../../config/app'
 import { AccountingService } from '../../../accounting/service'
@@ -9,8 +9,11 @@ import { IncomingPaymentService } from './service'
 import { IncomingPayment, IncomingPaymentState } from './model'
 import { errorToCode, errorToMessage, isIncomingPaymentError } from './errors'
 import { Amount } from '../amount'
-import { ValidatorService } from '../../validator'
-import { ValidateFunction } from 'ajv/dist/2020'
+import { ValidatorService, PathValidators } from '../../validator'
+
+type Validators = PathValidators<CreateBody, UpdateBody> & {
+  update: PathValidators<CreateBody, UpdateBody>['update']
+}
 
 // Don't allow creating an incoming payment too far out. Incoming payments with no payments before they expire are cleaned up, since incoming payments creation is unauthenticated.
 // TODO what is a good default value for this?
@@ -39,34 +42,29 @@ export function createIncomingPaymentRoutes(
   })
   const deps = { ...deps_, logger }
 
-  // expose this to use in app?
-  // or pass validate functions from app to routes methods?
-  const path = '/incoming-payments'
-
+  const validators = deps.validatorService.create<CreateBody, UpdateBody>(
+    '/incoming-payments'
+  )
+  assert.ok(validators.update)
   return {
-    get: (ctx: AppContext) => getIncomingPayment(deps, ctx),
+    get: (ctx: AppContext) => getIncomingPayment(deps, ctx, validators.read),
     create: (ctx: AppContext) =>
-      createIncomingPayment(
-        deps,
-        ctx,
-        deps.validatorService.create<CreateIncomingPaymentBody>(path, 'post')
-      ),
-    update: (ctx: AppContext) => updateIncomingPayment(deps, ctx)
+      createIncomingPayment(deps, ctx, validators.create),
+    update: (ctx: AppContext) =>
+      updateIncomingPayment(deps, ctx, validators.update)
   }
 }
 
 async function getIncomingPayment(
   deps: ServiceDependencies,
-  ctx: AppContext
+  ctx: AppContext,
+  validate: Validators['read']
 ): Promise<void> {
-  const { incomingPaymentId } = ctx.params
-  ctx.assert(validateId(incomingPaymentId), 400, 'invalid id')
-  const acceptJSON = ctx.accepts('application/json')
-  ctx.assert(acceptJSON, 406, 'must accept json')
+  if (!validate(ctx)) {
+    return ctx.throw(400)
+  }
 
-  const incomingPayment = await deps.incomingPaymentService.get(
-    incomingPaymentId
-  )
+  const incomingPayment = await deps.incomingPaymentService.get(ctx.params.id)
   if (!incomingPayment) return ctx.throw(404)
 
   const amountReceived = await deps.accountingService.getTotalReceived(
@@ -96,7 +94,7 @@ export interface AmountBody {
   assetScale: number
 }
 
-export interface CreateIncomingPaymentBody {
+export interface CreateBody {
   description?: string
   expiresAt?: string
   incomingAmount?: AmountBody
@@ -106,29 +104,16 @@ export interface CreateIncomingPaymentBody {
 async function createIncomingPayment(
   deps: ServiceDependencies,
   ctx: AppContext,
-  validate: ValidateFunction<CreateIncomingPaymentBody>
+  validate: Validators['create']
 ): Promise<void> {
-  const { accountId } = ctx.params
-  ctx.assert(validateId(accountId), 400, 'invalid account id')
-  ctx.assert(ctx.accepts('application/json'), 406, 'must accept json')
-  ctx.assert(
-    ctx.get('Content-Type') === 'application/json',
-    400,
-    'must send json body'
-  )
+  if (!validate(ctx)) {
+    return ctx.throw(400)
+  }
 
   const { body } = ctx.request
 
-  if (!validate(body)) {
-    const error = validate.errors?.[0]
-    ctx.throw(
-      400,
-      `${error?.instancePath.slice(1).replace('/', '.')} ${error?.message}`
-    )
-  }
-
   const incomingPaymentOrError = await deps.incomingPaymentService.create({
-    accountId,
+    accountId: ctx.params.accountId,
     description: body.description,
     externalRef: body.externalRef,
     expiresAt: body.expiresAt ? new Date(body.expiresAt) : undefined,
@@ -153,31 +138,22 @@ async function createIncomingPayment(
   ctx.body = res
 }
 
+export interface UpdateBody {
+  state: string
+}
+
 async function updateIncomingPayment(
   deps: ServiceDependencies,
-  ctx: AppContext
+  ctx: AppContext,
+  validate: Validators['update']
 ): Promise<void> {
-  const { incomingPaymentId } = ctx.params
-  ctx.assert(validateId(incomingPaymentId), 400, 'invalid id')
-  const acceptJSON = ctx.accepts('application/json')
-  ctx.assert(acceptJSON, 406, 'must accept json')
-  ctx.assert(
-    ctx.get('Content-Type') === 'application/json',
-    400,
-    'must send json body'
-  )
-
-  const { body } = ctx.request
-  if (typeof body !== 'object') return ctx.throw(400, 'json body required')
-  if (typeof body['state'] !== 'string') return ctx.throw(400, 'invalid state')
-  const state = Object.values(IncomingPaymentState).find(
-    (name) => name.toLowerCase() === body.state
-  )
-  if (state === undefined) return ctx.throw(400, 'invalid state')
+  if (!validate || !validate(ctx)) {
+    return ctx.throw(400)
+  }
 
   const incomingPaymentOrError = await deps.incomingPaymentService.update({
-    id: incomingPaymentId,
-    state
+    id: ctx.params.id,
+    state: IncomingPaymentState.Completed
   })
 
   if (isIncomingPaymentError(incomingPaymentOrError)) {

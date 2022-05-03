@@ -264,7 +264,7 @@ export class App {
     )
 
     this.publicRouter.get(
-      '/:accountId/incoming-payments/:incomingPaymentId',
+      '/:accountId/incoming-payments/:id',
       createAuthMiddleware({
         type: AccessType.IncomingPayment,
         action: AccessAction.Read
@@ -280,7 +280,7 @@ export class App {
       incomingPaymentRoutes.create
     )
     this.publicRouter.put(
-      '/:accountId/incoming-payments/:incomingPaymentId',
+      '/:accountId/incoming-payments/:id',
       createAuthMiddleware({
         type: AccessType.IncomingPayment,
         action: AccessAction.Update
