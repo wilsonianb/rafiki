@@ -3,7 +3,7 @@ import { Logger } from 'pino'
 import Ajv2020, { ValidateFunction } from 'ajv/dist/2020'
 import addFormats from 'ajv-formats'
 import { convertParametersToJSONSchema } from 'openapi-jsonschema-parameters'
-import { OpenAPIV3, OpenAPIV3_1 } from 'openapi-types'
+import { OpenAPIV3, OpenAPIV3_1, IJsonSchema } from 'openapi-types'
 
 import { AppContext } from '../app'
 
@@ -19,11 +19,17 @@ export interface ValidatorService {
   ): PathValidators<CreateT, UpdateT>
 }
 
-export interface CollectionParams {
+interface CollectionParams {
   accountId: string
 }
 
-export interface ResourceParams extends CollectionParams {
+interface ListParams extends CollectionParams {
+  cursor?: string
+  first?: number
+  last?: number
+}
+
+interface ResourceParams extends CollectionParams {
   id: string
 }
 
@@ -132,6 +138,24 @@ const accountIdSchema = {
   }
 }
 
+function getParametersSchema(
+  parameters: OpenAPIV3_1.ParameterObject[]
+): IJsonSchema {
+  const schemas = convertParametersToJSONSchema(parameters)
+  const allOf: IJsonSchema[] = []
+  return {
+    allOf: ['path', 'query'].reduce((allOf, key) => {
+      if (schemas[key]) {
+        allOf.push({
+          type: 'object',
+          ...schemas[key]
+        })
+      }
+      return allOf
+    }, allOf)
+  }
+}
+
 function createPathValidators<CreateT, UpdateT = unknown>(
   deps: ServiceDependencies,
   path: string
@@ -139,34 +163,33 @@ function createPathValidators<CreateT, UpdateT = unknown>(
   const collectionPath = deps.spec.paths?.[path]
   assert.ok(collectionPath)
   // assert.ok(collectionPath?.parameters)
-  // const validateCollectionParams = deps.ajv.compile<CollectionParams>(convertParametersToJSONSchema(collectionPath.parameters))
-  const validateCollectionParams = deps.ajv.compile<CollectionParams>(
-    accountIdSchema
-  )
+  // const collectionParams = convertParametersToJSONSchema(collectionPath.parameters)
+  const collectionParams = accountIdSchema
 
   const createBody = collectionPath[OpenAPIV3.HttpMethods.POST]
     ?.requestBody as OpenAPIV3_1.RequestBodyObject
   assert.ok(createBody?.content['application/json'].schema)
 
+  assert.ok(collectionPath[OpenAPIV3.HttpMethods.GET]?.parameters)
+  const listParams = getParametersSchema(
+    collectionPath[OpenAPIV3.HttpMethods.GET]
+      ?.parameters as OpenAPIV3_1.ParameterObject[]
+  )
+
   const resourcePath = deps.spec.paths?.[`${path}/{id}`]
   assert.ok(resourcePath?.parameters)
-  const params = convertParametersToJSONSchema(resourcePath.parameters)
-  assert.ok(params.path)
+  const params = getParametersSchema(
+    resourcePath.parameters as OpenAPIV3_1.ParameterObject[]
+  )
 
-  const validateResourceParams = deps.ajv.compile<ResourceParams>({
-    type: 'object',
-    properties: {
-      ...params.path.properties,
-      ...params.query?.properties
-    }
-  })
+  const validateResourceParams = deps.ajv.compile<ResourceParams>(params)
 
   const updateBody = resourcePath[OpenAPIV3.HttpMethods.PUT]
     ?.requestBody as OpenAPIV3_1.RequestBodyObject
 
   return {
     create: createValidator<CreateContext<CreateT>>(
-      validateCollectionParams,
+      deps.ajv.compile<CollectionParams>(collectionParams),
       deps.ajv.compile<CreateT>(createBody.content['application/json'].schema)
     ),
     read: createValidator<ReadContext>(validateResourceParams),
@@ -176,6 +199,10 @@ function createPathValidators<CreateT, UpdateT = unknown>(
         validateResourceParams,
         deps.ajv.compile<UpdateT>(updateBody.content['application/json'].schema)
       ),
-    list: createValidator<ListContext>(validateCollectionParams)
+    list: createValidator<ListContext>(
+      deps.ajv.compile<ListParams>({
+        allOf: [collectionParams, listParams]
+      })
+    )
   }
 }
