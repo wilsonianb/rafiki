@@ -1,10 +1,8 @@
-import $RefParser from '@apidevtools/json-schema-ref-parser'
 import { EventEmitter } from 'events'
 import { Server } from 'http'
 import createLogger from 'pino'
 import Knex from 'knex'
 import { Model } from 'objection'
-import { OpenAPIV3_1 } from 'openapi-types'
 import { makeWorkerUtils } from 'graphile-worker'
 import { Ioc, IocContract } from '@adonisjs/fold'
 import IORedis from 'ioredis'
@@ -37,6 +35,7 @@ import { createWebhookService } from './webhook/service'
 import { createConnectorService } from './connector'
 import { createSessionService } from './session/service'
 import { createApiKeyService } from './apiKey/service'
+import { createOpenAPI } from './openapi'
 
 BigInt.prototype.toJSON = function () {
   return this.toString()
@@ -124,9 +123,7 @@ export function initIocContainer(
   })
   container.singleton('openApi', async (deps) => {
     const config = await deps.use('config')
-    return (await $RefParser.dereference(
-      config.openPaymentsSpec
-    )) as OpenAPIV3_1.Document
+    return await createOpenAPI(config.openPaymentsSpec)
   })
 
   /**

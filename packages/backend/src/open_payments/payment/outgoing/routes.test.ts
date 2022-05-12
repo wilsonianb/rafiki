@@ -27,7 +27,8 @@ import { createOutgoingPayment } from '../../../tests/outgoingPayment'
 import { createQuote } from '../../../tests/quote'
 import { AppContext } from '../../../app'
 import { AccountingService } from '../../../accounting/service'
-import { createResponseValidators, ResponseValidators } from '../../validator'
+import { OpenAPI, HttpMethod } from '../../../openapi'
+import { createResponseValidator } from '../../../openapi/validator'
 
 describe('Outgoing Payment Routes', (): void => {
   let deps: IocContract<AppServices>
@@ -39,7 +40,7 @@ describe('Outgoing Payment Routes', (): void => {
   let accountId: string
   let accountUrl: string
   let accountingService: AccountingService
-  let validators: ResponseValidators<OutgoingPaymentJSON>
+  let openApi: OpenAPI
 
   const messageProducer = new GraphileProducer()
   const mockMessageProducer = {
@@ -86,11 +87,7 @@ describe('Outgoing Payment Routes', (): void => {
       config = await deps.use('config')
       outgoingPaymentRoutes = await deps.use('outgoingPaymentRoutes')
       accountingService = await deps.use('accountingService')
-      const openApi = await deps.use('openApi')
-      validators = createResponseValidators<OutgoingPaymentJSON>(
-        openApi,
-        '/outgoing-payments'
-      )
+      openApi = await deps.use('openApi')
     }
   )
 
@@ -122,11 +119,30 @@ describe('Outgoing Payment Routes', (): void => {
         {
           headers: { Accept: 'application/json' }
         },
-        { id: 'not_a_uuid' }
+        {
+          id: 'not_a_uuid',
+          accountId
+        }
       )
       await expect(outgoingPaymentRoutes.get(ctx)).rejects.toHaveProperty(
         'message',
         'id must match format "uuid"'
+      )
+    })
+
+    test('returns error on invalid accountId', async (): Promise<void> => {
+      const ctx = createContext(
+        {
+          headers: { Accept: 'application/json' }
+        },
+        {
+          id: uuid(),
+          accountId: 'not_a_uuid'
+        }
+      )
+      await expect(outgoingPaymentRoutes.get(ctx)).rejects.toHaveProperty(
+        'message',
+        'accountId must match format "uuid"'
       )
     })
 
@@ -135,7 +151,10 @@ describe('Outgoing Payment Routes', (): void => {
         {
           headers: { Accept: 'test/plain' }
         },
-        { id: uuid() }
+        {
+          id: uuid(),
+          accountId
+        }
       )
       await expect(outgoingPaymentRoutes.get(ctx)).rejects.toHaveProperty(
         'status',
@@ -148,7 +167,10 @@ describe('Outgoing Payment Routes', (): void => {
         {
           headers: { Accept: 'application/json' }
         },
-        { id: uuid() }
+        {
+          id: uuid(),
+          accountId
+        }
       )
       await expect(outgoingPaymentRoutes.get(ctx)).rejects.toHaveProperty(
         'status',
@@ -168,7 +190,10 @@ describe('Outgoing Payment Routes', (): void => {
         {
           headers: { Accept: 'application/json' }
         },
-        { id: outgoingPayment.id }
+        {
+          id: outgoingPayment.id,
+          accountId
+        }
       )
       await expect(outgoingPaymentRoutes.get(ctx)).rejects.toMatchObject({
         status: 500,
@@ -186,10 +211,17 @@ describe('Outgoing Payment Routes', (): void => {
         {
           headers: { Accept: 'application/json' }
         },
-        { id: outgoingPayment.id }
+        {
+          id: outgoingPayment.id,
+          accountId
+        }
       )
       await expect(outgoingPaymentRoutes.get(ctx)).resolves.toBeUndefined()
-      assert.ok(validators.read(ctx))
+      const validate = createResponseValidator<OutgoingPaymentJSON>({
+        path: openApi.paths[outgoingPaymentRoutes.resourcePath],
+        method: HttpMethod.GET
+      })
+      assert.ok(validate(ctx))
 
       expect(ctx.body).toEqual({
         id: `${accountUrl}/outgoing-payments/${outgoingPayment.id}`,
@@ -230,7 +262,11 @@ describe('Outgoing Payment Routes', (): void => {
           { id: outgoingPayment.id }
         )
         await expect(outgoingPaymentRoutes.get(ctx)).resolves.toBeUndefined()
-        assert.ok(validators.read(ctx))
+        const validate = createResponseValidator<OutgoingPaymentJSON>({
+          path: openApi.paths[outgoingPaymentRoutes.resourcePath],
+          method: HttpMethod.GET
+        })
+        assert.ok(validate(ctx))
         expect(ctx.body).toEqual({
           id: `${accountUrl}/outgoing-payments/${outgoingPayment.id}`,
           accountId: accountUrl,
@@ -348,7 +384,11 @@ describe('Outgoing Payment Routes', (): void => {
         }
         const ctx = setup({})
         await expect(outgoingPaymentRoutes.create(ctx)).resolves.toBeUndefined()
-        assert.ok(validators.create(ctx))
+        const validate = createResponseValidator<OutgoingPaymentJSON>({
+          path: openApi.paths[outgoingPaymentRoutes.collectionPath],
+          method: HttpMethod.POST
+        })
+        assert.ok(validate(ctx))
         const outgoingPaymentId = ctx.response.body.id.split('/').pop()
         expect(ctx.response.body).toEqual({
           id: `${accountUrl}/outgoing-payments/${outgoingPaymentId}`,

@@ -1,6 +1,5 @@
 import assert from 'assert'
 import base64url from 'base64url'
-import { OpenAPIV3_1 } from 'openapi-types'
 import { StreamServer } from '@interledger/stream-receiver'
 import { Logger } from 'pino'
 import { AppContext } from '../../../app'
@@ -14,28 +13,36 @@ import {
   isIncomingPaymentError
 } from './errors'
 import { AmountJSON, parseAmount } from '../../amount'
-import { createRequestValidators, RequestValidators } from '../../validator'
+import { OpenAPI, HttpMethod } from '../../../openapi'
+import {
+  createRequestValidator,
+  ReadContext,
+  CreateContext,
+  UpdateContext,
+  RequestValidator
+} from '../../../openapi/validator'
 
 // Don't allow creating an incoming payment too far out. Incoming payments with no payments before they expire are cleaned up, since incoming payments creation is unauthenticated.
 // TODO what is a good default value for this?
 export const MAX_EXPIRY = 24 * 60 * 60 * 1000 // milliseconds
 
-type Validators = RequestValidators<CreateBody, UpdateBody> & {
-  update: RequestValidators<CreateBody, UpdateBody>['update']
-}
+const COLLECTION_PATH = '/{accountId}/incoming-payments'
+const RESOURCE_PATH = `${COLLECTION_PATH}/{id}`
 
 interface ServiceDependencies {
   config: IAppConfig
   logger: Logger
   incomingPaymentService: IncomingPaymentService
   streamServer: StreamServer
-  openApi: OpenAPIV3_1.Document
+  openApi: OpenAPI
 }
 
 export interface IncomingPaymentRoutes {
   get(ctx: AppContext): Promise<void>
   create(ctx: AppContext): Promise<void>
   update(ctx: AppContext): Promise<void>
+  collectionPath: string
+  resourcePath: string
 }
 
 export function createIncomingPaymentRoutes(
@@ -45,25 +52,45 @@ export function createIncomingPaymentRoutes(
     service: 'IncomingPaymentRoutes'
   })
   const deps = { ...deps_, logger }
-
-  const validators = createRequestValidators<CreateBody, UpdateBody>(
-    deps.openApi,
-    '/incoming-payments'
-  )
-  assert.ok(validators.update)
+  assert.ok(deps.openApi.hasPath(RESOURCE_PATH))
+  assert.ok(deps.openApi.hasPath(COLLECTION_PATH))
   return {
-    get: (ctx: AppContext) => getIncomingPayment(deps, ctx, validators.read),
+    get: (ctx: AppContext) =>
+      getIncomingPayment(
+        deps,
+        ctx,
+        createRequestValidator<ReadContext>({
+          path: deps.openApi.paths[RESOURCE_PATH],
+          method: HttpMethod.GET
+        })
+      ),
     create: (ctx: AppContext) =>
-      createIncomingPayment(deps, ctx, validators.create),
+      createIncomingPayment(
+        deps,
+        ctx,
+        createRequestValidator<CreateContext<CreateBody>>({
+          path: deps.openApi.paths[COLLECTION_PATH],
+          method: HttpMethod.POST
+        })
+      ),
     update: (ctx: AppContext) =>
-      updateIncomingPayment(deps, ctx, validators.update)
+      updateIncomingPayment(
+        deps,
+        ctx,
+        createRequestValidator<UpdateContext<UpdateBody>>({
+          path: deps.openApi.paths[RESOURCE_PATH],
+          method: HttpMethod.PUT
+        })
+      ),
+    collectionPath: COLLECTION_PATH,
+    resourcePath: RESOURCE_PATH
   }
 }
 
 async function getIncomingPayment(
   deps: ServiceDependencies,
   ctx: AppContext,
-  validate: Validators['read']
+  validate: RequestValidator<ReadContext>
 ): Promise<void> {
   if (!validate(ctx)) {
     return ctx.throw(400)
@@ -97,7 +124,7 @@ export interface CreateBody {
 async function createIncomingPayment(
   deps: ServiceDependencies,
   ctx: AppContext,
-  validate: Validators['create']
+  validate: RequestValidator<CreateContext<CreateBody>>
 ): Promise<void> {
   if (!validate(ctx)) {
     return ctx.throw(400)
@@ -145,9 +172,9 @@ export interface UpdateBody {
 async function updateIncomingPayment(
   deps: ServiceDependencies,
   ctx: AppContext,
-  validate: Validators['update']
+  validate: RequestValidator<UpdateContext<UpdateBody>>
 ): Promise<void> {
-  if (!validate || !validate(ctx)) {
+  if (!validate(ctx)) {
     return ctx.throw(400)
   }
 

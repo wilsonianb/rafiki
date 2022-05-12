@@ -20,7 +20,8 @@ import { Amount } from '../amount'
 import { randomAsset } from '../../tests/asset'
 import { createQuote } from '../../tests/quote'
 import { AppContext } from '../../app'
-import { createResponseValidators, ResponseValidators } from '../validator'
+import { OpenAPI, HttpMethod } from '../../openapi'
+import { createResponseValidator } from '../../openapi/validator'
 
 describe('Quote Routes', (): void => {
   let deps: IocContract<AppServices>
@@ -32,7 +33,7 @@ describe('Quote Routes', (): void => {
   let quoteRoutes: QuoteRoutes
   let accountId: string
   let accountUrl: string
-  let validators: ResponseValidators<QuoteJSON>
+  let openApi: OpenAPI
 
   const messageProducer = new GraphileProducer()
   const mockMessageProducer = {
@@ -76,10 +77,7 @@ describe('Quote Routes', (): void => {
       config = await deps.use('config')
       quoteRoutes = await deps.use('quoteRoutes')
       quoteService = await deps.use('quoteService')
-      validators = createResponseValidators<QuoteJSON>(
-        await deps.use('openApi'),
-        '/quotes'
-      )
+      openApi = await deps.use('openApi')
     }
   )
 
@@ -118,11 +116,30 @@ describe('Quote Routes', (): void => {
         {
           headers: { Accept: 'application/json' }
         },
-        { id: 'not_a_uuid' }
+        {
+          id: 'not_a_uuid',
+          accountId
+        }
       )
       await expect(quoteRoutes.get(ctx)).rejects.toHaveProperty(
         'message',
         'id must match format "uuid"'
+      )
+    })
+
+    test('returns error on invalid accountId', async (): Promise<void> => {
+      const ctx = createContext(
+        {
+          headers: { Accept: 'application/json' }
+        },
+        {
+          id: uuid(),
+          accountId: 'not_a_uuid'
+        }
+      )
+      await expect(quoteRoutes.get(ctx)).rejects.toHaveProperty(
+        'message',
+        'accountId must match format "uuid"'
       )
     })
 
@@ -131,7 +148,10 @@ describe('Quote Routes', (): void => {
         {
           headers: { Accept: 'test/plain' }
         },
-        { id: uuid() }
+        {
+          id: uuid(),
+          accountId
+        }
       )
       await expect(quoteRoutes.get(ctx)).rejects.toHaveProperty('status', 406)
     })
@@ -141,7 +161,10 @@ describe('Quote Routes', (): void => {
         {
           headers: { Accept: 'application/json' }
         },
-        { id: uuid() }
+        {
+          id: uuid(),
+          accountId
+        }
       )
       await expect(quoteRoutes.get(ctx)).rejects.toHaveProperty('status', 404)
     })
@@ -152,9 +175,17 @@ describe('Quote Routes', (): void => {
         {
           headers: { Accept: 'application/json' }
         },
-        { id: quote.id }
+        {
+          id: quote.id,
+          accountId
+        }
       )
       await expect(quoteRoutes.get(ctx)).resolves.toBeUndefined()
+      const validate = createResponseValidator<QuoteJSON>({
+        path: openApi.paths[quoteRoutes.resourcePath],
+        method: HttpMethod.GET
+      })
+      assert.ok(validate(ctx))
 
       expect(ctx.body).toEqual({
         id: `${accountUrl}/quotes/${quote.id}`,
@@ -365,7 +396,11 @@ describe('Quote Routes', (): void => {
                 value: BigInt(options.receiveAmount.value)
               }
             })
-            assert.ok(validators.create(ctx))
+            const validate = createResponseValidator<QuoteJSON>({
+              path: openApi.paths[quoteRoutes.collectionPath],
+              method: HttpMethod.POST
+            })
+            assert.ok(validate(ctx))
             const quoteId = ctx.response.body.id.split('/').pop()
             assert.ok(quote)
             expect(ctx.response.body).toEqual({
@@ -408,7 +443,11 @@ describe('Quote Routes', (): void => {
               accountId,
               receivingPayment
             })
-            assert.ok(validators.create(ctx))
+            const validate = createResponseValidator<QuoteJSON>({
+              path: openApi.paths[quoteRoutes.collectionPath],
+              method: HttpMethod.POST
+            })
+            assert.ok(validate(ctx))
             const quoteId = ctx.response.body.id.split('/').pop()
             assert.ok(quote)
             expect(ctx.response.body).toEqual({

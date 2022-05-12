@@ -1,24 +1,33 @@
+import assert from 'assert'
 import { Logger } from 'pino'
-import { OpenAPIV3_1 } from 'openapi-types'
 import { AppContext } from '../../../app'
 import { IAppConfig } from '../../../config/app'
 import { OutgoingPaymentService } from './service'
 import { isOutgoingPaymentError, errorToCode, errorToMessage } from './errors'
 import { OutgoingPayment, OutgoingPaymentState } from './model'
-import { createRequestValidators, RequestValidators } from '../../validator'
+import { OpenAPI, HttpMethod } from '../../../openapi'
+import {
+  createRequestValidator,
+  ReadContext,
+  CreateContext,
+  RequestValidator
+} from '../../../openapi/validator'
 
-type Validators = RequestValidators<CreateBody>
+const COLLECTION_PATH = '/{accountId}/outgoing-payments'
+const RESOURCE_PATH = `${COLLECTION_PATH}/{id}`
 
 interface ServiceDependencies {
   config: IAppConfig
   logger: Logger
   outgoingPaymentService: OutgoingPaymentService
-  openApi: OpenAPIV3_1.Document
+  openApi: OpenAPI
 }
 
 export interface OutgoingPaymentRoutes {
   get(ctx: AppContext): Promise<void>
   create(ctx: AppContext): Promise<void>
+  collectionPath: string
+  resourcePath: string
 }
 
 export function createOutgoingPaymentRoutes(
@@ -28,21 +37,36 @@ export function createOutgoingPaymentRoutes(
     service: 'OutgoingPaymentRoutes'
   })
   const deps = { ...deps_, logger }
-  const validators = createRequestValidators<CreateBody>(
-    deps.openApi,
-    '/outgoing-payments'
-  )
+  assert.ok(deps.openApi.hasPath(RESOURCE_PATH))
+  assert.ok(deps.openApi.hasPath(COLLECTION_PATH))
   return {
-    get: (ctx: AppContext) => getOutgoingPayment(deps, ctx, validators.read),
+    get: (ctx: AppContext) =>
+      getOutgoingPayment(
+        deps,
+        ctx,
+        createRequestValidator<ReadContext>({
+          path: deps.openApi.paths[RESOURCE_PATH],
+          method: HttpMethod.GET
+        })
+      ),
     create: (ctx: AppContext) =>
-      createOutgoingPayment(deps, ctx, validators.create)
+      createOutgoingPayment(
+        deps,
+        ctx,
+        createRequestValidator<CreateContext<CreateBody>>({
+          path: deps.openApi.paths[COLLECTION_PATH],
+          method: HttpMethod.POST
+        })
+      ),
+    collectionPath: COLLECTION_PATH,
+    resourcePath: RESOURCE_PATH
   }
 }
 
 async function getOutgoingPayment(
   deps: ServiceDependencies,
   ctx: AppContext,
-  validate: Validators['read']
+  validate: RequestValidator<ReadContext>
 ): Promise<void> {
   if (!validate(ctx)) {
     return ctx.throw(400)
@@ -69,7 +93,7 @@ export interface CreateBody {
 async function createOutgoingPayment(
   deps: ServiceDependencies,
   ctx: AppContext,
-  validate: Validators['create']
+  validate: RequestValidator<CreateContext<CreateBody>>
 ): Promise<void> {
   if (!validate(ctx)) {
     return ctx.throw(400)

@@ -26,11 +26,8 @@ import { IncomingPaymentRoutes, MAX_EXPIRY } from './routes'
 import { AppContext } from '../../../app'
 import { isIncomingPaymentError } from './errors'
 import { AccountingService } from '../../../accounting/service'
-import { createResponseValidators, ResponseValidators } from '../../validator'
-
-type Validators = ResponseValidators<IncomingPaymentJSON> & {
-  update: ResponseValidators<IncomingPaymentJSON>['update']
-}
+import { OpenAPI, HttpMethod } from '../../../openapi'
+import { createResponseValidator } from '../../../openapi/validator'
 
 describe('Incoming Payment Routes', (): void => {
   let deps: IocContract<AppServices>
@@ -42,7 +39,7 @@ describe('Incoming Payment Routes', (): void => {
   let incomingPaymentService: IncomingPaymentService
   let config: IAppConfig
   let incomingPaymentRoutes: IncomingPaymentRoutes
-  let validators: Validators
+  let openApi: OpenAPI
   const messageProducer = new GraphileProducer()
   const mockMessageProducer = {
     send: jest.fn()
@@ -82,12 +79,7 @@ describe('Incoming Payment Routes', (): void => {
       messageProducer.setUtils(workerUtils)
       knex = await deps.use('knex')
       accountingService = await deps.use('accountingService')
-      const openApi = await deps.use('openApi')
-      validators = createResponseValidators<IncomingPaymentJSON>(
-        openApi,
-        '/incoming-payments'
-      ) as Validators
-      assert.ok(validators['update'])
+      openApi = await deps.use('openApi')
     }
   )
 
@@ -143,14 +135,18 @@ describe('Incoming Payment Routes', (): void => {
 
   describe('get', (): void => {
     test.each`
-      id              | headers                     | status | message                          | description
-      ${'not_a_uuid'} | ${null}                     | ${400} | ${'id must match format "uuid"'} | ${'invalid incoming payment id'}
-      ${null}         | ${{ Accept: 'text/plain' }} | ${406} | ${'must accept json'}            | ${'invalid Accept header'}
-      ${uuid()}       | ${null}                     | ${404} | ${'Not Found'}                   | ${'unknown incoming payment'}
+      id              | accountId       | headers                     | status | message                                 | description
+      ${'not_a_uuid'} | ${null}         | ${null}                     | ${400} | ${'id must match format "uuid"'}        | ${'invalid incoming payment id'}
+      ${uuid()}       | ${'not_a_uuid'} | ${null}                     | ${400} | ${'accountId must match format "uuid"'} | ${'invalid accountId id'}
+      ${null}         | ${null}         | ${{ Accept: 'text/plain' }} | ${406} | ${'must accept json'}                   | ${'invalid Accept header'}
+      ${uuid()}       | ${null}         | ${null}                     | ${404} | ${'Not Found'}                          | ${'unknown incoming payment'}
     `(
       'returns $status on $description',
-      async ({ id, headers, status, message }): Promise<void> => {
-        const params = id ? { id } : { id: incomingPayment.id }
+      async ({ id, accountId, headers, status, message }): Promise<void> => {
+        const params = {
+          id: id ?? incomingPayment.id,
+          accountId: accountId ?? account.id
+        }
         const ctx = setup({ headers }, params)
         await expect(incomingPaymentRoutes.get(ctx)).rejects.toMatchObject({
           status,
@@ -164,10 +160,17 @@ describe('Incoming Payment Routes', (): void => {
         {
           headers: { Accept: 'application/json' }
         },
-        { id: incomingPayment.id }
+        {
+          id: incomingPayment.id,
+          accountId: account.id
+        }
       )
       await expect(incomingPaymentRoutes.get(ctx)).resolves.toBeUndefined()
-      assert.ok(validators.read(ctx))
+      const validate = createResponseValidator<IncomingPaymentJSON>({
+        path: openApi.paths[incomingPaymentRoutes.resourcePath],
+        method: HttpMethod.GET
+      })
+      assert.ok(validate(ctx))
 
       const sharedSecret = ctx.response.body.sharedSecret
 
@@ -206,7 +209,10 @@ describe('Incoming Payment Routes', (): void => {
         {
           headers: { Accept: 'application/json' }
         },
-        { id: incomingPayment.id }
+        {
+          id: incomingPayment.id,
+          accountId: account.id
+        }
       )
       await expect(incomingPaymentRoutes.get(ctx)).rejects.toMatchObject({
         status: 500,
@@ -276,7 +282,11 @@ describe('Incoming Payment Routes', (): void => {
           { accountId: account.id }
         )
         await expect(incomingPaymentRoutes.create(ctx)).resolves.toBeUndefined()
-        assert.ok(validators.create(ctx))
+        const validate = createResponseValidator<IncomingPaymentJSON>({
+          path: openApi.paths[incomingPaymentRoutes.collectionPath],
+          method: HttpMethod.POST
+        })
+        assert.ok(validate(ctx))
         const incomingPaymentId = (ctx.response.body['id'] as string)
           .split('/')
           .pop()
@@ -306,18 +316,29 @@ describe('Incoming Payment Routes', (): void => {
 
   describe('update', (): void => {
     test.each`
-      id              | headers                             | body                      | status | message                                               | description
-      ${'not_a_uuid'} | ${null}                             | ${{ state: 'completed' }} | ${400} | ${'id must match format "uuid"'}                      | ${'invalid incoming payment id'}
-      ${null}         | ${{ Accept: 'text/plain' }}         | ${{ state: 'completed' }} | ${406} | ${'must accept json'}                                 | ${'invalid Accept header'}
-      ${null}         | ${{ 'Content-Type': 'text/plain' }} | ${{ state: 'completed' }} | ${400} | ${'must send json body'}                              | ${'invalid Content-Type header'}
-      ${null}         | ${null}                             | ${{ state: 123 }}         | ${400} | ${'state must be string'}                             | ${'invalid state type'}
-      ${null}         | ${null}                             | ${{ state: 'foo' }}       | ${400} | ${'state must be equal to one of the allowed values'} | ${'invalid state value'}
-      ${null}         | ${null}                             | ${{ state: 'expired' }}   | ${400} | ${'state must be equal to one of the allowed values'} | ${'invalid state'}
-      ${uuid()}       | ${null}                             | ${{ state: 'completed' }} | ${404} | ${'unknown payment'}                                  | ${'unknown incoming payment'}
+      id              | accountId       | headers                             | body                      | status | message                                               | description
+      ${'not_a_uuid'} | ${null}         | ${null}                             | ${{ state: 'completed' }} | ${400} | ${'id must match format "uuid"'}                      | ${'invalid incoming payment id'}
+      ${null}         | ${'not_a_uuid'} | ${null}                             | ${{ state: 'completed' }} | ${400} | ${'accountId must match format "uuid"'}               | ${'invalid incoming payment id'}
+      ${null}         | ${null}         | ${{ Accept: 'text/plain' }}         | ${{ state: 'completed' }} | ${406} | ${'must accept json'}                                 | ${'invalid Accept header'}
+      ${null}         | ${null}         | ${{ 'Content-Type': 'text/plain' }} | ${{ state: 'completed' }} | ${400} | ${'must send json body'}                              | ${'invalid Content-Type header'}
+      ${null}         | ${null}         | ${null}                             | ${{ state: 123 }}         | ${400} | ${'state must be string'}                             | ${'invalid state type'}
+      ${null}         | ${null}         | ${null}                             | ${{ state: 'foo' }}       | ${400} | ${'state must be equal to one of the allowed values'} | ${'invalid state value'}
+      ${null}         | ${null}         | ${null}                             | ${{ state: 'expired' }}   | ${400} | ${'state must be equal to one of the allowed values'} | ${'invalid state'}
+      ${uuid()}       | ${null}         | ${null}                             | ${{ state: 'completed' }} | ${404} | ${'unknown payment'}                                  | ${'unknown incoming payment'}
     `(
       'returns $status on $description',
-      async ({ id, headers, body, status, message }): Promise<void> => {
-        const params = id ? { id: id } : { id: incomingPayment.id }
+      async ({
+        id,
+        accountId,
+        headers,
+        body,
+        status,
+        message
+      }): Promise<void> => {
+        const params = {
+          id: id ?? incomingPayment.id,
+          accountId: accountId ?? account.id
+        }
         const ctx = setup({ headers, body }, params)
         await expect(incomingPaymentRoutes.update(ctx)).rejects.toMatchObject({
           status,
@@ -332,10 +353,17 @@ describe('Incoming Payment Routes', (): void => {
           headers: { Accept: 'application/json' },
           body: { state: 'completed' }
         },
-        { id: incomingPayment.id }
+        {
+          id: incomingPayment.id,
+          accountId: account.id
+        }
       )
       await expect(incomingPaymentRoutes.update(ctx)).resolves.toBeUndefined()
-      assert.ok(validators.update && validators.update(ctx))
+      const validate = createResponseValidator<IncomingPaymentJSON>({
+        path: openApi.paths[incomingPaymentRoutes.resourcePath],
+        method: HttpMethod.PUT
+      })
+      assert.ok(validate(ctx))
       expect(ctx.body).toEqual({
         id: `${accountId}/incoming-payments/${incomingPayment.id}`,
         accountId,
