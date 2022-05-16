@@ -1373,6 +1373,22 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@cspotcode/source-map-consumer@npm:0.8.0":
+  version: 0.8.0
+  resolution: "@cspotcode/source-map-consumer@npm:0.8.0"
+  checksum: c0c16ca3d2f58898f1bd74c4f41a189dbcc202e642e60e489cbcc2e52419c4e89bdead02c886a12fb13ea37798ede9e562b2321df997ebc210ae9bd881561b4e
+  languageName: node
+  linkType: hard
+
+"@cspotcode/source-map-support@npm:0.7.0":
+  version: 0.7.0
+  resolution: "@cspotcode/source-map-support@npm:0.7.0"
+  dependencies:
+    "@cspotcode/source-map-consumer": 0.8.0
+  checksum: 9faddda7757cd778b5fd6812137b2cc265810043680d6399acc20441668fafcdc874053be9dccd0d9110087287bfad27eb3bf342f72bceca9aa9059f5d0c4be8
+  languageName: node
+  linkType: hard
+
 "@endemolshinegroup/cosmiconfig-typescript-loader@npm:3.0.2":
   version: 3.0.2
   resolution: "@endemolshinegroup/cosmiconfig-typescript-loader@npm:3.0.2"
@@ -2561,6 +2577,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@shopify/jest-koa-mocks@npm:^3.1.5":
+  version: 3.1.5
+  resolution: "@shopify/jest-koa-mocks@npm:3.1.5"
+  dependencies:
+    koa: ^2.13.4
+    node-mocks-http: ^1.5.8
+  checksum: cdd796a7f74f381cf97b431dfb02c62552d7ae7f7567916939e4f33170021e46b1e7aaca948372a8ea01dfa199a03470c39e5c870c8dd487e93bcb6700ea0ca6
+  languageName: node
+  linkType: hard
+
 "@sindresorhus/is@npm:^0.14.0":
   version: 0.14.0
   resolution: "@sindresorhus/is@npm:0.14.0"
@@ -2593,6 +2619,46 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@smartlyio/oats-runtime@npm:^4.3.2":
+  version: 4.3.2
+  resolution: "@smartlyio/oats-runtime@npm:4.3.2"
+  dependencies:
+    "@smartlyio/safe-navigation": ^5.0.1
+    "@types/encodeurl": 1.0.0
+    "@types/escape-html": 1.0.1
+    encodeurl: 1.0.2
+    escape-html: 1.0.3
+    lodash: ^4.17.20
+  peerDependencies:
+    typescript: ^4.0.0
+  checksum: c1f42eba06fb81da74640f79a1b2f4fe87088fc9b93b5786376f9ee445e6609351c2b3786897c47bf537f04f488f0a5bde0fef2e736adc5c72145143e9a452ed
+  languageName: node
+  linkType: hard
+
+"@smartlyio/oats@npm:^4.3.2":
+  version: 4.3.2
+  resolution: "@smartlyio/oats@npm:4.3.2"
+  dependencies:
+    "@smartlyio/safe-navigation": ^5.0.1
+    js-yaml: ^4.0.0
+    lodash: ^4.17.20
+    openapi3-ts: ^2.0.0
+  peerDependencies:
+    "@smartlyio/oats-runtime": ^4.3.1
+    typescript: ^4.0.0
+  checksum: e2c4bb4fd58bfa74061fd42ddf77f1168de6077cc20dc28d024396c1c94c6e1285b054477c4b01123beb8002bf189f9d55fb35c464316668d31a978c4fb674b0
+  languageName: node
+  linkType: hard
+
+"@smartlyio/safe-navigation@npm:^5.0.1":
+  version: 5.0.2
+  resolution: "@smartlyio/safe-navigation@npm:5.0.2"
+  dependencies:
+    lodash: ^4.17.19
+  checksum: fb3c44c0943cd52161d5d38fa0be722ec90d60ee5a8a309faf352593ba25695bce762fb7546ef422edc6fec3fae30e7338b7cbda812b319c020f8eacc1de5439
+  languageName: node
+  linkType: hard
+
 "@szmarczak/http-timer@npm:^1.1.2":
   version: 1.1.2
   resolution: "@szmarczak/http-timer@npm:1.1.2"
@@ -2615,6 +2681,34 @@ __metadata:
   version: 1.1.2
   resolution: "@tootallnate/once@npm:1.1.2"
   checksum: e1fb1bbbc12089a0cb9433dc290f97bddd062deadb6178ce9bcb93bb7c1aecde5e60184bc7065aec42fe1663622a213493c48bbd4972d931aae48315f18e1be9
+  languageName: node
+  linkType: hard
+
+"@tsconfig/node10@npm:^1.0.7":
+  version: 1.0.8
+  resolution: "@tsconfig/node10@npm:1.0.8"
+  checksum: b8d5fffbc6b17ef64ef74f7fdbccee02a809a063ade785c3648dae59406bc207f70ea2c4296f92749b33019fa36a5ae716e42e49cc7f1bbf0fd147be0d6b970a
+  languageName: node
+  linkType: hard
+
+"@tsconfig/node12@npm:^1.0.7":
+  version: 1.0.9
+  resolution: "@tsconfig/node12@npm:1.0.9"
+  checksum: a01b2400ab3582b86b589c6d31dcd0c0656f333adecde85d6d7d4086adb059808b82692380bb169546d189bf771ae21d02544a75b57bd6da4a5dd95f8567bec9
+  languageName: node
+  linkType: hard
+
+"@tsconfig/node14@npm:^1.0.0":
+  version: 1.0.1
+  resolution: "@tsconfig/node14@npm:1.0.1"
+  checksum: 976345e896c0f059867f94f8d0f6ddb8b1844fb62bf36b727de8a9a68f024857e5db97ed51d3325e23e0616a5e48c034ff51a8d595b3fe7e955f3587540489be
+  languageName: node
+  linkType: hard
+
+"@tsconfig/node16@npm:^1.0.2":
+  version: 1.0.2
+  resolution: "@tsconfig/node16@npm:1.0.2"
+  checksum: ca94d3639714672bbfd55f03521d3f56bb6a25479bd425da81faf21f13e1e9d15f40f97377dedbbf477a5841c5b0c8f4cd1b391f33553d750b9202c54c2c07aa
   languageName: node
   linkType: hard
 
@@ -2803,6 +2897,20 @@ __metadata:
     "@types/docker-modem": "*"
     "@types/node": "*"
   checksum: 3eebbe2c3e5c067c06ece6f67b8ff8beb8598b8f68ed34509cc6d0f4447705229b7cc20e95b6f64e42e26bc183da8ba186955d289f27d4fc3439f0c44fada93b
+  languageName: node
+  linkType: hard
+
+"@types/encodeurl@npm:1.0.0":
+  version: 1.0.0
+  resolution: "@types/encodeurl@npm:1.0.0"
+  checksum: cb2a08361e0cd57050f5710aa5c50c98904679d32992b3490b88e842fe7e335e8a72c92eb15c41f986cee724c0aa1fa2b55ec126b99bf4bf0560e252ffe30bfa
+  languageName: node
+  linkType: hard
+
+"@types/escape-html@npm:1.0.1":
+  version: 1.0.1
+  resolution: "@types/escape-html@npm:1.0.1"
+  checksum: 141d6e44dd514b0bf8a1c5e7730d6b9fa291bb11a52bcc3434d269252b10622f52bd7458553efc2c95ca8341bafab836fe696f8fe72f82c5809204239b8ba791
   languageName: node
   linkType: hard
 
@@ -3729,6 +3837,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"acorn-walk@npm:^8.1.1":
+  version: 8.2.0
+  resolution: "acorn-walk@npm:8.2.0"
+  checksum: 1715e76c01dd7b2d4ca472f9c58968516a4899378a63ad5b6c2d668bba8da21a71976c14ec5f5b75f887b6317c4ae0b897ab141c831d741dc76024d8745f1ad1
+  languageName: node
+  linkType: hard
+
 "acorn@npm:^7.1.1, acorn@npm:^7.4.0":
   version: 7.4.1
   resolution: "acorn@npm:7.4.1"
@@ -3744,6 +3859,15 @@ __metadata:
   bin:
     acorn: bin/acorn
   checksum: 8e33848192989aec641e1d8945372791da093ccc60a4fa985ef18a1561dda2bb5e063791aa2ca26ae31e3efcf47da007717b19998ebac7f20670c8af859b4d82
+  languageName: node
+  linkType: hard
+
+"acorn@npm:^8.4.1":
+  version: 8.7.1
+  resolution: "acorn@npm:8.7.1"
+  bin:
+    acorn: bin/acorn
+  checksum: aca0aabf98826717920ac2583fdcad0a6fbe4e583fdb6e843af2594e907455aeafe30b1e14f1757cd83ce1776773cf8296ffc3a4acf13f0bd3dfebcf1db6ae80
   languageName: node
   linkType: hard
 
@@ -4836,6 +4960,9 @@ __metadata:
     "@interledger/stream-receiver": ^0.2.2
     "@koa/cors": ^3.1.0
     "@koa/router": ^10.0.0
+    "@shopify/jest-koa-mocks": ^3.1.5
+    "@smartlyio/oats": ^4.3.2
+    "@smartlyio/oats-runtime": ^4.3.2
     "@types/bcrypt": ^5.0.0
     "@types/ioredis": ^4.22.3
     "@types/jest": ^26.0.22
@@ -4882,6 +5009,7 @@ __metadata:
     objection: ^2.2.15
     objection-db-errors: ^1.1.2
     oer-utils: ^5.1.2
+    openapi-enforcer: ^1.19.0
     openapi-jsonschema-parameters: ^11.0.0
     openapi-types: ^11.0.0
     pg: ^8.6.0
@@ -4892,6 +5020,7 @@ __metadata:
     testcontainers: ^7.20.4
     tigerbeetle-node: ^0.6.0
     tmp: ^0.2.1
+    ts-node: ^10.7.0
     typescript: ^4.2.4
     uuid: ^8.3.2
   languageName: unknown
@@ -6625,6 +6754,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"drange@npm:^1.0.2":
+  version: 1.1.1
+  resolution: "drange@npm:1.1.1"
+  checksum: 7e6ed639f9ab4d826e79717e2b0685a7ab02ecd39dac6483305dcc43ea2a27dc78b538e10adaba35c086efab216ef1f53f22bc402abfd0d29454b1c5f48fecd1
+  languageName: node
+  linkType: hard
+
 "duplexer3@npm:^0.1.4":
   version: 0.1.4
   resolution: "duplexer3@npm:0.1.4"
@@ -6714,7 +6850,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"encodeurl@npm:^1.0.2, encodeurl@npm:~1.0.2":
+"encodeurl@npm:1.0.2, encodeurl@npm:^1.0.2, encodeurl@npm:~1.0.2":
   version: 1.0.2
   resolution: "encodeurl@npm:1.0.2"
   checksum: e50e3d508cdd9c4565ba72d2012e65038e5d71bdc9198cb125beb6237b5b1ade6c0d343998da9e170fb2eae52c1bed37d4d6d98a46ea423a0cddbed5ac3f780c
@@ -6813,7 +6949,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"escape-html@npm:^1.0.3, escape-html@npm:~1.0.3":
+"escape-html@npm:1.0.3, escape-html@npm:^1.0.3, escape-html@npm:~1.0.3":
   version: 1.0.3
   resolution: "escape-html@npm:1.0.3"
   checksum: 6213ca9ae00d0ab8bccb6d8d4e0a98e76237b2410302cf7df70aaa6591d509a2a37ce8998008cbecae8fc8ffaadf3fb0229535e6a145f3ce0b211d060decbb24
@@ -11425,7 +11561,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"node-mocks-http@npm:^1.11.0":
+"node-mocks-http@npm:^1.11.0, node-mocks-http@npm:^1.5.8":
   version: 1.11.0
   resolution: "node-mocks-http@npm:1.11.0"
   dependencies:
@@ -11808,6 +11944,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"openapi-enforcer@npm:^1.19.0":
+  version: 1.19.0
+  resolution: "openapi-enforcer@npm:1.19.0"
+  dependencies:
+    js-yaml: ^4.1.0
+    randexp: ^0.5.3
+  checksum: 0abd0379f03edfe4e87870c69d18c93bd06bc8ff006f5a46b66d17403468897b2aa564e676782484bbad74f2a91c8c9515121d03d254f812af1895d205d5d7f4
+  languageName: node
+  linkType: hard
+
 "openapi-jsonschema-parameters@npm:^11.0.0":
   version: 11.0.0
   resolution: "openapi-jsonschema-parameters@npm:11.0.0"
@@ -11821,6 +11967,15 @@ __metadata:
   version: 11.0.0
   resolution: "openapi-types@npm:11.0.0"
   checksum: 2c54c8edcd20b25713fceb51b5b3829b80c67ee070779f32e99e7fe26cf08afa3d53a047e62fe6e6831f80cd6a803b17ad16b0ae3c6f3abe638363832b6a917f
+  languageName: node
+  linkType: hard
+
+"openapi3-ts@npm:^2.0.0":
+  version: 2.0.2
+  resolution: "openapi3-ts@npm:2.0.2"
+  dependencies:
+    yaml: ^1.10.2
+  checksum: ec82bbbbd51cb8311f52f10e0441d72715b10446269040556251edcdc0230b86e3790f48b324881c4a1b22e87a317b5eb70e4d6cb717242bfd32674f21eecfc9
   languageName: node
   linkType: hard
 
@@ -12708,6 +12863,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"randexp@npm:^0.5.3":
+  version: 0.5.3
+  resolution: "randexp@npm:0.5.3"
+  dependencies:
+    drange: ^1.0.2
+    ret: ^0.2.0
+  checksum: 9a4011b4b012debea545fc379a18208876fffc1179d2ac211351caf7626a3956efc4bc41e329bc5b241a671553eda58e0703933a9bcfdf90dde501ba1a2cf40a
+  languageName: node
+  linkType: hard
+
 "range-parser@npm:^1.2.0, range-parser@npm:~1.2.1":
   version: 1.2.1
   resolution: "range-parser@npm:1.2.1"
@@ -13295,6 +13460,13 @@ resolve@^2.0.0-next.3:
     onetime: ^5.1.0
     signal-exit: ^3.0.2
   checksum: f877dd8741796b909f2a82454ec111afb84eb45890eb49ac947d87991379406b3b83ff9673a46012fca0d7844bb989f45cc5b788254cf1a39b6b5a9659de0630
+  languageName: node
+  linkType: hard
+
+"ret@npm:^0.2.0":
+  version: 0.2.2
+  resolution: "ret@npm:0.2.2"
+  checksum: 774964bb413a3525e687bca92d81c1cd75555ec33147c32ecca22f3d06409e35df87952cfe3d57afff7650a0f7e42139cf60cb44e94c29dde390243bc1941f16
   languageName: node
   linkType: hard
 
@@ -14828,6 +15000,44 @@ resolve@^2.0.0-next.3:
   languageName: node
   linkType: hard
 
+"ts-node@npm:^10.7.0":
+  version: 10.7.0
+  resolution: "ts-node@npm:10.7.0"
+  dependencies:
+    "@cspotcode/source-map-support": 0.7.0
+    "@tsconfig/node10": ^1.0.7
+    "@tsconfig/node12": ^1.0.7
+    "@tsconfig/node14": ^1.0.0
+    "@tsconfig/node16": ^1.0.2
+    acorn: ^8.4.1
+    acorn-walk: ^8.1.1
+    arg: ^4.1.0
+    create-require: ^1.1.0
+    diff: ^4.0.1
+    make-error: ^1.1.1
+    v8-compile-cache-lib: ^3.0.0
+    yn: 3.1.1
+  peerDependencies:
+    "@swc/core": ">=1.2.50"
+    "@swc/wasm": ">=1.2.50"
+    "@types/node": "*"
+    typescript: ">=2.7"
+  peerDependenciesMeta:
+    "@swc/core":
+      optional: true
+    "@swc/wasm":
+      optional: true
+  bin:
+    ts-node: dist/bin.js
+    ts-node-cwd: dist/bin-cwd.js
+    ts-node-esm: dist/bin-esm.js
+    ts-node-script: dist/bin-script.js
+    ts-node-transpile-only: dist/bin-transpile.js
+    ts-script: dist/bin-script-deprecated.js
+  checksum: 2a379e43f7478d0b79e1e63af91fe222d83857727957df4bd3bdf3c0a884de5097b12feb9bbf530074526b8874c0338b0e6328cf334f3a5e2c49c71e837273f7
+  languageName: node
+  linkType: hard
+
 "ts-node@npm:^9, ts-node@npm:^9.0.0":
   version: 9.1.1
   resolution: "ts-node@npm:9.1.1"
@@ -15217,6 +15427,13 @@ typescript@^4.2.4:
   bin:
     uuid: dist/bin/uuid
   checksum: 5575a8a75c13120e2f10e6ddc801b2c7ed7d8f3c8ac22c7ed0c7b2ba6383ec0abda88c905085d630e251719e0777045ae3236f04c812184b7c765f63a70e58df
+  languageName: node
+  linkType: hard
+
+"v8-compile-cache-lib@npm:^3.0.0":
+  version: 3.0.1
+  resolution: "v8-compile-cache-lib@npm:3.0.1"
+  checksum: 78089ad549e21bcdbfca10c08850022b22024cdcc2da9b168bcf5a73a6ed7bf01a9cebb9eac28e03cd23a684d81e0502797e88f3ccd27a32aeab1cfc44c39da0
   languageName: node
   linkType: hard
 
