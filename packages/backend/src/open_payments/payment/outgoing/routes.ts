@@ -1,20 +1,33 @@
+import assert from 'assert'
 import { Logger } from 'pino'
-import { validateId } from '../../../shared/utils'
 import { AppContext } from '../../../app'
 import { IAppConfig } from '../../../config/app'
 import { OutgoingPaymentService } from './service'
 import { isOutgoingPaymentError, errorToCode, errorToMessage } from './errors'
 import { OutgoingPayment, OutgoingPaymentState } from './model'
+import { OpenAPI, HttpMethod } from '../../../openapi'
+import {
+  createRequestValidator,
+  ReadContext,
+  CreateContext,
+  RequestValidator
+} from '../../../openapi/validator'
+
+const COLLECTION_PATH = '/{accountId}/outgoing-payments'
+const RESOURCE_PATH = `${COLLECTION_PATH}/{id}`
 
 interface ServiceDependencies {
   config: IAppConfig
   logger: Logger
   outgoingPaymentService: OutgoingPaymentService
+  openApi: OpenAPI
 }
 
 export interface OutgoingPaymentRoutes {
   get(ctx: AppContext): Promise<void>
   create(ctx: AppContext): Promise<void>
+  collectionPath: string
+  resourcePath: string
 }
 
 export function createOutgoingPaymentRoutes(
@@ -24,24 +37,44 @@ export function createOutgoingPaymentRoutes(
     service: 'OutgoingPaymentRoutes'
   })
   const deps = { ...deps_, logger }
+  assert.ok(deps.openApi.hasPath(RESOURCE_PATH))
+  assert.ok(deps.openApi.hasPath(COLLECTION_PATH))
   return {
-    get: (ctx: AppContext) => getOutgoingPayment(deps, ctx),
-    create: (ctx: AppContext) => createOutgoingPayment(deps, ctx)
+    get: (ctx: AppContext) =>
+      getOutgoingPayment(
+        deps,
+        ctx,
+        createRequestValidator<ReadContext>({
+          path: deps.openApi.paths[RESOURCE_PATH],
+          method: HttpMethod.GET
+        })
+      ),
+    create: (ctx: AppContext) =>
+      createOutgoingPayment(
+        deps,
+        ctx,
+        createRequestValidator<CreateContext<CreateBody>>({
+          path: deps.openApi.paths[COLLECTION_PATH],
+          method: HttpMethod.POST
+        })
+      ),
+    collectionPath: COLLECTION_PATH,
+    resourcePath: RESOURCE_PATH
   }
 }
 
 async function getOutgoingPayment(
   deps: ServiceDependencies,
-  ctx: AppContext
+  ctx: AppContext,
+  validate: RequestValidator<ReadContext>
 ): Promise<void> {
-  const { outgoingPaymentId: outgoingPaymentId } = ctx.params
-  ctx.assert(validateId(outgoingPaymentId), 400, 'invalid id')
-  const acceptJSON = ctx.accepts('application/json')
-  ctx.assert(acceptJSON, 406)
+  if (!validate(ctx)) {
+    return ctx.throw(400)
+  }
 
   let outgoingPayment: OutgoingPayment | undefined
   try {
-    outgoingPayment = await deps.outgoingPaymentService.get(outgoingPaymentId)
+    outgoingPayment = await deps.outgoingPaymentService.get(ctx.params.id)
   } catch (_) {
     ctx.throw(500, 'Error trying to get outgoing payment')
   }
@@ -51,32 +84,31 @@ async function getOutgoingPayment(
   ctx.body = body
 }
 
+export interface CreateBody {
+  quoteId: string
+  description?: string
+  externalRef?: string
+}
+
 async function createOutgoingPayment(
   deps: ServiceDependencies,
-  ctx: AppContext
+  ctx: AppContext,
+  validate: RequestValidator<CreateContext<CreateBody>>
 ): Promise<void> {
-  const { accountId } = ctx.params
-  ctx.assert(validateId(accountId), 400, 'invalid account id')
-  ctx.assert(ctx.accepts('application/json'), 406, 'must accept json')
-  ctx.assert(
-    ctx.get('Content-Type') === 'application/json',
-    400,
-    'must send json body'
-  )
-
+  if (!validate(ctx)) {
+    return ctx.throw(400)
+  }
   const { body } = ctx.request
-  if (typeof body !== 'object') return ctx.throw(400, 'json body required')
 
-  if (typeof body.quoteId !== 'string') return ctx.throw(400, 'invalid quoteId')
-
-  if (body.description !== undefined && typeof body.description !== 'string')
-    return ctx.throw(400, 'invalid description')
-  if (body.externalRef !== undefined && typeof body.externalRef !== 'string')
-    return ctx.throw(400, 'invalid externalRef')
+  const quoteUrlParts = body.quoteId.split('/')
+  const quoteId = quoteUrlParts.pop() || quoteUrlParts.pop() // handle trailing slash
+  if (!quoteId) {
+    return ctx.throw(400, 'invalid quoteId')
+  }
 
   const paymentOrErr = await deps.outgoingPaymentService.create({
-    accountId,
-    quoteId: body.quoteId,
+    accountId: ctx.params.accountId,
+    quoteId,
     description: body.description,
     externalRef: body.externalRef
   })
@@ -118,6 +150,8 @@ function outgoingPaymentToBody(
       value: outgoingPayment.receiveAmount.value.toString()
     },
     description: outgoingPayment.description ?? undefined,
-    externalRef: outgoingPayment.externalRef ?? undefined
+    externalRef: outgoingPayment.externalRef ?? undefined,
+    createdAt: outgoingPayment.createdAt.toISOString(),
+    updatedAt: outgoingPayment.updatedAt.toISOString()
   }
 }

@@ -35,6 +35,7 @@ import { createWebhookService } from './webhook/service'
 import { createConnectorService } from './connector'
 import { createSessionService } from './session/service'
 import { createApiKeyService } from './apiKey/service'
+import { createOpenAPI } from './openapi'
 
 BigInt.prototype.toJSON = function () {
   return this.toString()
@@ -120,6 +121,10 @@ export function initIocContainer(
       replica_addresses: config.tigerbeetleReplicaAddresses
     })
   })
+  container.singleton('openApi', async (deps) => {
+    const config = await deps.use('config')
+    return await createOpenAPI(config.openPaymentsSpec)
+  })
 
   /**
    * Add services to the container.
@@ -201,7 +206,8 @@ export function initIocContainer(
       config: await deps.use('config'),
       logger: await deps.use('logger'),
       incomingPaymentService: await deps.use('incomingPaymentService'),
-      streamServer: await deps.use('streamServer')
+      streamServer: await deps.use('streamServer'),
+      openApi: await deps.use('openApi')
     })
   })
   container.singleton('accountRoutes', async (deps) => {
@@ -253,7 +259,8 @@ export function initIocContainer(
     return createQuoteRoutes({
       config: await deps.use('config'),
       logger: await deps.use('logger'),
-      quoteService: await deps.use('quoteService')
+      quoteService: await deps.use('quoteService'),
+      openApi: await deps.use('openApi')
     })
   })
   container.singleton('outgoingPaymentService', async (deps) => {
@@ -269,7 +276,8 @@ export function initIocContainer(
     return createOutgoingPaymentRoutes({
       config: await deps.use('config'),
       logger: await deps.use('logger'),
-      outgoingPaymentService: await deps.use('outgoingPaymentService')
+      outgoingPaymentService: await deps.use('outgoingPaymentService'),
+      openApi: await deps.use('openApi')
     })
   })
 

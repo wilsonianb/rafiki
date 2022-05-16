@@ -98,6 +98,8 @@ export const Config = {
   signatureSecret: process.env.SIGNATURE_SECRET, // optional
   signatureVersion: envInt('SIGNATURE_VERSION', 1),
 
+  openPaymentsSpec: envString('OPEN_PAYMENTS_SPEC', './open-api-spec.yaml'),
+
   /** Frontend **/
   frontendUrl: envString('FRONTEND_URL', 'http://localhost:3000')
 }

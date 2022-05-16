@@ -13,13 +13,15 @@ import { Config, IAppConfig } from '../../config/app'
 import { initIocContainer } from '../..'
 import { AppServices } from '../../app'
 import { truncateTables } from '../../tests/tableManager'
-import { QuoteService, CreateQuoteOptions } from './service'
-import { Quote } from './model'
-import { QuoteRoutes } from './routes'
+import { QuoteService } from './service'
+import { Quote, QuoteJSON } from './model'
+import { QuoteRoutes, CreateBody } from './routes'
 import { Amount } from '../amount'
 import { randomAsset } from '../../tests/asset'
 import { createQuote } from '../../tests/quote'
 import { AppContext } from '../../app'
+import { OpenAPI, HttpMethod } from '../../openapi'
+import { createResponseValidator } from '../../openapi/validator'
 
 describe('Quote Routes', (): void => {
   let deps: IocContract<AppServices>
@@ -31,6 +33,7 @@ describe('Quote Routes', (): void => {
   let quoteRoutes: QuoteRoutes
   let accountId: string
   let accountUrl: string
+  let openApi: OpenAPI
 
   const messageProducer = new GraphileProducer()
   const mockMessageProducer = {
@@ -74,6 +77,7 @@ describe('Quote Routes', (): void => {
       config = await deps.use('config')
       quoteRoutes = await deps.use('quoteRoutes')
       quoteService = await deps.use('quoteService')
+      openApi = await deps.use('openApi')
     }
   )
 
@@ -112,11 +116,30 @@ describe('Quote Routes', (): void => {
         {
           headers: { Accept: 'application/json' }
         },
-        { quoteId: 'not_a_uuid' }
+        {
+          id: 'not_a_uuid',
+          accountId
+        }
       )
       await expect(quoteRoutes.get(ctx)).rejects.toHaveProperty(
         'message',
-        'invalid id'
+        'id must match format "uuid"'
+      )
+    })
+
+    test('returns error on invalid accountId', async (): Promise<void> => {
+      const ctx = createContext(
+        {
+          headers: { Accept: 'application/json' }
+        },
+        {
+          id: uuid(),
+          accountId: 'not_a_uuid'
+        }
+      )
+      await expect(quoteRoutes.get(ctx)).rejects.toHaveProperty(
+        'message',
+        'accountId must match format "uuid"'
       )
     })
 
@@ -125,7 +148,10 @@ describe('Quote Routes', (): void => {
         {
           headers: { Accept: 'test/plain' }
         },
-        { quoteId: uuid() }
+        {
+          id: uuid(),
+          accountId
+        }
       )
       await expect(quoteRoutes.get(ctx)).rejects.toHaveProperty('status', 406)
     })
@@ -135,7 +161,10 @@ describe('Quote Routes', (): void => {
         {
           headers: { Accept: 'application/json' }
         },
-        { quoteId: uuid() }
+        {
+          id: uuid(),
+          accountId
+        }
       )
       await expect(quoteRoutes.get(ctx)).rejects.toHaveProperty('status', 404)
     })
@@ -146,13 +175,17 @@ describe('Quote Routes', (): void => {
         {
           headers: { Accept: 'application/json' }
         },
-        { quoteId: quote.id }
+        {
+          id: quote.id,
+          accountId
+        }
       )
       await expect(quoteRoutes.get(ctx)).resolves.toBeUndefined()
-      expect(ctx.status).toBe(200)
-      expect(ctx.response.get('Content-Type')).toBe(
-        'application/json; charset=utf-8'
-      )
+      const validate = createResponseValidator<QuoteJSON>({
+        path: openApi.paths[quoteRoutes.resourcePath],
+        method: HttpMethod.GET
+      })
+      assert.ok(validate(ctx))
 
       expect(ctx.body).toEqual({
         id: `${accountUrl}/quotes/${quote.id}`,
@@ -174,7 +207,7 @@ describe('Quote Routes', (): void => {
   })
 
   describe('create', (): void => {
-    let options: Omit<CreateQuoteOptions, 'accountId'>
+    let options: CreateBody
 
     beforeEach(() => {
       options = {}
@@ -192,7 +225,9 @@ describe('Quote Routes', (): void => {
         },
         { accountId }
       )
-      ctx.request.body = options
+      ctx.request.body = {
+        ...options
+      }
       return ctx
     }
 
@@ -200,7 +235,7 @@ describe('Quote Routes', (): void => {
       const ctx = setup({})
       ctx.params.accountId = 'not_a_uuid'
       await expect(quoteRoutes.create(ctx)).rejects.toMatchObject({
-        message: 'invalid account id',
+        message: 'accountId must match format "uuid"',
         status: 400
       })
     })
@@ -222,18 +257,18 @@ describe('Quote Routes', (): void => {
     })
 
     test.each`
-      field                 | invalidValue
-      ${'receivingAccount'} | ${123}
-      ${'sendAmount'}       | ${123}
-      ${'receiveAmount'}    | ${123}
-      ${'receivingPayment'} | ${123}
+      field                 | invalidValue | expectedType
+      ${'receivingAccount'} | ${123}       | ${'string'}
+      ${'sendAmount'}       | ${123}       | ${'object'}
+      ${'receiveAmount'}    | ${123}       | ${'object'}
+      ${'receivingPayment'} | ${123}       | ${'string'}
     `(
       'returns error on invalid $field',
-      async ({ field, invalidValue }): Promise<void> => {
+      async ({ field, invalidValue, expectedType }): Promise<void> => {
         const ctx = setup({})
         ctx.request.body[field] = invalidValue
         await expect(quoteRoutes.create(ctx)).rejects.toMatchObject({
-          message: `invalid ${field}`,
+          message: `${field} must be ${expectedType}`,
           status: 400
         })
       }
@@ -242,8 +277,8 @@ describe('Quote Routes', (): void => {
     test.each`
       receivingAccount    | receivingPayment    | sendAmount   | receiveAmount
       ${receivingAccount} | ${undefined}        | ${undefined} | ${undefined}
-      ${receivingAccount} | ${undefined}        | ${123}       | ${123}
-      ${undefined}        | ${receivingPayment} | ${123}       | ${123}
+      ${receivingAccount} | ${undefined}        | ${'123'}     | ${'123'}
+      ${undefined}        | ${receivingPayment} | ${'123'}     | ${'123'}
     `(
       'returns error on invalid amount',
       async ({
@@ -283,6 +318,7 @@ describe('Quote Routes', (): void => {
         receivingAccount,
         sendAmount: {
           ...sendAmount,
+          value: sendAmount.value.toString(),
           assetScale: sendAmount.assetScale + 1
         }
       }
@@ -360,12 +396,12 @@ describe('Quote Routes', (): void => {
                 value: BigInt(options.receiveAmount.value)
               }
             })
-            expect(ctx.response.status).toBe(201)
-            const quoteId = ((ctx.response.body as Record<string, unknown>)[
-              'id'
-            ] as string)
-              .split('/')
-              .pop()
+            const validate = createResponseValidator<QuoteJSON>({
+              path: openApi.paths[quoteRoutes.collectionPath],
+              method: HttpMethod.POST
+            })
+            assert.ok(validate(ctx))
+            const quoteId = ctx.response.body.id.split('/').pop()
             assert.ok(quote)
             expect(ctx.response.body).toEqual({
               id: `${accountUrl}/quotes/${quoteId}`,
@@ -407,12 +443,12 @@ describe('Quote Routes', (): void => {
               accountId,
               receivingPayment
             })
-            expect(ctx.response.status).toBe(201)
-            const quoteId = ((ctx.response.body as Record<string, unknown>)[
-              'id'
-            ] as string)
-              .split('/')
-              .pop()
+            const validate = createResponseValidator<QuoteJSON>({
+              path: openApi.paths[quoteRoutes.collectionPath],
+              method: HttpMethod.POST
+            })
+            assert.ok(validate(ctx))
+            const quoteId = ctx.response.body.id.split('/').pop()
             assert.ok(quote)
             expect(ctx.response.body).toEqual({
               id: `${accountUrl}/quotes/${quoteId}`,
