@@ -4846,7 +4846,7 @@ __metadata:
     raw-body: ^2.4.1
     rosie: ^2.1.0
     testcontainers: ^7.20.4
-    tigerbeetle-node: ^0.6.0
+    tigerbeetle-node: "workspace:packages/tigerbeetle-node"
     tmp: ^0.2.1
     typescript: ^4.2.4
     uuid: ^8.3.2
@@ -14509,12 +14509,11 @@ resolve@^2.0.0-next.3:
   languageName: node
   linkType: hard
 
-"tigerbeetle-node@npm:^0.6.0":
-  version: 0.6.0
-  resolution: "tigerbeetle-node@npm:0.6.0"
-  checksum: e1af485571f6907123a5121da5b874225175eadea46ed5eabb8bd9c8cebad5ec247866debf82d5b0ed329ae723c4fca4fdf2993af5c1359be2d1a230a12303b7
-  languageName: node
-  linkType: hard
+"tigerbeetle-node@workspace:packages/tigerbeetle-node":
+  version: 0.0.0-use.local
+  resolution: "tigerbeetle-node@workspace:packages/tigerbeetle-node"
+  languageName: unknown
+  linkType: soft
 
 "tildify@npm:2.0.0":
   version: 2.0.0
