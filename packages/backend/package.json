@@ -46,6 +46,7 @@
   },
   "dependencies": {
     "@adonisjs/fold": "^8.1.0",
+    "@apidevtools/json-schema-ref-parser": "^9.0.9",
     "@apollo/client": "^3.3.20",
     "@faker-js/faker": "^6.0.0",
     "@graphql-tools/graphql-file-loader": "^7.0.6",
@@ -79,6 +80,7 @@
     "knex": "^0.21.17",
     "koa": "^2.13.1",
     "koa-bodyparser": "^4.3.0",
+    "koa-openapi": "^11.0.1",
     "lodash": "^4.17.21",
     "objection": "^2.2.15",
     "objection-db-errors": "^1.1.2",

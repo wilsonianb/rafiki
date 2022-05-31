@@ -3,6 +3,9 @@ import { join } from 'path'
 import { Server } from 'http'
 import { EventEmitter } from 'events'
 import { ParsedUrlQuery } from 'querystring'
+import $RefParser from '@apidevtools/json-schema-ref-parser'
+import { initialize } from 'koa-openapi'
+import { OpenAPIV3 } from 'openapi-types'
 
 import { IocContract } from '@adonisjs/fold'
 import Knex from 'knex'
@@ -298,6 +301,22 @@ export class App {
     const openApi = await this.container.use('openApi')
     const toRouterPath = (path: string): string =>
       path.replace(/{/g, ':').replace(/}/g, '')
+
+    initialize({
+      router: this.publicRouter,
+      apiDoc: (await $RefParser.dereference(
+        this.config.openPaymentsSpec
+      )) as OpenAPIV3.Document,
+      // dependencies: {
+      //   worldsService: v1WorldsService
+      // },
+      paths: [
+        {
+          path: '/{id}',
+          module: accountRoutes.get
+        }
+      ]
+    })
 
     const toAction = ({
       path,

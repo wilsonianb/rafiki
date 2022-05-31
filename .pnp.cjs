@@ -6602,6 +6602,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "packageDependencies": [
             ["backend", "workspace:packages/backend"],
             ["@adonisjs/fold", "npm:8.1.0"],
+            ["@apidevtools/json-schema-ref-parser", "npm:9.0.9"],
             ["@apollo/client", "virtual:aa59773ac87791c4813d53447077fcf8a847d6de5a301d34dc31286584b1dbb26d30d3adb5b4c41c1e8aea04371e926fda05c09c6253647c432e11d872a304ba#npm:3.3.20"],
             ["@faker-js/faker", "npm:6.0.0"],
             ["@graphql-codegen/cli", "virtual:aa59773ac87791c4813d53447077fcf8a847d6de5a301d34dc31286584b1dbb26d30d3adb5b4c41c1e8aea04371e926fda05c09c6253647c432e11d872a304ba#npm:1.21.5"],
@@ -6656,6 +6657,7 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["knex", "virtual:990efca738494a53ff0d9b0f885198a865d5bcf851affae39ba56cc6b00fa8e7bf36df9191bd9bbb6b519579671add53cf12113448e1a9b327e9a128e1f1b5e9#npm:0.21.19"],
             ["koa", "npm:2.13.1"],
             ["koa-bodyparser", "npm:4.3.0"],
+            ["koa-openapi", "npm:11.0.1"],
             ["lodash", "npm:4.17.21"],
             ["nock", "npm:13.1.0"],
             ["node-mocks-http", "npm:1.10.1"],
@@ -6798,6 +6800,14 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["brace-expansion", "npm:1.1.11"],
             ["balanced-match", "npm:1.0.2"],
             ["concat-map", "npm:0.0.1"]
+          ],
+          "linkType": "HARD",
+        }],
+        ["npm:2.0.1", {
+          "packageLocation": "./.yarn/cache/brace-expansion-npm-2.0.1-17aa2616f9-a61e7cd2e8.zip/node_modules/brace-expansion/",
+          "packageDependencies": [
+            ["brace-expansion", "npm:2.0.1"],
+            ["balanced-match", "npm:1.0.2"]
           ],
           "linkType": "HARD",
         }]
@@ -8543,6 +8553,16 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "linkType": "HARD",
         }]
       ]],
+      ["difunc", [
+        ["npm:0.0.4", {
+          "packageLocation": "./.yarn/cache/difunc-npm-0.0.4-e9398a31b9-19b850dae2.zip/node_modules/difunc/",
+          "packageDependencies": [
+            ["difunc", "npm:0.0.4"],
+            ["esprima", "npm:4.0.1"]
+          ],
+          "linkType": "HARD",
+        }]
+      ]],
       ["dir-glob", [
         ["npm:3.0.1", {
           "packageLocation": "./.yarn/cache/dir-glob-npm-3.0.1-1aea628b1b-fa05e18324.zip/node_modules/dir-glob/",
@@ -9896,6 +9916,28 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "linkType": "HARD",
         }]
       ]],
+      ["fs-routes", [
+        ["npm:11.0.1", {
+          "packageLocation": "./.yarn/cache/fs-routes-npm-11.0.1-ddd4581330-9dc90f3c75.zip/node_modules/fs-routes/",
+          "packageDependencies": [
+            ["fs-routes", "npm:11.0.1"]
+          ],
+          "linkType": "SOFT",
+        }],
+        ["virtual:8a825b7ddda56b43c6cf3cb66b56c1f7989e1868cbdac250b14a15389708e6cbae1e4c5ec47ebab46b78af397afab33e5a1768659d24626ad237b62c788102b0#npm:11.0.1", {
+          "packageLocation": "./.yarn/__virtual__/fs-routes-virtual-afe43d4250/0/cache/fs-routes-npm-11.0.1-ddd4581330-9dc90f3c75.zip/node_modules/fs-routes/",
+          "packageDependencies": [
+            ["fs-routes", "virtual:8a825b7ddda56b43c6cf3cb66b56c1f7989e1868cbdac250b14a15389708e6cbae1e4c5ec47ebab46b78af397afab33e5a1768659d24626ad237b62c788102b0#npm:11.0.1"],
+            ["@types/glob", null],
+            ["glob", "npm:8.0.3"]
+          ],
+          "packagePeers": [
+            "@types/glob",
+            "glob"
+          ],
+          "linkType": "HARD",
+        }]
+      ]],
       ["fs.realpath", [
         ["npm:1.0.0", {
           "packageLocation": "./.yarn/cache/fs.realpath-npm-1.0.0-c8f05d8126-99ddea01a7.zip/node_modules/fs.realpath/",
@@ -10107,6 +10149,18 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["minimatch", "npm:3.0.4"],
             ["once", "npm:1.4.0"],
             ["path-is-absolute", "npm:1.0.1"]
+          ],
+          "linkType": "HARD",
+        }],
+        ["npm:8.0.3", {
+          "packageLocation": "./.yarn/cache/glob-npm-8.0.3-750f909025-50bcdea19d.zip/node_modules/glob/",
+          "packageDependencies": [
+            ["glob", "npm:8.0.3"],
+            ["fs.realpath", "npm:1.0.0"],
+            ["inflight", "npm:1.0.6"],
+            ["inherits", "npm:2.0.4"],
+            ["minimatch", "npm:5.1.0"],
+            ["once", "npm:1.4.0"]
           ],
           "linkType": "HARD",
         }]
@@ -11378,6 +11432,15 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["is-accessor-descriptor", "npm:1.0.0"],
             ["is-data-descriptor", "npm:1.0.0"],
             ["kind-of", "npm:6.0.3"]
+          ],
+          "linkType": "HARD",
+        }]
+      ]],
+      ["is-dir", [
+        ["npm:1.0.0", {
+          "packageLocation": "./.yarn/cache/is-dir-npm-1.0.0-b756886d82-b81430f22d.zip/node_modules/is-dir/",
+          "packageDependencies": [
+            ["is-dir", "npm:1.0.0"]
           ],
           "linkType": "HARD",
         }]
@@ -12989,6 +13052,16 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "linkType": "HARD",
         }]
       ]],
+      ["koa-openapi", [
+        ["npm:11.0.1", {
+          "packageLocation": "./.yarn/cache/koa-openapi-npm-11.0.1-a2a55cfc98-90014b5f03.zip/node_modules/koa-openapi/",
+          "packageDependencies": [
+            ["koa-openapi", "npm:11.0.1"],
+            ["openapi-framework", "npm:11.0.1"]
+          ],
+          "linkType": "HARD",
+        }]
+      ]],
       ["latest-version", [
         ["npm:5.1.0", {
           "packageLocation": "./.yarn/cache/latest-version-npm-5.1.0-ddb9b0eb39-fbc72b071e.zip/node_modules/latest-version/",
@@ -13841,6 +13914,14 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["brace-expansion", "npm:1.1.11"]
           ],
           "linkType": "HARD",
+        }],
+        ["npm:5.1.0", {
+          "packageLocation": "./.yarn/cache/minimatch-npm-5.1.0-34f6240621-15ce53d31a.zip/node_modules/minimatch/",
+          "packageDependencies": [
+            ["minimatch", "npm:5.1.0"],
+            ["brace-expansion", "npm:2.0.1"]
+          ],
+          "linkType": "HARD",
         }]
       ]],
       ["minimist", [
@@ -14662,6 +14743,28 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
           "linkType": "HARD",
         }]
       ]],
+      ["openapi-framework", [
+        ["npm:11.0.1", {
+          "packageLocation": "./.yarn/cache/openapi-framework-npm-11.0.1-8a825b7ddd-400e29ec60.zip/node_modules/openapi-framework/",
+          "packageDependencies": [
+            ["openapi-framework", "npm:11.0.1"],
+            ["difunc", "npm:0.0.4"],
+            ["fs-routes", "virtual:8a825b7ddda56b43c6cf3cb66b56c1f7989e1868cbdac250b14a15389708e6cbae1e4c5ec47ebab46b78af397afab33e5a1768659d24626ad237b62c788102b0#npm:11.0.1"],
+            ["glob", "npm:8.0.3"],
+            ["is-dir", "npm:1.0.0"],
+            ["js-yaml", "npm:3.14.1"],
+            ["openapi-default-setter", "npm:11.0.1"],
+            ["openapi-request-coercer", "npm:11.0.1"],
+            ["openapi-request-validator", "npm:11.0.1"],
+            ["openapi-response-validator", "npm:11.0.1"],
+            ["openapi-schema-validator", "npm:11.0.1"],
+            ["openapi-security-handler", "npm:11.0.1"],
+            ["openapi-types", "npm:11.0.1"],
+            ["ts-log", "npm:2.2.4"]
+          ],
+          "linkType": "HARD",
+        }]
+      ]],
       ["openapi-jsonschema-parameters", [
         ["npm:11.0.1", {
           "packageLocation": "./.yarn/cache/openapi-jsonschema-parameters-npm-11.0.1-c6ea5d50ba-a1b75b2b44.zip/node_modules/openapi-jsonschema-parameters/",
@@ -14719,6 +14822,17 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
         }]
       ]],
       ["openapi-schema-validator", [
+        ["npm:11.0.1", {
+          "packageLocation": "./.yarn/cache/openapi-schema-validator-npm-11.0.1-3a8c8fb236-b994cfd051.zip/node_modules/openapi-schema-validator/",
+          "packageDependencies": [
+            ["openapi-schema-validator", "npm:11.0.1"],
+            ["ajv", "npm:8.11.0"],
+            ["ajv-formats", "virtual:f3365d3729ff2810e57b449fca1d4e64bb15e9f2757c2733381f781d5989b78a423db2d5f1336d91018bbe54132491e8aba9904a83194842ef097a18987e75a0#npm:2.1.1"],
+            ["lodash.merge", "npm:4.6.2"],
+            ["openapi-types", "npm:11.0.1"]
+          ],
+          "linkType": "HARD",
+        }],
         ["npm:9.3.1", {
           "packageLocation": "./.yarn/cache/openapi-schema-validator-npm-9.3.1-f3365d3729-c0b7d72902.zip/node_modules/openapi-schema-validator/",
           "packageDependencies": [
@@ -14727,6 +14841,16 @@ function $$SETUP_STATE(hydrateRuntimeState, basePath) {
             ["ajv-formats", "virtual:f3365d3729ff2810e57b449fca1d4e64bb15e9f2757c2733381f781d5989b78a423db2d5f1336d91018bbe54132491e8aba9904a83194842ef097a18987e75a0#npm:2.1.1"],
             ["lodash.merge", "npm:4.6.2"],
             ["openapi-types", "npm:9.3.1"]
+          ],
+          "linkType": "HARD",
+        }]
+      ]],
+      ["openapi-security-handler", [
+        ["npm:11.0.1", {
+          "packageLocation": "./.yarn/cache/openapi-security-handler-npm-11.0.1-f5b15b4cb6-f558e9d8bb.zip/node_modules/openapi-security-handler/",
+          "packageDependencies": [
+            ["openapi-security-handler", "npm:11.0.1"],
+            ["openapi-types", "npm:11.0.1"]
           ],
           "linkType": "HARD",
         }]
