@@ -1,6 +1,7 @@
 import { Model, Pojo } from 'objection'
 
 import { Asset } from '../asset/model'
+import { Account } from '../open_payments/account/model'
 import { BaseModel } from '../shared/baseModel'
 
 const fieldPrefixes = ['withdrawal']
@@ -12,9 +13,6 @@ export class WebhookEvent extends BaseModel {
 
   public type!: string
   public data!: Record<string, unknown>
-  public attempts!: number
-  public statusCode?: number
-  public processAt!: Date | null
 
   public withdrawal?: {
     accountId: string
@@ -23,6 +21,14 @@ export class WebhookEvent extends BaseModel {
   }
 
   static relationMappings = {
+    withdrawalAccount: {
+      relation: Model.HasOneRelation,
+      modelClass: Account,
+      join: {
+        from: 'webhookEvents.withdrawalAccountId',
+        to: 'accounts.id'
+      }
+    },
     withdrawalAsset: {
       relation: Model.HasOneRelation,
       modelClass: Asset,
