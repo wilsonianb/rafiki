@@ -6,6 +6,7 @@ import {
   createAsset,
   updateAssetWithdrawalThreshold
 } from './asset'
+import { getEvents } from './event'
 import { getAccountIncomingPayments } from './incoming_payment'
 import { getQuote, createQuote, getAccountQuotes } from './quote'
 import {
@@ -35,6 +36,7 @@ export const resolvers: Resolvers = {
     account: getAccount,
     asset: getAsset,
     assets: getAssets,
+    events: getEvents,
     outgoingPayment: getOutgoingPayment,
     peer: getPeer,
     peers: getPeers,
