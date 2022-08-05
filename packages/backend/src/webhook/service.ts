@@ -47,9 +47,7 @@ async function createWebhookEvent(
     return event
   } catch (err) {
     if (err instanceof ForeignKeyViolationError) {
-      if (err.constraint === 'webhookevents_withdrawalaccountid_foreign') {
-        return WebhookEventError.InvalidWithdrawalAccount
-      } else if (err.constraint === 'webhookevents_withdrawalassetid_foreign') {
+      if (err.constraint === 'webhookevents_withdrawalassetid_foreign') {
         return WebhookEventError.InvalidWithdrawalAsset
       }
     }

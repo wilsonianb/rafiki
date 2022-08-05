@@ -6,7 +6,6 @@ exports.up = function (knex) {
     table.json('data').notNullable()
 
     table.uuid('withdrawalAccountId').nullable()
-    table.foreign('withdrawalAccountId').references('accounts.id')
     table.uuid('withdrawalAssetId').nullable()
     table.foreign('withdrawalAssetId').references('assets.id')
     table.bigInteger('withdrawalAmount').nullable()

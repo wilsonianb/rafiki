@@ -132,7 +132,7 @@ describe('Webhook Service', (): void => {
     )
 
     if (withdrawal) {
-      test('Cannot create webhook event with unknown withdrawal account', async (): Promise<void> => {
+      test.skip('Cannot create webhook event with unknown withdrawal account', async (): Promise<void> => {
         assert.ok(options.withdrawal)
         options.withdrawal.accountId = uuid()
         await expect(webhookService.createEvent(options)).resolves.toEqual(
