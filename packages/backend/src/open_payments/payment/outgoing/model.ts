@@ -120,23 +120,15 @@ export class OutgoingPayment
           ...this.sendAmount,
           value: amountSent.toString()
         },
+        description: this.description ?? null,
+        externalRef: this.externalRef ?? null,
+        error: this.error ?? null,
         stateAttempts: this.stateAttempts,
         createdAt: new Date(+this.createdAt).toISOString(),
         updatedAt: new Date(+this.updatedAt).toISOString(),
-        balance: balance.toString()
+        balance: balance.toString(),
+        peerId: this.peerId ?? null
       }
-    }
-    if (this.description) {
-      data.payment.description = this.description
-    }
-    if (this.externalRef) {
-      data.payment.externalRef = this.externalRef
-    }
-    if (this.error) {
-      data.payment.error = this.error
-    }
-    if (this.peerId) {
-      data.payment.peerId = this.peerId
     }
     return data
   }
@@ -198,27 +190,13 @@ export const PaymentEventType = {
 }
 export type PaymentEventType = PaymentDepositType | PaymentWithdrawType
 
-export interface OutgoingPaymentResponse {
-  id: string
-  accountId: string
-  createdAt: string
-  receiver: string
-  sendAmount: AmountJSON
-  receiveAmount: AmountJSON
-  description?: string
-  externalRef?: string
-  failed: boolean
-  updatedAt: string
-  sentAmount: AmountJSON
-}
-
 export type PaymentData = {
-  payment: Omit<OutgoingPaymentResponse, 'failed'> & {
-    error?: string
+  payment: Omit<OutgoingPaymentJSON, 'failed'> & {
+    error: string | null
     state: OutgoingPaymentState
     stateAttempts: number
     balance: string
-    peerId?: string
+    peerId: string | null
   }
 }
 

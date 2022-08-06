@@ -24,23 +24,8 @@ export enum IncomingPaymentState {
   Expired = 'EXPIRED'
 }
 
-export interface IncomingPaymentResponse {
-  id: string
-  accountId: string
-  description?: string
-  createdAt: string
-  updatedAt: string
-  expiresAt: string
-  incomingAmount?: AmountJSON
-  receivedAmount: AmountJSON
-  externalRef?: string
-  completed: boolean
-  ilpAddress?: string
-  sharedSecret?: string
-}
-
 export type IncomingPaymentData = {
-  incomingPayment: IncomingPaymentResponse
+  incomingPayment: IncomingPaymentJSON
 }
 
 export class IncomingPaymentEvent extends WebhookEvent {
@@ -144,36 +129,29 @@ export class IncomingPayment
   }
 
   public toData(amountReceived: bigint): IncomingPaymentData {
-    const data: IncomingPaymentData = {
+    return {
       incomingPayment: {
         id: this.id,
         accountId: this.accountId,
         createdAt: new Date(+this.createdAt).toISOString(),
         expiresAt: this.expiresAt.toISOString(),
+        incomingAmount: this.incomingAmount
+          ? {
+              ...this.incomingAmount,
+              value: this.incomingAmount.value.toString()
+            }
+          : null,
         receivedAmount: {
           value: amountReceived.toString(),
           assetCode: this.asset.code,
           assetScale: this.asset.scale
         },
+        description: this.description ?? null,
+        externalRef: this.externalRef ?? null,
         completed: this.state === IncomingPaymentState.Completed,
         updatedAt: new Date(+this.updatedAt).toISOString()
       }
     }
-
-    if (this.incomingAmount) {
-      data.incomingPayment.incomingAmount = {
-        ...this.incomingAmount,
-        value: this.incomingAmount.value.toString()
-      }
-    }
-    if (this.description) {
-      data.incomingPayment.description = this.description
-    }
-    if (this.externalRef) {
-      data.incomingPayment.externalRef = this.externalRef
-    }
-
-    return data
   }
 
   $formatJson(json: Pojo): Pojo {

@@ -1,9 +1,10 @@
 import { GraphQLResolveInfo, GraphQLScalarType, GraphQLScalarTypeConfig } from 'graphql';
-export type Maybe<T> = T | undefined;
+export type Maybe<T> = T | null;
+export type InputMaybe<T> = T | undefined;
 export type Exact<T extends { [key: string]: unknown }> = { [K in keyof T]: T[K] };
 export type MakeOptional<T, K extends keyof T> = Omit<T, K> & { [SubKey in K]?: Maybe<T[SubKey]> };
 export type MakeMaybe<T, K extends keyof T> = Omit<T, K> & { [SubKey in K]: Maybe<T[SubKey]> };
-export type RequireFields<T, K extends keyof T> = { [X in Exclude<keyof T, K>]?: T[X] } & { [P in K]-?: NonNullable<T[P]> };
+export type RequireFields<T, K extends keyof T> = Omit<T, K> & { [P in K]-?: NonNullable<T[P]> };
 /** All built-in and custom scalars, mapped to their actual values */
 export type Scalars = {
   ID: string;
@@ -13,8 +14,6 @@ export type Scalars = {
   Float: number;
   UInt64: bigint;
 };
-
-
 
 export type Account = Model & {
   __typename?: 'Account';
@@ -28,26 +27,26 @@ export type Account = Model & {
 
 
 export type AccountIncomingPaymentsArgs = {
-  after?: Maybe<Scalars['String']>;
-  before?: Maybe<Scalars['String']>;
-  first?: Maybe<Scalars['Int']>;
-  last?: Maybe<Scalars['Int']>;
+  after?: InputMaybe<Scalars['String']>;
+  before?: InputMaybe<Scalars['String']>;
+  first?: InputMaybe<Scalars['Int']>;
+  last?: InputMaybe<Scalars['Int']>;
 };
 
 
 export type AccountQuotesArgs = {
-  after?: Maybe<Scalars['String']>;
-  before?: Maybe<Scalars['String']>;
-  first?: Maybe<Scalars['Int']>;
-  last?: Maybe<Scalars['Int']>;
+  after?: InputMaybe<Scalars['String']>;
+  before?: InputMaybe<Scalars['String']>;
+  first?: InputMaybe<Scalars['Int']>;
+  last?: InputMaybe<Scalars['Int']>;
 };
 
 
 export type AccountOutgoingPaymentsArgs = {
-  after?: Maybe<Scalars['String']>;
-  before?: Maybe<Scalars['String']>;
-  first?: Maybe<Scalars['Int']>;
-  last?: Maybe<Scalars['Int']>;
+  after?: InputMaybe<Scalars['String']>;
+  before?: InputMaybe<Scalars['String']>;
+  first?: InputMaybe<Scalars['Int']>;
+  last?: InputMaybe<Scalars['Int']>;
 };
 
 export type AccountData = Model & {
@@ -154,7 +153,7 @@ export type AssetsConnection = {
 
 export type CreateAccountInput = {
   asset: AssetInput;
-  publicName?: Maybe<Scalars['String']>;
+  publicName?: InputMaybe<Scalars['String']>;
 };
 
 export type CreateAccountMutationResponse = MutationResponse & {
@@ -188,7 +187,7 @@ export type CreateApiKeyMutationResponse = MutationResponse & {
 export type CreateAssetInput = {
   code: Scalars['String'];
   scale: Scalars['Int'];
-  withdrawalThreshold?: Maybe<Scalars['UInt64']>;
+  withdrawalThreshold?: InputMaybe<Scalars['UInt64']>;
 };
 
 export type CreateAssetLiquidityWithdrawalInput = {
@@ -203,12 +202,12 @@ export type CreateAssetLiquidityWithdrawalInput = {
 export type CreateOutgoingPaymentInput = {
   accountId: Scalars['String'];
   quoteId: Scalars['String'];
-  description?: Maybe<Scalars['String']>;
-  externalRef?: Maybe<Scalars['String']>;
+  description?: InputMaybe<Scalars['String']>;
+  externalRef?: InputMaybe<Scalars['String']>;
 };
 
 export type CreatePeerInput = {
-  maxPacketAmount?: Maybe<Scalars['UInt64']>;
+  maxPacketAmount?: InputMaybe<Scalars['UInt64']>;
   http: HttpInput;
   asset: AssetInput;
   staticIlpAddress: Scalars['String'];
@@ -233,8 +232,8 @@ export type CreatePeerMutationResponse = MutationResponse & {
 
 export type CreateQuoteInput = {
   accountId: Scalars['String'];
-  sendAmount?: Maybe<AmountInput>;
-  receiveAmount?: Maybe<AmountInput>;
+  sendAmount?: InputMaybe<AmountInput>;
+  receiveAmount?: InputMaybe<AmountInput>;
   receiver: Scalars['String'];
 };
 
@@ -288,7 +287,7 @@ export type HttpIncomingInput = {
 };
 
 export type HttpInput = {
-  incoming?: Maybe<HttpIncomingInput>;
+  incoming?: InputMaybe<HttpIncomingInput>;
   outgoing: HttpOutgoingInput;
 };
 
@@ -653,18 +652,18 @@ export type QueryAssetArgs = {
 
 
 export type QueryAssetsArgs = {
-  after?: Maybe<Scalars['String']>;
-  before?: Maybe<Scalars['String']>;
-  first?: Maybe<Scalars['Int']>;
-  last?: Maybe<Scalars['Int']>;
+  after?: InputMaybe<Scalars['String']>;
+  before?: InputMaybe<Scalars['String']>;
+  first?: InputMaybe<Scalars['Int']>;
+  last?: InputMaybe<Scalars['Int']>;
 };
 
 
 export type QueryEventsArgs = {
-  after?: Maybe<Scalars['String']>;
-  before?: Maybe<Scalars['String']>;
-  first?: Maybe<Scalars['Int']>;
-  last?: Maybe<Scalars['Int']>;
+  after?: InputMaybe<Scalars['String']>;
+  before?: InputMaybe<Scalars['String']>;
+  first?: InputMaybe<Scalars['Int']>;
+  last?: InputMaybe<Scalars['Int']>;
 };
 
 
@@ -674,10 +673,10 @@ export type QueryPeerArgs = {
 
 
 export type QueryPeersArgs = {
-  after?: Maybe<Scalars['String']>;
-  before?: Maybe<Scalars['String']>;
-  first?: Maybe<Scalars['Int']>;
-  last?: Maybe<Scalars['Int']>;
+  after?: InputMaybe<Scalars['String']>;
+  before?: InputMaybe<Scalars['String']>;
+  first?: InputMaybe<Scalars['Int']>;
+  last?: InputMaybe<Scalars['Int']>;
 };
 
 
@@ -786,17 +785,16 @@ export type TriggerAccountEventsMutationResponse = MutationResponse & {
   count?: Maybe<Scalars['Int']>;
 };
 
-
 export type UpdateAssetInput = {
   id: Scalars['String'];
-  withdrawalThreshold?: Maybe<Scalars['UInt64']>;
+  withdrawalThreshold?: InputMaybe<Scalars['UInt64']>;
 };
 
 export type UpdatePeerInput = {
   id: Scalars['String'];
-  maxPacketAmount?: Maybe<Scalars['UInt64']>;
-  http?: Maybe<HttpInput>;
-  staticIlpAddress?: Maybe<Scalars['String']>;
+  maxPacketAmount?: InputMaybe<Scalars['UInt64']>;
+  http?: InputMaybe<HttpInput>;
+  staticIlpAddress?: InputMaybe<Scalars['String']>;
 };
 
 export type UpdatePeerMutationResponse = MutationResponse & {
@@ -812,19 +810,10 @@ export type UpdatePeerMutationResponse = MutationResponse & {
 export type ResolverTypeWrapper<T> = Promise<T> | T;
 
 
-export type LegacyStitchingResolver<TResult, TParent, TContext, TArgs> = {
-  fragment: string;
+export type ResolverWithResolve<TResult, TParent, TContext, TArgs> = {
   resolve: ResolverFn<TResult, TParent, TContext, TArgs>;
 };
-
-export type NewStitchingResolver<TResult, TParent, TContext, TArgs> = {
-  selectionSet: string;
-  resolve: ResolverFn<TResult, TParent, TContext, TArgs>;
-};
-export type StitchingResolver<TResult, TParent, TContext, TArgs> = LegacyStitchingResolver<TResult, TParent, TContext, TArgs> | NewStitchingResolver<TResult, TParent, TContext, TArgs>;
-export type Resolver<TResult, TParent = {}, TContext = {}, TArgs = {}> =
-  | ResolverFn<TResult, TParent, TContext, TArgs>
-  | StitchingResolver<TResult, TParent, TContext, TArgs>;
+export type Resolver<TResult, TParent = {}, TContext = {}, TArgs = {}> = ResolverFn<TResult, TParent, TContext, TArgs> | ResolverWithResolve<TResult, TParent, TContext, TArgs>;
 
 export type ResolverFn<TResult, TParent, TContext, TArgs> = (
   parent: TParent,
@@ -838,7 +827,7 @@ export type SubscriptionSubscribeFn<TResult, TParent, TContext, TArgs> = (
   args: TArgs,
   context: TContext,
   info: GraphQLResolveInfo
-) => AsyncIterator<TResult> | Promise<AsyncIterator<TResult>>;
+) => AsyncIterable<TResult> | Promise<AsyncIterable<TResult>>;
 
 export type SubscriptionResolveFn<TResult, TParent, TContext, TArgs> = (
   parent: TParent,
@@ -1052,20 +1041,20 @@ export type ResolversParentTypes = {
   UpdatePeerMutationResponse: Partial<UpdatePeerMutationResponse>;
 };
 
-export type AuthDirectiveArgs = {  };
+export type AuthDirectiveArgs = { };
 
 export type AuthDirectiveResolver<Result, Parent, ContextType = any, Args = AuthDirectiveArgs> = DirectiveResolverFn<Result, Parent, ContextType, Args>;
 
-export type IsAdminDirectiveArgs = {  };
+export type IsAdminDirectiveArgs = { };
 
 export type IsAdminDirectiveResolver<Result, Parent, ContextType = any, Args = IsAdminDirectiveArgs> = DirectiveResolverFn<Result, Parent, ContextType, Args>;
 
 export type AccountResolvers<ContextType = any, ParentType extends ResolversParentTypes['Account'] = ResolversParentTypes['Account']> = {
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   asset?: Resolver<ResolversTypes['Asset'], ParentType, ContextType>;
-  incomingPayments?: Resolver<Maybe<ResolversTypes['IncomingPaymentConnection']>, ParentType, ContextType, RequireFields<AccountIncomingPaymentsArgs, never>>;
-  quotes?: Resolver<Maybe<ResolversTypes['QuoteConnection']>, ParentType, ContextType, RequireFields<AccountQuotesArgs, never>>;
-  outgoingPayments?: Resolver<Maybe<ResolversTypes['OutgoingPaymentConnection']>, ParentType, ContextType, RequireFields<AccountOutgoingPaymentsArgs, never>>;
+  incomingPayments?: Resolver<Maybe<ResolversTypes['IncomingPaymentConnection']>, ParentType, ContextType, Partial<AccountIncomingPaymentsArgs>>;
+  quotes?: Resolver<Maybe<ResolversTypes['QuoteConnection']>, ParentType, ContextType, Partial<AccountQuotesArgs>>;
+  outgoingPayments?: Resolver<Maybe<ResolversTypes['OutgoingPaymentConnection']>, ParentType, ContextType, Partial<AccountOutgoingPaymentsArgs>>;
   createdAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
@@ -1367,10 +1356,10 @@ export type PeersConnectionResolvers<ContextType = any, ParentType extends Resol
 export type QueryResolvers<ContextType = any, ParentType extends ResolversParentTypes['Query'] = ResolversParentTypes['Query']> = {
   account?: Resolver<Maybe<ResolversTypes['Account']>, ParentType, ContextType, RequireFields<QueryAccountArgs, 'id'>>;
   asset?: Resolver<Maybe<ResolversTypes['Asset']>, ParentType, ContextType, RequireFields<QueryAssetArgs, 'id'>>;
-  assets?: Resolver<ResolversTypes['AssetsConnection'], ParentType, ContextType, RequireFields<QueryAssetsArgs, never>>;
-  events?: Resolver<ResolversTypes['EventsConnection'], ParentType, ContextType, RequireFields<QueryEventsArgs, never>>;
+  assets?: Resolver<ResolversTypes['AssetsConnection'], ParentType, ContextType, Partial<QueryAssetsArgs>>;
+  events?: Resolver<ResolversTypes['EventsConnection'], ParentType, ContextType, Partial<QueryEventsArgs>>;
   peer?: Resolver<Maybe<ResolversTypes['Peer']>, ParentType, ContextType, RequireFields<QueryPeerArgs, 'id'>>;
-  peers?: Resolver<ResolversTypes['PeersConnection'], ParentType, ContextType, RequireFields<QueryPeersArgs, never>>;
+  peers?: Resolver<ResolversTypes['PeersConnection'], ParentType, ContextType, Partial<QueryPeersArgs>>;
   quote?: Resolver<Maybe<ResolversTypes['Quote']>, ParentType, ContextType, RequireFields<QueryQuoteArgs, 'id'>>;
   outgoingPayment?: Resolver<Maybe<ResolversTypes['OutgoingPayment']>, ParentType, ContextType, RequireFields<QueryOutgoingPaymentArgs, 'id'>>;
 };
@@ -1521,20 +1510,7 @@ export type Resolvers<ContextType = any> = {
   UpdatePeerMutationResponse?: UpdatePeerMutationResponseResolvers<ContextType>;
 };
 
-
-/**
- * @deprecated
- * Use "Resolvers" root object instead. If you wish to get "IResolvers", add "typesPrefix: I" to your config.
- */
-export type IResolvers<ContextType = any> = Resolvers<ContextType>;
 export type DirectiveResolvers<ContextType = any> = {
   auth?: AuthDirectiveResolver<any, any, ContextType>;
   isAdmin?: IsAdminDirectiveResolver<any, any, ContextType>;
 };
-
-
-/**
- * @deprecated
- * Use "DirectiveResolvers" root object instead. If you wish to get "IDirectiveResolvers", add "typesPrefix: I" to your config.
- */
-export type IDirectiveResolvers<ContextType = any> = DirectiveResolvers<ContextType>;
