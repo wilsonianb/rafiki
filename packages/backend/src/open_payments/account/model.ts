@@ -1,5 +1,6 @@
 import { Model } from 'objection'
 
+import { AmountJSON } from '../amount'
 import { LiquidityAccount, OnCreditOptions } from '../../accounting/service'
 import { ConnectorAccount } from '../../connector/core/rafiki'
 import { Asset } from '../../asset/model'
@@ -61,31 +62,30 @@ export class Account
     }
     return this
   }
+}
 
-  public toData(received: bigint): AccountData {
-    return {
-      account: {
-        id: this.id,
-        createdAt: new Date(+this.createdAt).toISOString(),
-        received: received.toString()
-      }
-    }
+export const isWebMonetizationEventType = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types
+  o: any
+): o is WebMonetizationEventType =>
+  Object.values(WebMonetizationEventType).includes(o)
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types
+export const isWebMonetizationEvent = (o: any): o is WebMonetizationEvent =>
+  o instanceof WebhookEvent && isWebMonetizationEventType(o.type)
+
+export class WebMonetizationEvent extends WebhookEvent {
+  public type!: WebMonetizationEventType
+  public data!: WebMonetizationData
+}
+
+export enum WebMonetizationEventType {
+  WebMonetizationReceived = 'WEB_MONETIZATION_RECEIVED'
+}
+
+export type WebMonetizationData = {
+  webMonetization: {
+    accountId: string
+    amount: AmountJSON
   }
-}
-
-export enum AccountEventType {
-  AccountWebMonetization = 'account.web_monetization'
-}
-
-export type AccountData = {
-  account: {
-    id: string
-    createdAt: string
-    received: string
-  }
-}
-
-export class AccountEvent extends WebhookEvent {
-  public type!: AccountEventType
-  public data!: AccountData
 }

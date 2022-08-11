@@ -23,7 +23,7 @@ The wallet creates a payment on behalf of a user by passing details to `Mutation
 
 ### Funding
 
-After the payment is created, Rafiki notifies the wallet operator via an `outgoing_payment.created` [webhook event](#webhooks) to reserve the maximum requisite funds for the payment attempt by moving `sendAmount.value` from the funding wallet account owned by the payer to the payment account.
+After the payment is created, Rafiki notifies the wallet operator via an `OUTGOING_PAYMENT_CREATED` [webhook event](#webhooks) to reserve the maximum requisite funds for the payment attempt by moving `sendAmount.value` from the funding wallet account owned by the payer to the payment account.
 
 If the wallet funds the payment, the state advances to `SENDING`.
 
@@ -47,7 +47,7 @@ After the payment completes, the instance releases the lock on the payment and a
 
 ### Payment resolution
 
-In the `COMPLETED` and `FAILED` cases, the wallet is notifed of any remaining funds in the payment account via `outgoing_payment.completed` and `outgoing_payment.failed` [webhook events](#webhooks).
+In the `COMPLETED` and `FAILED` cases, the wallet is notifed of any remaining funds in the payment account via `OUTGOING_PAYMENT_COMPLETED` and `OUTGOING_PAYMENT_FAILED` [webhook events](#webhooks).
 
 ## Incoming Payment Lifecycle
 
@@ -65,9 +65,9 @@ An incoming payment expires when it passes the `expiresAt` time.
 
 An incoming payment is completed when it has received its specified `incomingAmount.value` or when it is completed manually via an API call.
 
-When the incoming payment expires, Rafiki notifies the wallet of received funds via the `incoming_payment.expired` [webhook event](#webhooks).
+When the incoming payment expires, Rafiki notifies the wallet of received funds via the `INCOMING_PAYMENT_EXPIRED` [webhook event](#webhooks).
 
-When the incoming payment is completed, Rafiki notifies the wallet of received funds via the `incoming_payment.completed` [webhook event](#webhooks).
+When the incoming payment is completed, Rafiki notifies the wallet of received funds via the `INCOMING_PAYMENT_COMPLETED` [webhook event](#webhooks).
 
 An expired incoming payment that has never received money is deleted.
 
@@ -79,41 +79,41 @@ Webhook event handlers must be idempotent and return `200` on success. Rafiki wi
 
 ### `EventType`
 
-#### `account.web_monetization`
-
-Account has web monetization balance to be withdrawn.
-
-Credit `account.received` to the wallet balance for `account.id`, and call `Mutation.withdrawEventLiquidity` with the event id.
-
-#### `incoming_payment.expired`
+#### `INCOMING_PAYMENT_EXPIRED`
 
 Incoming payment has expired.
 
 Credit `incomingPayment.received` to the wallet balance for `incomingPayment.accountId`, and call `Mutation.withdrawEventLiquidity` with the event id.
 
-#### `incoming_payment.completed`
+#### `INCOMING_PAYMENT_COMPLETED`
 
 Incoming payment has received its specified `incomingAmount`.
 
 Credit `incomingPayment.received` to the wallet balance for `incomingPayment.accountId`, and call `Mutation.withdrawEventLiquidity` with the event id.
 
-#### `outgoing_payment.created`
+#### `OUTGOING_PAYMENT_CREATED`
 
 Payment created and needs liquidity in order to send quoted amount.
 
 To fund the payment, deduct `sendAmount.value` from the wallet balance for `payment.accountId` and call `Mutation.depositEventLiquidity` with the event id.
 
-#### `outgoing_payment.failed`
+#### `OUTGOING_PAYMENT_FAILED`
 
 Payment failed.
 
 Credit `payment.balance` to the wallet balance for `payment.accountId`, and call `Mutation.withdrawEventLiquidity` with the event id.
 
-#### `outgoing_payment.completed`
+#### `OUTGOING_PAYMENT_COMPLETED`
 
 Payment completed sending the quoted amount.
 
 Credit `payment.balance` to the wallet balance for `payment.accountId`, and call `Mutation.withdrawEventLiquidity` with the event id.
+
+#### `WEB_MONETIZATION_RECEIVED`
+
+Account has web monetization balance to be withdrawn.
+
+Credit `amount` to the wallet balance for `accountId`, and call `Mutation.withdrawEventLiquidity` with the event id.
 
 ### Webhook Event
 
@@ -161,7 +161,6 @@ The payment must be created with `quoteId`.
 | `description`              | Yes      | `String`               | Human readable description of the outgoing payment.                                                                |
 | `externalRef`              | Yes      | `String`               | A reference that can be used by external systems to reconcile this payment with their systems.                     |
 | `error`                    | Yes      | `String`               | Failure reason.                                                                                                    |
-| `stateAttempts`            | No       | `Integer`              | Retry number at current state.                                                                                     |
 | `accountId`                | No       | `ID`                   | Id of the payer's Open Payments account.                                                                           |
 | `quoteId`                  | No       | `ID`                   | Id of the payment's Open Payments quote.                                                                           |
 | `sendAmount`               | No       | `Object`               |                                                                                                                    |
@@ -194,35 +193,30 @@ The payment must be created with `quoteId`.
 
 ### `Incoming Payment`
 
-| Name                        | Optional | Type                   | Description                                                                               |
-| :-------------------------- | :------- | :--------------------- | :---------------------------------------------------------------------------------------- |
-| `id`                        | No       | `ID`                   | Unique ID for this incoming payment, randomly generated by Rafiki.                        |
-| `accountId`                 | No       | `ID`                   | Id of the recipient's Open Payments account.                                              |
-| `state`                     | No       | `IncomingPaymentState` | See [`IncomingPaymentState`](#incomingpaymentstate)                                       |
-| `incomingAmount`            | Yes      | `Object`               | The amount that is expected to be received.                                               |
-| `incomingAmount.value`      | No       | `UInt64`               | The amount that will be received in the base unit and asset of the receiving account.     |
-| `incomingAmount.assetScale` | No       | `Integer`              |                                                                                           |
-| `incomingAmount.assetCode`  | No       | `String`               |                                                                                           |
-| `receivedAmount`            | No       | `Object`               | The amount that has been received.                                                        |
-| `receivedAmount.value`      | No       | `UInt64`               | The amount that has been received in the base unit and asset of the receiving account.    |
-| `receivedAmount.assetScale` | No       | `Integer`              |                                                                                           |
-| `receivedAmount.assetCode`  | No       | `String`               |                                                                                           |
-| `description`               | Yes      | `String`               | Human readable description of the incoming payment.                                       |
-| `externalRef`               | Yes      | `String`               | Human readable external reference to correlate the incoming payment to, e.g., an invoice. |
-| `createdAt`                 | No       | `String`               | ISO 8601 format.                                                                          |
-| `expiresAt`                 | No       | `String`               | ISO 8601 format.                                                                          |
-
-### `IncomingPaymentState`
-
-- `PENDING`: The payment has a state of `PENDING` when it is initially created.
-- `PROCESSING`: As soon as payment has started (funds have cleared into the account) the state moves to `PROCESSING`.
-- `COMPLETED`: The payment is either auto-completed once the received amount equals the expected `incomingAmount`, or it is completed manually via an API call.
-- `EXPIRED`: If the payment expires before it is completed then the state will move to `EXPIRED` and no further payments will be accepted.
+| Name                        | Optional | Type      | Description                                                                               |
+| :-------------------------- | :------- | :-------- | :---------------------------------------------------------------------------------------- |
+| `id`                        | No       | `ID`      | Unique ID for this incoming payment, randomly generated by Rafiki.                        |
+| `accountId`                 | No       | `ID`      | Id of the recipient's Open Payments account.                                              |
+| `completed`                 | No       | `Boolean` | Describes whether the incoming payment has completed receiving fund.                      |
+| `incomingAmount`            | Yes      | `Object`  | The amount that is expected to be received.                                               |
+| `incomingAmount.value`      | No       | `UInt64`  | The amount that will be received in the base unit and asset of the receiving account.     |
+| `incomingAmount.assetScale` | No       | `Integer` |                                                                                           |
+| `incomingAmount.assetCode`  | No       | `String`  |                                                                                           |
+| `receivedAmount`            | No       | `Object`  | The amount that has been received.                                                        |
+| `receivedAmount.value`      | No       | `UInt64`  | The amount that has been received in the base unit and asset of the receiving account.    |
+| `receivedAmount.assetScale` | No       | `Integer` |                                                                                           |
+| `receivedAmount.assetCode`  | No       | `String`  |                                                                                           |
+| `description`               | Yes      | `String`  | Human readable description of the incoming payment.                                       |
+| `externalRef`               | Yes      | `String`  | Human readable external reference to correlate the incoming payment to, e.g., an invoice. |
+| `createdAt`                 | No       | `String`  | ISO 8601 format.                                                                          |
+| `expiresAt`                 | No       | `String`  | ISO 8601 format.                                                                          |
 
 ### `Account`
 
-| Name        | Optional | Type     | Description                                               |
-| :---------- | :------- | :------- | :-------------------------------------------------------- |
-| `id`        | No       | `ID`     | Unique ID for this account, randomly generated by Rafiki. |
-| `received`  | No       | `UInt64` | The amount received, in base units of the account asset.  |
-| `createdAt` | No       | `String` | ISO 8601 format.                                          |
+| Name                | Optional | Type      | Description                                                                            |
+| :------------------ | :------- | :-------- | :------------------------------------------------------------------------------------- |
+| `accountId`         | No       | `ID`      | Unique ID for this account, randomly generated by Rafiki.                              |
+| `amount`            | No       | `Object`  | The amount that has been received.                                                     |
+| `amount.value`      | No       | `UInt64`  | The amount that has been received in the base unit and asset of the receiving account. |
+| `amount.assetScale` | No       | `Integer` |                                                                                        |
+| `amount.assetCode`  | No       | `String`  |                                                                                        |

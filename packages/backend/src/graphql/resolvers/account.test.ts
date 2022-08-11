@@ -12,11 +12,11 @@ import { Config } from '../../config/app'
 import { truncateTables } from '../../tests/tableManager'
 import {
   Account as AccountModel,
-  AccountEvent,
-  AccountEventType
+  WebMonetizationEventType
 } from '../../open_payments/account/model'
 import { AccountService } from '../../open_payments/account/service'
 import { randomAsset } from '../../tests/asset'
+import { WebhookEvent } from '../../webhook/model'
 import {
   CreateAccountInput,
   CreateAccountMutationResponse,
@@ -286,8 +286,8 @@ describe('Account Resolvers', (): void => {
         expect(response.code).toEqual('200')
         expect(response.count).toEqual(count)
         await expect(
-          AccountEvent.query(knex).where({
-            type: AccountEventType.AccountWebMonetization
+          WebhookEvent.query(knex).where({
+            type: WebMonetizationEventType.WebMonetizationReceived
           })
         ).resolves.toHaveLength(count)
         for (let i = 1; i <= count; i++) {

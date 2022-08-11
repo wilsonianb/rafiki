@@ -11,7 +11,7 @@ import {
 import {
   OutgoingPayment,
   OutgoingPaymentState,
-  PaymentEventType
+  OutgoingPaymentEventType
 } from './model'
 import { AccountingService } from '../../../accounting/service'
 import { AccountService } from '../../account/service'
@@ -141,7 +141,7 @@ async function createOutgoingPayment(
           knex: trx
         },
         payment,
-        PaymentEventType.PaymentCreated
+        OutgoingPaymentEventType.OutgoingPaymentCreated
       )
       return await addSentAmount(deps, payment, BigInt(0))
     })
