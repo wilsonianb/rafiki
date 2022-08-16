@@ -4891,7 +4891,6 @@ __metadata:
     axios: ^0.21.4
     base64url: ^3.0.1
     bcrypt: ^5.0.1
-    canonical-json: ^0.0.4
     cross-fetch: ^3.1.4
     extensible-error: ^1.0.2
     fishery: ^1.2.0
@@ -4908,6 +4907,7 @@ __metadata:
     ioredis: ^4.26.0
     iso8601-duration: ^1.3.0
     jest-openapi: ^0.14.2
+    json-canonicalize: ^1.0.4
     knex: ^0.21.17
     koa: ^2.13.1
     koa-bodyparser: ^4.3.0
@@ -5397,13 +5397,6 @@ __metadata:
   version: 1.0.30001237
   resolution: "caniuse-lite@npm:1.0.30001237"
   checksum: 929dc395f1ff67beb385aade65122faba47c0364044f41cedfe7ada1b89d656beb05d38abf1eedcf9f6e09af0b34577b7953668ff363a6392bf35f20095bba66
-  languageName: node
-  linkType: hard
-
-"canonical-json@npm:^0.0.4":
-  version: 0.0.4
-  resolution: "canonical-json@npm:0.0.4"
-  checksum: cc1efe7d7a82d4b5678c156620f62502871dde9773e9f7b082e55e02baf8ee12011f8a4a696ddd3d717a1ec5e84a472c0ad8678301779fa10ba5cfa3e86cb44e
   languageName: node
   linkType: hard
 
@@ -10166,6 +10159,13 @@ __metadata:
   version: 3.0.1
   resolution: "json-buffer@npm:3.0.1"
   checksum: 9026b03edc2847eefa2e37646c579300a1f3a4586cfb62bf857832b60c852042d0d6ae55d1afb8926163fa54c2b01d83ae24705f34990348bdac6273a29d4581
+  languageName: node
+  linkType: hard
+
+"json-canonicalize@npm:^1.0.4":
+  version: 1.0.4
+  resolution: "json-canonicalize@npm:1.0.4"
+  checksum: 21b8c78fbc0e51856ccebd5f70bf8261f68773062edf7f584a4778c70fd48a7076e498c3a73446eb34dcf0978db43da09885617defc1d7e2d173095cc35c48f4
   languageName: node
   linkType: hard
 
