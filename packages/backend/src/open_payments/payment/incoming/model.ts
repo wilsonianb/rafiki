@@ -213,6 +213,12 @@ export class IncomingPayment
   }
 }
 
+export type IlpStreamConnectionJSON = {
+  id: string
+  ilpAddress: string
+  sharedSecret: string
+}
+
 export type IncomingPaymentJSON = {
   id: string
   paymentPointer: string
@@ -224,5 +230,5 @@ export type IncomingPaymentJSON = {
   createdAt: string
   updatedAt: string
   expiresAt: string
-  ilpStreamConnection: string
+  ilpStreamConnection: IlpStreamConnectionJSON | string
 }
