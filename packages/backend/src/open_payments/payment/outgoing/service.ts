@@ -1,6 +1,5 @@
 import assert from 'assert'
 import { ForeignKeyViolationError, TransactionOrKnex } from 'objection'
-import * as Pay from '@interledger/pay'
 
 import { Pagination } from '../../../shared/baseModel'
 import { BaseService } from '../../../shared/baseService'
@@ -18,6 +17,7 @@ import {
 import { AccountingService } from '../../../accounting/service'
 import { PeerService } from '../../../peer/service'
 import { Grant, AccessLimits, getInterval } from '../../auth/grant'
+import { SetupPaymentService } from '../../setup_payment/service'
 import { IlpPlugin, IlpPluginOptions } from '../../../shared/ilp_plugin'
 import { sendWebhookEvent } from './lifecycle'
 import * as worker from './worker'
@@ -46,6 +46,7 @@ export interface OutgoingPaymentService {
 export interface ServiceDependencies extends BaseService {
   knex: TransactionOrKnex
   accountingService: AccountingService
+  setupPaymentService: SetupPaymentService
   peerService: PeerService
   makeIlpPlugin: (options: IlpPluginOptions) => IlpPlugin
   publicHost: string
@@ -150,10 +151,11 @@ async function createOutgoingPayment(
       })
       try {
         await plugin.connect()
-        const destination = await Pay.setupPayment({
-          plugin,
-          destinationPayment: payment.receiver
-        })
+        const destination = await deps.setupPaymentService.setupPayment(
+          payment.receiver,
+          'TODO GNAP TOKEN',
+          plugin
+        )
         const peer = await deps.peerService.getByDestinationAddress(
           destination.destinationAddress
         )

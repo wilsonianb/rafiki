@@ -10,6 +10,7 @@ import { QuoteError, isQuoteError } from './errors'
 import { Quote } from './model'
 import { Amount } from '../amount'
 import { PaymentPointerService } from '../payment_pointer/service'
+import { SetupPaymentService } from '../setup_payment/service'
 import { RatesService } from '../../rates/service'
 import { IlpPlugin, IlpPluginOptions } from '../../shared/ilp_plugin'
 
@@ -33,6 +34,7 @@ export interface ServiceDependencies extends BaseService {
   signatureVersion: number
   paymentPointerService: PaymentPointerService
   ratesService: RatesService
+  setupPaymentService: SetupPaymentService
   makeIlpPlugin: (options: IlpPluginOptions) => IlpPlugin
 }
 
@@ -184,10 +186,11 @@ export async function resolveDestination(
 ): Promise<Pay.ResolvedPayment> {
   let destination: Pay.ResolvedPayment
   try {
-    destination = await Pay.setupPayment({
-      plugin,
-      destinationPayment: options.receiver
-    })
+    destination = await deps.setupPaymentService.setupPayment(
+      options.receiver,
+      'TODO GNAP TOKEN',
+      plugin
+    )
   } catch (err) {
     if (err === Pay.PaymentError.QueryFailed) {
       throw QuoteError.InvalidDestination
