@@ -8,6 +8,8 @@ import {
   PaymentEventType
 } from './model'
 import { ServiceDependencies } from './service'
+import { IncomingPaymentJSON } from '../incoming/model'
+import { toResolvedPayment } from '../../shared/resolvedPayment'
 import { IlpPlugin } from '../../../shared/ilp_plugin'
 
 // "payment" is locked by the "deps.knex" transaction.
@@ -18,16 +20,15 @@ export async function handleSending(
 ): Promise<void> {
   if (!payment.quote) throw LifecycleError.MissingQuote
 
-  const destination = await Pay.setupPayment({
-    plugin,
-    destinationPayment: payment.receiver
-  })
+  const incomingPayment = await deps.clientService.incomingPayment.get(
+    payment.receiver
+  )
 
-  if (!destination.destinationPaymentDetails) {
+  if (!incomingPayment) {
     throw LifecycleError.MissingIncomingPayment
   }
 
-  validateAssets(deps, payment, destination)
+  validateAssets(deps, payment, incomingPayment)
 
   // TODO: Query Tigerbeetle transfers by code to distinguish sending debits from withdrawals
   const amountSent = await deps.accountingService.getTotalSent(payment.id)
@@ -39,10 +40,10 @@ export async function handleSending(
   const newMaxSourceAmount = payment.sendAmount.value - amountSent
 
   let newMinDeliveryAmount
-  if (destination.destinationPaymentDetails.incomingAmount) {
+  if (incomingPayment.incomingAmount) {
     newMinDeliveryAmount =
-      destination.destinationPaymentDetails.incomingAmount.value -
-      destination.destinationPaymentDetails.receivedAmount.value
+      BigInt(incomingPayment.incomingAmount.value) -
+      BigInt(incomingPayment.receivedAmount.value)
   } else {
     // This is only an approximation of the true amount delivered due to exchange rate variance. The true amount delivered is returned on stream response packets, but due to connection failures there isn't a reliable way to track that in sync with the amount sent.
     // eslint-disable-next-line no-case-declarations
@@ -55,13 +56,13 @@ export async function handleSending(
   }
 
   if (newMinDeliveryAmount <= BigInt(0)) {
-    // Payment is already (unexpectedly) done. Maybe this is a retry and the previous attempt failed to save the state to Postgres. Or the invoice could have been paid by a totally different payment in the time since the quote.
+    // Payment is already (unexpectedly) done. Maybe this is a retry and the previous attempt failed to save the state to Postgres. Or the incoming payment could have been paid by a totally different payment in the time since the quote.
     deps.logger.warn(
       {
         newMaxSourceAmount,
         newMinDeliveryAmount,
         amountSent,
-        incomingPayment: destination.destinationPaymentDetails
+        incomingPayment
       },
       'handleSending payment was already paid'
     )
@@ -97,6 +98,7 @@ export async function handleSending(
     minExchangeRate
   }
 
+  const destination = toResolvedPayment(incomingPayment)
   const receipt = await Pay.pay({ plugin, destination, quote }).finally(() => {
     return Pay.closeConnection(plugin, destination).catch((err) => {
       // Ignore connection close failures, all of the money was delivered.
@@ -186,20 +188,21 @@ export const sendWebhookEvent = async (
 const validateAssets = (
   deps: ServiceDependencies,
   payment: OutgoingPayment,
-  destination: Pay.ResolvedPayment
+  destination: IncomingPaymentJSON
 ): void => {
   if (payment.assetId !== payment.paymentPointer?.assetId) {
     throw LifecycleError.SourceAssetConflict
   }
   if (payment.receiveAmount) {
     if (
-      payment.receiveAmount.assetScale !== destination.destinationAsset.scale ||
-      payment.receiveAmount.assetCode !== destination.destinationAsset.code
+      payment.receiveAmount.assetScale !==
+        destination.receivedAmount.assetScale ||
+      payment.receiveAmount.assetCode !== destination.receivedAmount.assetCode
     ) {
       deps.logger.warn(
         {
           oldAsset: payment.receiveAmount,
-          newAsset: destination.destinationAsset
+          newAsset: destination.receivedAmount
         },
         'destination asset changed'
       )

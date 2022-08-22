@@ -776,12 +776,10 @@ describe('OutgoingPaymentService', (): void => {
           receiveAmount
         })
 
-        let scope: nock.Scope | undefined
         const payment = await processNext(
           paymentId,
           OutgoingPaymentState.Completed
         )
-        scope?.isDone()
         if (!payment.sendAmount) throw 'no sendAmount'
         const amountSent = payment.receiveAmount.value * BigInt(2)
         await expectOutcome(payment, {

@@ -1,3 +1,4 @@
+import { IlpAddress } from 'ilp-packet'
 import { Model, Pojo } from 'objection'
 import { v4 as uuid } from 'uuid'
 
@@ -216,9 +217,16 @@ export class IncomingPayment
       createdAt: json.createdAt,
       updatedAt: json.updatedAt,
       expiresAt: json.expiresAt?.toISOString(),
+      // TODO
       ilpStreamConnection: json.connectionId
     }
   }
+}
+
+export type IlpStreamConnectionJSON = {
+  id: string
+  ilpAddress: IlpAddress
+  sharedSecret: string
 }
 
 export type IncomingPaymentJSON = {
@@ -232,5 +240,7 @@ export type IncomingPaymentJSON = {
   createdAt: string
   updatedAt: string
   expiresAt: string
-  ilpStreamConnection: string
+  // TODO
+  // ilpStreamConnection: IlpStreamConnectionJSON | string
+  ilpStreamConnection: IlpStreamConnectionJSON
 }
