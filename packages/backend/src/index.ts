@@ -12,7 +12,6 @@ import { Config } from './config/app'
 import { createRatesService } from './rates/service'
 import { createQuoteRoutes } from './open_payments/quote/routes'
 import { createQuoteService } from './open_payments/quote/service'
-import { createSetupPaymentService } from './open_payments/setup_payment/service'
 import { createOutgoingPaymentRoutes } from './open_payments/payment/outgoing/routes'
 import { createOutgoingPaymentService } from './open_payments/payment/outgoing/service'
 import {
@@ -187,10 +186,13 @@ export function initIocContainer(
     })
   })
   container.singleton('incomingPaymentService', async (deps) => {
+    const config = await deps.use('config')
     return await createIncomingPaymentService({
       logger: await deps.use('logger'),
       knex: await deps.use('knex'),
+      accessToken: config.clientAccessToken,
       accountingService: await deps.use('accountingService'),
+      openApi: await deps.use('openApi'),
       paymentPointerService: await deps.use('paymentPointerService')
     })
   })
@@ -274,17 +276,11 @@ export function initIocContainer(
       knex: await deps.use('knex'),
       makeIlpPlugin: await deps.use('makeIlpPlugin'),
       paymentPointerService: await deps.use('paymentPointerService'),
-      setupPaymentService: await deps.use('setupPaymentService'),
+      incomingPaymentService: await deps.use('incomingPaymentService'),
       ratesService: await deps.use('ratesService')
     })
   })
 
-  container.singleton('setupPaymentService', async (deps) => {
-    return await createSetupPaymentService({
-      logger: await deps.use('logger'),
-      openApi: await deps.use('openApi')
-    })
-  })
   container.singleton('quoteRoutes', async (deps) => {
     return createQuoteRoutes({
       config: await deps.use('config'),
@@ -298,7 +294,7 @@ export function initIocContainer(
       logger: await deps.use('logger'),
       knex: await deps.use('knex'),
       accountingService: await deps.use('accountingService'),
-      setupPaymentService: await deps.use('setupPaymentService'),
+      incomingPaymentService: await deps.use('incomingPaymentService'),
       makeIlpPlugin: await deps.use('makeIlpPlugin'),
       peerService: await deps.use('peerService'),
       publicHost: config.publicHost

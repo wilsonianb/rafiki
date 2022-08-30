@@ -2,14 +2,18 @@ import {
   IncomingPayment,
   IncomingPaymentEvent,
   IncomingPaymentEventType,
+  IncomingPaymentJSON,
   IncomingPaymentState
 } from './model'
 import { AccountingService } from '../../../accounting/service'
 import { Pagination } from '../../../shared/baseModel'
 import { BaseService } from '../../../shared/baseService'
+import { Counter, PaymentError, ResolvedPayment } from '@interledger/pay'
 import assert from 'assert'
+import axios from 'axios'
 import { Knex } from 'knex'
 import { TransactionOrKnex } from 'objection'
+import { OpenAPI, HttpMethod, ValidateFunction } from 'openapi'
 import { PaymentPointerService } from '../../payment_pointer/service'
 import { Amount } from '../../amount'
 import { IncomingPaymentError } from './errors'
@@ -39,6 +43,7 @@ export interface IncomingPaymentService {
     trx?: Knex.Transaction
   ): Promise<IncomingPayment | IncomingPaymentError>
   complete(id: string): Promise<IncomingPayment | IncomingPaymentError>
+  resolve(url: string): Promise<ResolvedPayment>
   getPaymentPointerPage(
     paymentPointerId: string,
     pagination?: Pagination
@@ -49,24 +54,34 @@ export interface IncomingPaymentService {
 
 export interface ServiceDependencies extends BaseService {
   knex: TransactionOrKnex
+  accessToken: string
   accountingService: AccountingService
+  openApi: OpenAPI
   paymentPointerService: PaymentPointerService
+  validateResponse: ValidateFunction<IncomingPaymentJSON>
 }
 
 export async function createIncomingPaymentService(
-  deps_: ServiceDependencies
+  deps_: Omit<ServiceDependencies, 'validateResponse'>
 ): Promise<IncomingPaymentService> {
   const log = deps_.logger.child({
     service: 'IncomingPaymentService'
   })
+  const validateResponse =
+    deps_.openApi.createResponseValidator<IncomingPaymentJSON>({
+      path: '/incoming-payments/{incomingPaymentId}',
+      method: HttpMethod.GET
+    })
   const deps: ServiceDependencies = {
     ...deps_,
-    logger: log
+    logger: log,
+    validateResponse
   }
   return {
     get: (id) => getIncomingPayment(deps, 'id', id),
     create: (options, trx) => createIncomingPayment(deps, options, trx),
     complete: (id) => completeIncomingPayment(deps, id),
+    resolve: (url) => resolveIncomingPayment(deps, url),
     getPaymentPointerPage: (paymentPointerId, pagination) =>
       getPaymentPointerPage(deps, paymentPointerId, pagination),
     processNext: () => processNextIncomingPayment(deps),
@@ -303,6 +318,68 @@ async function completeIncomingPayment(
     })
     return await addReceivedAmount(deps, payment)
   })
+}
+
+function createHttpUrl(rawUrl: string, base?: string): URL | undefined {
+  try {
+    const url = new URL(rawUrl, base)
+    if (url.protocol === 'https:' || url.protocol === 'http:') {
+      return url
+    }
+  } catch (_) {
+    return
+  }
+}
+
+export async function resolveIncomingPayment(
+  deps: ServiceDependencies,
+  url: string
+): Promise<ResolvedPayment> {
+  if (!createHttpUrl(url)) {
+    console.log('destinationPayment query failed: URL not HTTP/HTTPS.')
+    throw new Error(PaymentError.QueryFailed)
+  }
+  const requestHeaders = {
+    Authorization: `GNAP ${deps.accessToken}`,
+    'Content-Type': 'application/json'
+  }
+
+  const { status, data } = await axios.get(url, {
+    headers: requestHeaders,
+    validateStatus: (status) => status === 200
+  })
+
+  try {
+    if (
+      !deps.validateResponse({
+        status,
+        body: data
+      })
+    ) {
+      throw new Error('unreachable')
+    }
+    return {
+      destinationAsset: {
+        code: data.receivedAmount.assetCode,
+        scale: data.receivedAmount.assetScale
+      },
+      destinationAddress: data.ilpStreamConnection.ilpAddress,
+      sharedSecret: data.ilpStreamConnection.sharedSecret,
+      requestCounter: Counter.from(0)
+    }
+  } catch (_) {
+    throw new Error(PaymentError.QueryFailed)
+  }
+
+  // return await Pay.setupPayment({
+  //   plugin,
+  //   destinationAddress: (data.ilpStreamConnection as IlpStreamConnectionJSON)
+  //     .ilpAddress,
+  //   sharedSecret: Buffer.from(
+  //     (data.ilpStreamConnection as IlpStreamConnectionJSON).sharedSecret,
+  //     'base64'
+  //   )
+  // })
 }
 
 async function addReceivedAmount(

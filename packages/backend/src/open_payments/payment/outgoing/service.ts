@@ -17,7 +17,7 @@ import {
 import { AccountingService } from '../../../accounting/service'
 import { PeerService } from '../../../peer/service'
 import { Grant, AccessLimits, getInterval } from '../../auth/grant'
-import { SetupPaymentService } from '../../setup_payment/service'
+import { IncomingPaymentService } from '../incoming/service'
 import { IlpPlugin, IlpPluginOptions } from '../../../shared/ilp_plugin'
 import { sendWebhookEvent } from './lifecycle'
 import * as worker from './worker'
@@ -46,7 +46,7 @@ export interface OutgoingPaymentService {
 export interface ServiceDependencies extends BaseService {
   knex: TransactionOrKnex
   accountingService: AccountingService
-  setupPaymentService: SetupPaymentService
+  incomingPaymentService: IncomingPaymentService
   peerService: PeerService
   makeIlpPlugin: (options: IlpPluginOptions) => IlpPlugin
   publicHost: string
@@ -139,33 +139,14 @@ async function createOutgoingPayment(
           throw OutgoingPaymentError.InsufficientGrant
         }
       }
-      const plugin = deps.makeIlpPlugin({
-        sourceAccount: {
-          id: payment.paymentPointerId,
-          asset: {
-            id: payment.assetId,
-            ledger: payment.asset.ledger
-          }
-        },
-        unfulfillable: true
-      })
-      try {
-        await plugin.connect()
-        const destination = await deps.setupPaymentService.setupPayment(
-          payment.receiver,
-          'TODO GNAP TOKEN',
-          plugin
-        )
-        const peer = await deps.peerService.getByDestinationAddress(
-          destination.destinationAddress
-        )
-        if (peer) {
-          await payment.$query(trx).patch({ peerId: peer.id })
-        }
-      } finally {
-        plugin.disconnect().catch((err: Error) => {
-          deps.logger.warn({ error: err.message }, 'error disconnecting plugin')
-        })
+      const destination = await deps.incomingPaymentService.resolve(
+        payment.receiver
+      )
+      const peer = await deps.peerService.getByDestinationAddress(
+        destination.destinationAddress
+      )
+      if (peer) {
+        await payment.$query(trx).patch({ peerId: peer.id })
       }
 
       await sendWebhookEvent(

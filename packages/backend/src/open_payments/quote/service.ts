@@ -10,7 +10,7 @@ import { QuoteError, isQuoteError } from './errors'
 import { Quote } from './model'
 import { Amount } from '../amount'
 import { PaymentPointerService } from '../payment_pointer/service'
-import { SetupPaymentService } from '../setup_payment/service'
+import { IncomingPaymentService } from '../payment/incoming/service'
 import { RatesService } from '../../rates/service'
 import { IlpPlugin, IlpPluginOptions } from '../../shared/ilp_plugin'
 
@@ -34,7 +34,7 @@ export interface ServiceDependencies extends BaseService {
   signatureVersion: number
   paymentPointerService: PaymentPointerService
   ratesService: RatesService
-  setupPaymentService: SetupPaymentService
+  incomingPaymentService: IncomingPaymentService
   makeIlpPlugin: (options: IlpPluginOptions) => IlpPlugin
 }
 
@@ -99,16 +99,16 @@ async function createQuote(
     unfulfillable: true
   })
 
+  const destination = await resolveDestination(deps, options)
+
+  const receivingPaymentValue = destination.destinationPaymentDetails
+    ?.incomingAmount
+    ? destination.destinationPaymentDetails.incomingAmount.value -
+      destination.destinationPaymentDetails.receivedAmount.value
+    : undefined
+
   try {
     await plugin.connect()
-
-    const destination = await resolveDestination(deps, options, plugin)
-
-    const receivingPaymentValue = destination.destinationPaymentDetails
-      ?.incomingAmount
-      ? destination.destinationPaymentDetails.incomingAmount.value -
-        destination.destinationPaymentDetails.receivedAmount.value
-      : undefined
 
     const ilpQuote = await startQuote(deps, options, {
       plugin,
@@ -181,16 +181,11 @@ async function createQuote(
 
 export async function resolveDestination(
   deps: ServiceDependencies,
-  options: CreateQuoteOptions,
-  plugin: IlpPlugin
+  options: CreateQuoteOptions
 ): Promise<Pay.ResolvedPayment> {
   let destination: Pay.ResolvedPayment
   try {
-    destination = await deps.setupPaymentService.setupPayment(
-      options.receiver,
-      'TODO GNAP TOKEN',
-      plugin
-    )
+    destination = await deps.incomingPaymentService.resolve(options.receiver)
   } catch (err) {
     if (err === Pay.PaymentError.QueryFailed) {
       throw QuoteError.InvalidDestination
