@@ -129,26 +129,6 @@ describe('SetupPaymentService', (): void => {
     ilpStreamConnection:
       'http://openpayments.guide/connections/ff394f02-7b7b-45e2-b645-51d04e7c345c'
   }
-  describe(' url connection', (): void => {
-    beforeEach(async (): Promise<void> => {
-      nock(testHost)
-        .get(incomingPaymentPath)
-        .reply(200, () => incomingPaymentRecordUrlConnection)
-        .persist()
-    })
-    afterEach(async (): Promise<void> => {
-      nock.cleanAll()
-    })
-    it('fails when the returned data specifies ilpStreamConnection as url', async () => {
-      await expect(
-        async () =>
-          await setupPaymentService.queryIncomingPayment(
-            `${testHost}${incomingPaymentPath}`,
-            'hkfjkcjk'
-          )
-      ).rejects.toThrow(PaymentError.QueryFailed)
-    })
-  })
   describe(' get success', (): void => {
     beforeEach(async (): Promise<void> => {
       nock(testHost)

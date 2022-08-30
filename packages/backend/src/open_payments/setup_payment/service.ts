@@ -103,15 +103,6 @@ export async function createSetupPaymentService(
     } catch (_) {
       throw new Error(PaymentError.QueryFailed)
     }
-    // GET requests to the Incoming Payment should always
-    // return an ilpConnectionStream object that has
-    // an `id` attribute. but for list requests,
-    // the ilpStreamConnection attribute can be a string.
-    // This checks to make sure we've gotten the right kind
-    // of response.
-    if (data.ilpStreamConnection !== Object(data.ilpStreamConnection)) {
-      throw new Error(PaymentError.QueryFailed)
-    }
     return data
   }
 
