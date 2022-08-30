@@ -33,7 +33,7 @@ export async function createSetupPaymentService(
   })
   const validateResponse =
     deps_.openApi.createResponseValidator<IncomingPaymentJSON>({
-      path: '/{accountId}/incoming-payments/{incomingPaymentId}',
+      path: '/incoming-payments/{incomingPaymentId}',
       method: HttpMethod.GET
     })
   const deps: ServiceDependencies = {

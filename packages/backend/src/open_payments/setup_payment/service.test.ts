@@ -48,12 +48,13 @@ describe('SetupPaymentService', (): void => {
     assetScale: asset.scale
   }
   const testHost = 'https://example.com'
-  const accountId = 'setup-payment-account-id'
+  const paymentPointerPath = '/setup-payment-account-id'
+  const paymentPointer = `${testHost}${paymentPointerPath}`
   const incomingPaymentId = 'setup-payment-incoming-payment-id'
-  const incomingPaymentPath = `/${accountId}/incoming-payments/${incomingPaymentId}`
+  const incomingPaymentPath = `/incoming-payments/${incomingPaymentId}`
   const incomingPaymentRecord = {
-    id: `${testHost}${incomingPaymentPath}`,
-    accountId: `${testHost}/${accountId}`,
+    id: `${paymentPointer}${incomingPaymentPath}`,
+    paymentPointer,
     incomingAmount,
     receivedAmount,
     description: 'description string',
@@ -69,8 +70,8 @@ describe('SetupPaymentService', (): void => {
     }
   }
   const invalidIncomingPaymentRecord = {
-    id: `${testHost}${incomingPaymentPath}`,
-    accountId: `${testHost}/${accountId}`,
+    id: `${paymentPointer}${incomingPaymentPath}`,
+    paymentPointer,
     incomingAmount,
     completed: false,
     description: 'description string',
@@ -88,7 +89,7 @@ describe('SetupPaymentService', (): void => {
   describe(' get failure', (): void => {
     beforeEach(async (): Promise<void> => {
       nock(testHost)
-        .get(incomingPaymentPath)
+        .get(`${paymentPointerPath}${incomingPaymentPath}`)
         .reply(200, () => invalidIncomingPaymentRecord)
         .persist()
     })
@@ -108,31 +109,17 @@ describe('SetupPaymentService', (): void => {
       await expect(
         async () =>
           await setupPaymentService.queryIncomingPayment(
-            `${testHost}${incomingPaymentPath}`,
+            `${paymentPointer}${incomingPaymentPath}`,
             'hkfjkcjk'
           )
       ).rejects.toThrow(PaymentError.QueryFailed)
     })
   })
 
-  const incomingPaymentRecordUrlConnection = {
-    id: `${testHost}${incomingPaymentPath}`,
-    accountId: `${testHost}/${accountId}`,
-    incomingAmount,
-    receivedAmount,
-    description: 'description string',
-    completed: false,
-    expiresAt: '2023-03-12T23:20:50.52Z',
-    createdAt: '2022-03-12T23:20:50.52Z',
-    updatedAt: '2022-03-12T23:20:50.52Z',
-    externalRef: 'INV2022-02-0137',
-    ilpStreamConnection:
-      'http://openpayments.guide/connections/ff394f02-7b7b-45e2-b645-51d04e7c345c'
-  }
   describe(' get success', (): void => {
     beforeEach(async (): Promise<void> => {
       nock(testHost)
-        .get(incomingPaymentPath)
+        .get(`${paymentPointerPath}${incomingPaymentPath}`)
         .reply(200, () => incomingPaymentRecord)
         .persist()
     })
@@ -142,7 +129,7 @@ describe('SetupPaymentService', (): void => {
     it('gets the incoming payment record', async () => {
       await expect(
         await setupPaymentService.queryIncomingPayment(
-          `${testHost}${incomingPaymentPath}`,
+          `${paymentPointer}${incomingPaymentPath}`,
           'hkfjkcjk'
         )
       ).toEqual(incomingPaymentRecord)
