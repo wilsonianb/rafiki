@@ -3,17 +3,19 @@ import {
   IncomingPaymentEvent,
   IncomingPaymentEventType,
   IncomingPaymentJSON,
-  IncomingPaymentState
+  IncomingPaymentState,
+  ResolvedIncomingPayment
 } from './model'
 import { AccountingService } from '../../../accounting/service'
 import { Pagination } from '../../../shared/baseModel'
 import { BaseService } from '../../../shared/baseService'
-import { Counter, PaymentError, ResolvedPayment } from '@interledger/pay'
 import assert from 'assert'
 import axios from 'axios'
+import { PaymentError } from '@interledger/pay'
 import { Knex } from 'knex'
 import { TransactionOrKnex } from 'objection'
 import { OpenAPI, HttpMethod, ValidateFunction } from 'openapi'
+import { ConnectionService } from '../../connection/service'
 import { PaymentPointerService } from '../../payment_pointer/service'
 import { Amount } from '../../amount'
 import { IncomingPaymentError } from './errors'
@@ -43,7 +45,7 @@ export interface IncomingPaymentService {
     trx?: Knex.Transaction
   ): Promise<IncomingPayment | IncomingPaymentError>
   complete(id: string): Promise<IncomingPayment | IncomingPaymentError>
-  resolve(url: string): Promise<ResolvedPayment>
+  resolve(url: string): Promise<ResolvedIncomingPayment>
   getPaymentPointerPage(
     paymentPointerId: string,
     pagination?: Pagination
@@ -56,6 +58,7 @@ export interface ServiceDependencies extends BaseService {
   knex: TransactionOrKnex
   accessToken: string
   accountingService: AccountingService
+  connectionService: ConnectionService
   openApi: OpenAPI
   paymentPointerService: PaymentPointerService
   validateResponse: ValidateFunction<IncomingPaymentJSON>
@@ -100,6 +103,26 @@ async function getIncomingPayment(
     .withGraphFetched('asset')
   if (incomingPayment) return await addReceivedAmount(deps, incomingPayment)
   else return
+}
+
+async function getIncomingPaymentByUrl(
+  deps: ServiceDependencies,
+  url: string
+): Promise<IncomingPayment | undefined> {
+  const parts = url.split('/incoming-payments/')
+  if (parts.length !== 2) {
+    return undefined
+  }
+  const [id, paymentPointer] = parts
+  const incomingPayment = await IncomingPayment.query(deps.knex)
+    .findOne({
+      id,
+      paymentPointer
+    })
+    .withGraphFetched('asset')
+  if (incomingPayment) {
+    return await addReceivedAmount(deps, incomingPayment)
+  }
 }
 
 async function createIncomingPayment(
@@ -334,7 +357,13 @@ function createHttpUrl(rawUrl: string, base?: string): URL | undefined {
 export async function resolveIncomingPayment(
   deps: ServiceDependencies,
   url: string
-): Promise<ResolvedPayment> {
+): Promise<ResolvedIncomingPayment> {
+  const incomingPayment = await getIncomingPaymentByUrl(deps, url)
+  if (incomingPayment) {
+    incomingPayment.ilpStreamConnection =
+      deps.connectionService.get(incomingPayment)
+    return incomingPayment as ResolvedIncomingPayment
+  }
   if (!createHttpUrl(url)) {
     console.log('destinationPayment query failed: URL not HTTP/HTTPS.')
     throw new Error(PaymentError.QueryFailed)
@@ -358,15 +387,7 @@ export async function resolveIncomingPayment(
     ) {
       throw new Error('unreachable')
     }
-    return {
-      destinationAsset: {
-        code: data.receivedAmount.assetCode,
-        scale: data.receivedAmount.assetScale
-      },
-      destinationAddress: data.ilpStreamConnection.ilpAddress,
-      sharedSecret: data.ilpStreamConnection.sharedSecret,
-      requestCounter: Counter.from(0)
-    }
+    return data
   } catch (_) {
     throw new Error(PaymentError.QueryFailed)
   }

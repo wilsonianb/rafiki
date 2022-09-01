@@ -192,6 +192,7 @@ export function initIocContainer(
       knex: await deps.use('knex'),
       accessToken: config.clientAccessToken,
       accountingService: await deps.use('accountingService'),
+      connectionService: await deps.use('connectionService'),
       openApi: await deps.use('openApi'),
       paymentPointerService: await deps.use('paymentPointerService')
     })

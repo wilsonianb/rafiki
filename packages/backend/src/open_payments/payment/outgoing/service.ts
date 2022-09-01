@@ -139,11 +139,11 @@ async function createOutgoingPayment(
           throw OutgoingPaymentError.InsufficientGrant
         }
       }
-      const destination = await deps.incomingPaymentService.resolve(
+      const incomingPayment = await deps.incomingPaymentService.resolve(
         payment.receiver
       )
       const peer = await deps.peerService.getByDestinationAddress(
-        destination.destinationAddress
+        incomingPayment.ilpStreamConnection.ilpAddress
       )
       if (peer) {
         await payment.$query(trx).patch({ peerId: peer.id })

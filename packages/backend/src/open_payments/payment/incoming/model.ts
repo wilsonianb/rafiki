@@ -1,3 +1,5 @@
+import { PaymentError, Counter, ResolvedPayment } from '@interledger/pay'
+import { StreamCredentials } from '@interledger/stream-receiver'
 import { Model, Pojo } from 'objection'
 import { Amount, AmountJSON } from '../../amount'
 import { PaymentPointer } from '../../payment_pointer/model'
@@ -58,7 +60,12 @@ export class IncomingPayment
   }
 
   static get virtualAttributes(): string[] {
-    return ['incomingAmount', 'receivedAmount']
+    return [
+      'completed',
+      'incomingAmount',
+      'receivedAmount',
+      'ilpStreamConnection'
+    ]
   }
 
   static relationMappings = {
@@ -88,6 +95,7 @@ export class IncomingPayment
   public state!: IncomingPaymentState
   public externalRef?: string
   public connectionId!: string
+  public ilpStreamConnection?: StreamCredentials
 
   public processAt!: Date | null
 
@@ -96,6 +104,10 @@ export class IncomingPayment
 
   private incomingAmountValue?: bigint | null
   private receivedAmountValue?: bigint
+
+  public get completed(): boolean {
+    return this.state === IncomingPaymentState.Completed
+  }
 
   public get incomingAmount(): Amount | undefined {
     if (this.incomingAmountValue) {
@@ -211,6 +223,32 @@ export class IncomingPayment
       ilpStreamConnection: json.connectionId
     }
   }
+
+  validateReceiver(): void {
+    if (!this.completed) {
+      throw PaymentError.IncomingPaymentCompleted
+    }
+    if (this.expiresAt && this.expiresAt.getTime() <= Date.now()) {
+      throw PaymentError.IncomingPaymentExpired
+    }
+    if (this.incomingAmount) {
+      if (this.incomingAmount.value <= this.receivedAmount.value) {
+        throw PaymentError.IncomingPaymentCompleted
+      }
+    }
+  }
+
+  toResolvedPayment(): ResolvedPayment {
+    return {
+      destinationAsset: {
+        code: this.receivedAmount.assetCode,
+        scale: this.receivedAmount.assetScale
+      },
+      destinationAddress: this.ilpStreamConnection.ilpAddress,
+      sharedSecret: this.ilpStreamConnection.sharedSecret,
+      requestCounter: Counter.from(0)
+    }
+  }
 }
 
 export type IlpStreamConnectionJSON = {
@@ -231,4 +269,8 @@ export type IncomingPaymentJSON = {
   updatedAt: string
   expiresAt: string
   ilpStreamConnection: IlpStreamConnectionJSON | string
+}
+
+export interface ResolvedIncomingPayment extends IncomingPayment {
+  ilpStreamConnection: StreamCredentials
 }
