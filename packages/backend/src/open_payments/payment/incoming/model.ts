@@ -205,17 +205,17 @@ export class IncomingPayment
             ...json.incomingAmount,
             value: json.incomingAmount.value.toString()
           }
-        : null,
+        : undefined,
       receivedAmount: {
         ...json.receivedAmount,
         value: json.receivedAmount.value.toString()
       },
       completed: json.completed,
-      description: json.description,
-      externalRef: json.externalRef,
+      description: json.description ?? undefined,
+      externalRef: json.externalRef ?? undefined,
       createdAt: json.createdAt,
       updatedAt: json.updatedAt,
-      expiresAt: json.expiresAt.toISOString(),
+      expiresAt: json.expiresAt?.toISOString(),
       ilpStreamConnection: json.connectionId
     }
   }
@@ -224,11 +224,11 @@ export class IncomingPayment
 export type IncomingPaymentJSON = {
   id: string
   paymentPointer: string
-  incomingAmount: AmountJSON | null
+  incomingAmount?: AmountJSON
   receivedAmount: AmountJSON
   completed: boolean
-  description: string | null
-  externalRef: string | null
+  description?: string
+  externalRef?: string
   createdAt: string
   updatedAt: string
   expiresAt: string
