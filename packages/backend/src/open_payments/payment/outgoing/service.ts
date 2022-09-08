@@ -102,9 +102,6 @@ async function createOutgoingPayment(
           })
           .onConflict('id')
           .ignore()
-          .forUpdate()
-          .timeout(5000)
-        if (options.callback) await new Promise(options.callback)
       }
       const payment = await OutgoingPayment.query(trx)
         .insertAndFetch({
@@ -132,7 +129,8 @@ async function createOutgoingPayment(
               knex: trx
             },
             payment,
-            options.grant
+            options.grant,
+            options.callback
           ))
         ) {
           throw OutgoingPaymentError.InsufficientGrant
@@ -251,7 +249,8 @@ interface PaymentLimits extends AccessLimits {
 async function validateGrant(
   deps: ServiceDependencies,
   payment: OutgoingPayment,
-  grant: Grant
+  grant: Grant,
+  callback?: (f: unknown) => NodeJS.Timeout
 ): Promise<boolean> {
   const grantAccess = grant.access[0]
   if (!grantAccess.limits) {
@@ -271,6 +270,12 @@ async function validateGrant(
     // Payment amount single-handedly exceeds amount limit
     return false
   }
+
+  await GrantModel.query(deps.knex)
+    .findById(grant.grant)
+    .forUpdate()
+    .timeout(5000)
+  if (callback) await new Promise(callback)
 
   const grantPayments = await OutgoingPayment.query(deps.knex)
     .where({
