@@ -2,7 +2,7 @@ import { Model, ModelOptions, Pojo, QueryContext } from 'objection'
 import { v4 as uuid } from 'uuid'
 
 import { Amount, AmountJSON } from '../../amount'
-import { ConnectionJSON } from '../../connection/service'
+import { components } from '../../generated/types'
 import { PaymentPointer } from '../../payment_pointer/model'
 import { Asset } from '../../../asset/model'
 import { LiquidityAccount, OnCreditOptions } from '../../../accounting/service'
@@ -255,18 +255,5 @@ export class IncomingPayment
   }
 }
 
-// TODO: disallow undefined
-// https://github.com/interledger/rafiki/issues/594
-export type IncomingPaymentJSON = {
-  id: string
-  paymentPointer: string
-  incomingAmount?: AmountJSON
-  receivedAmount: AmountJSON
-  completed: boolean
-  description?: string
-  externalRef?: string
-  createdAt: string
-  updatedAt: string
-  expiresAt?: string
-  ilpStreamConnection?: ConnectionJSON | string
-}
+export type IncomingPaymentJSON =
+  components['schemas']['incoming-payment-with-connection']

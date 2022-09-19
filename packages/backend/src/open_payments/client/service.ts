@@ -1,6 +1,7 @@
 import { Counter, ResolvedPayment } from '@interledger/pay'
 import axios, { AxiosRequestHeaders, AxiosResponse } from 'axios'
 import base64url from 'base64url'
+import { IlpAddress } from 'ilp-packet'
 import { OpenAPI, HttpMethod, ValidateFunction } from 'openapi'
 import { URL } from 'url'
 
@@ -50,7 +51,7 @@ export class Receiver extends ConnectionBase {
     private readonly receivedAmountValue?: bigint
   ) {
     super(
-      connection.ilpAddress,
+      connection.ilpAddress as IlpAddress,
       base64url.toBuffer(connection.sharedSecret),
       connection.assetCode,
       connection.assetScale

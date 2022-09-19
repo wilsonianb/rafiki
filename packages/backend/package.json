@@ -3,7 +3,7 @@
   "scripts": {
     "test": "jest --passWithNoTests --maxWorkers=50%",
     "knex": "knex",
-    "generate": "graphql-codegen --config codegen.yml",
+    "generate": "graphql-codegen --config codegen.yml && openapi-typescript $(ts-node -e 'import { Config } from \"./src/config/app\"; console.log(Config.openPaymentsSpec)') --output src/open_payments/generated/types.ts",
     "build:deps": "pnpm --filter openapi build && pnpm --filter auth build",
     "build": "pnpm build:deps && tsc --build tsconfig.json && pnpm copy-files",
     "clean": "rm -fr dist/",
@@ -35,6 +35,7 @@
     "nock": "^13.1.0",
     "node-mocks-http": "^1.10.1",
     "openapi-types": "^12.0.0",
+    "openapi-typescript": "^5.4.1",
     "react": "~18.2.0",
     "rosie": "^2.1.0",
     "testcontainers": "^8.12.0",

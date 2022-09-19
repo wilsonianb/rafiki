@@ -6,6 +6,7 @@ import { ConnectorAccount } from '../../../connector/core/rafiki'
 import { PaymentPointer } from '../../payment_pointer/model'
 import { Quote } from '../../quote/model'
 import { Amount, AmountJSON } from '../../amount'
+import { components } from '../../generated/types'
 import { BaseModel } from '../../../shared/baseModel'
 import { WebhookEvent } from '../../../webhook/model'
 import { GrantReference } from '../../grantReference/model'
@@ -247,15 +248,4 @@ export class PaymentEvent extends WebhookEvent {
   public data!: PaymentData
 }
 
-export type OutgoingPaymentJSON = {
-  id: string
-  paymentPointer: string
-  receiver: string
-  sendAmount: AmountJSON
-  sentAmount: AmountJSON
-  receiveAmount: AmountJSON
-  description: string | null
-  externalRef: string | null
-  createdAt: string
-  updatedAt: string
-}
+export type OutgoingPaymentJSON = components['schemas']['outgoing-payment']
