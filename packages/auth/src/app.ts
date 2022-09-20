@@ -11,7 +11,6 @@ import Router from '@koa/router'
 
 import { IAppConfig } from './config/app'
 import { ClientService } from './client/service'
-import { CreateGrantContext } from './grant/routes'
 import { GrantService } from './grant/service'
 import { AccessTokenRoutes } from './accessToken/routes'
 import { createValidatorMiddleware, HttpMethod } from 'openapi'
@@ -198,7 +197,7 @@ export class App {
     // Grant Initiation
     this.publicRouter.post(
       '/',
-      createValidatorMiddleware<CreateGrantContext>(openApi, {
+      createValidatorMiddleware<Context<typeof grantRoutes.create>>(openApi, {
         path: '/',
         method: HttpMethod.POST
       }),
