@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { OpenAPI, HttpMethod, ValidateFunction } from 'openapi'
+import { URL } from 'url'
 
 import { BaseService } from '../../shared/baseService'
 import { IncomingPaymentJSON } from '../payment/incoming/model'
@@ -43,14 +44,18 @@ export async function createOpenPaymentsClientService(
 
 export async function getIncomingPayment(
   deps: ServiceDependencies,
-  url: string
+  incomingPaymentUrl: string
 ): Promise<IncomingPaymentJSON | undefined> {
+  const url = new URL(incomingPaymentUrl)
   const requestHeaders = {
     Authorization: `GNAP ${deps.accessToken}`,
     'Content-Type': 'application/json'
   }
+  if (process.env.NODE_ENV === 'development') {
+    url.protocol = 'http'
+  }
   try {
-    const { status, data } = await axios.get(url, {
+    const { status, data } = await axios.get(url.href, {
       headers: requestHeaders,
       timeout: REQUEST_TIMEOUT,
       validateStatus: (status) => status === 200
