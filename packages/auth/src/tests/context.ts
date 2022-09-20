@@ -7,10 +7,10 @@ import { AppContext, AppContextData } from '../app'
 import { generateSigHeaders } from './signature'
 import { JWKWithRequired } from '../client/service'
 
-export function createContext(
+export function createContext<T extends AppContext>(
   reqOpts: httpMocks.RequestOptions,
   params: Record<string, unknown>
-): AppContext {
+): T {
   const req = httpMocks.createRequest(reqOpts)
   const res = httpMocks.createResponse()
   const koa = new Koa<unknown, AppContextData>()
@@ -31,7 +31,7 @@ export function createContext(
   ctx.params = params
   ctx.session = { ...req.session }
   ctx.closeEmitter = new EventEmitter()
-  return ctx as AppContext
+  return ctx as T
 }
 
 export async function createContextWithSigHeaders(

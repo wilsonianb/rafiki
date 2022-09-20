@@ -3,7 +3,7 @@ import { EventEmitter } from 'events'
 
 import { IocContract } from '@adonisjs/fold'
 import { Knex } from 'knex'
-import Koa, { DefaultState, DefaultContext } from 'koa'
+import Koa, { DefaultState } from 'koa'
 import bodyParser from 'koa-bodyparser'
 import session from 'koa-session'
 import { Logger } from 'pino'
@@ -11,11 +11,12 @@ import Router from '@koa/router'
 
 import { IAppConfig } from './config/app'
 import { ClientService } from './client/service'
+import { CreateGrantContext } from './grant/routes'
 import { GrantService } from './grant/service'
 import { AccessTokenRoutes } from './accessToken/routes'
 import { createValidatorMiddleware, HttpMethod } from 'openapi'
 
-export interface AppContextData extends DefaultContext {
+export interface AppContextData {
   logger: Logger
   closeEmitter: EventEmitter
   container: AppContainer
@@ -26,6 +27,10 @@ export interface AppContextData extends DefaultContext {
 }
 
 export type AppContext = Koa.ParameterizedContext<DefaultState, AppContextData>
+
+export type Context<T> = Omit<AppContext, 'request'> & {
+  request: T
+}
 
 export interface DatabaseCleanupRule {
   /**
@@ -193,9 +198,7 @@ export class App {
     // Grant Initiation
     this.publicRouter.post(
       '/',
-      createValidatorMiddleware<
-        ContextType<(ctx: AppContext) => Promise<void>>
-      >(openApi, {
+      createValidatorMiddleware<CreateGrantContext>(openApi, {
         path: '/',
         method: HttpMethod.POST
       }),
