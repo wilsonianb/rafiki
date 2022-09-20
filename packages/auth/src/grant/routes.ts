@@ -1,12 +1,11 @@
 import * as crypto from 'crypto'
 import { URL } from 'url'
-import { AppContext } from '../app'
+import { AppContext, Context } from '../app'
 import { GrantService, GrantRequest } from './service'
 import { GrantState } from './model'
 import { Access } from '../access/model'
 import { ClientService } from '../client/service'
 import { BaseService } from '../shared/baseService'
-import { isAccessRequest } from '../access/types'
 import { IAppConfig } from '../config/app'
 import { AccessTokenService } from '../accessToken/service'
 import { AccessService } from '../access/service'
@@ -20,8 +19,13 @@ interface ServiceDependencies extends BaseService {
   config: IAppConfig
 }
 
+type CreateGrantRequest = Omit<AppContext['request'], 'body'> & {
+  body: GrantRequest
+}
+export type CreateGrantContext = Context<CreateGrantRequest>
+
 export interface GrantRoutes {
-  create(ctx: AppContext): Promise<void>
+  create(ctx: CreateGrantContext): Promise<void>
   // TODO: factor this out into separate routes service
   interaction: {
     start(ctx: AppContext): Promise<void>
@@ -54,7 +58,7 @@ export function createGrantRoutes({
     config
   }
   return {
-    create: (ctx: AppContext) => createGrantInitiation(deps, ctx),
+    create: (ctx: CreateGrantContext) => createGrantInitiation(deps, ctx),
     interaction: {
       start: (ctx: AppContext) => startInteraction(deps, ctx),
       finish: (ctx: AppContext) => finishInteraction(deps, ctx),
@@ -66,22 +70,9 @@ export function createGrantRoutes({
   }
 }
 
-function validateGrantRequest(
-  grantRequest: GrantRequest
-): grantRequest is GrantRequest {
-  if (typeof grantRequest.access_token !== 'object') return false
-  const { access_token } = grantRequest
-  if (typeof access_token.access !== 'object') return false
-  for (const access of access_token.access) {
-    if (!isAccessRequest(access)) return false
-  }
-
-  return grantRequest.interact?.start !== undefined
-}
-
 async function createGrantInitiation(
   deps: ServiceDependencies,
-  ctx: AppContext
+  ctx: CreateGrantContext
 ): Promise<void> {
   if (
     !ctx.accepts('application/json') ||
@@ -96,11 +87,6 @@ async function createGrantInitiation(
 
   const { body } = ctx.request
   const { grantService, config } = deps
-  if (!validateGrantRequest(body)) {
-    ctx.status = 400
-    ctx.body = { error: 'invalid_request' }
-    return
-  }
 
   const grant = await grantService.initiateGrant(body)
   ctx.status = 201
