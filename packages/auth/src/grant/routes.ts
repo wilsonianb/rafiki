@@ -96,13 +96,11 @@ async function createGrantInitiation(
       })
       .every((el) => el === true)
   ) {
-    const trx = await Grant.startTransaction()
-    try {
+    await Grant.transaction(async (trx) => {
       const grant = await grantService.create(body, trx)
       const accessToken = await deps.accessTokenService.create(grant.id, {
         trx
       })
-      await trx.commit()
       const access = await deps.accessService.getByGrant(grant.id)
       ctx.status = 200
       ctx.body = createGrantBody({
@@ -111,11 +109,8 @@ async function createGrantInitiation(
         access,
         accessToken
       })
-      return
-    } catch (err) {
-      await trx.rollback()
-      throw err
-    }
+    })
+    return
   }
 
   if (!body.interact) {
