@@ -94,27 +94,54 @@ describe('Outgoing Payment Routes', (): void => {
   })
 
   describe('get', (): void => {
+    let outgoingPayment: OutgoingPayment
+    beforeEach(async (): Promise<void> => {
+      outgoingPayment = await createPayment({
+        paymentPointerId: paymentPointer.id,
+        grant,
+        description: 'rent',
+        externalRef: '202201'
+      })
+    })
+
     describe.each`
       withGrant | description
       ${false}  | ${'without grant'}
       ${true}   | ${'with grant'}
     `('$description', ({ withGrant }): void => {
-      test('returns 404 for nonexistent outgoing payment', async (): Promise<void> => {
-        const ctx = setup<ReadContext>({
-          reqOpts: {
-            headers: { Accept: 'application/json' }
-          },
-          params: {
-            id: uuid()
-          },
-          paymentPointer,
-          grant: withGrant ? grant : undefined
-        })
-        await expect(outgoingPaymentRoutes.get(ctx)).rejects.toHaveProperty(
-          'status',
-          404
-        )
-      })
+      test.each`
+        id           | clientId     | paymentPointerId | description
+        ${uuid()}    | ${undefined} | ${undefined}     | ${'unknown outgoing payment'}
+        ${undefined} | ${uuid()}    | ${undefined}     | ${'conflicting clientId'}
+        ${undefined} | ${undefined} | ${uuid()}        | ${'conflicting payment pointer'}
+      `(
+        'returns 404 on $description',
+        async ({ id, clientId, paymentPointerId }): Promise<void> => {
+          if (clientId) {
+            grant = new Grant({
+              ...grant,
+              clientId
+            })
+          }
+          if (paymentPointerId) {
+            paymentPointer.id = paymentPointerId
+          }
+          const ctx = setup<ReadContext>({
+            reqOpts: {
+              headers: { Accept: 'application/json' }
+            },
+            params: {
+              id: id || outgoingPayment.id
+            },
+            paymentPointer,
+            grant: withGrant || clientId ? grant : undefined
+          })
+          await expect(outgoingPaymentRoutes.get(ctx)).rejects.toMatchObject({
+            status: 404,
+            message: 'Not Found'
+          })
+        }
+      )
 
       test.each`
         failed   | description
@@ -123,12 +150,6 @@ describe('Outgoing Payment Routes', (): void => {
       `(
         'returns the $description outgoing payment on success',
         async ({ failed }): Promise<void> => {
-          const outgoingPayment = await createPayment({
-            paymentPointerId: paymentPointer.id,
-            grant,
-            description: 'rent',
-            externalRef: '202201'
-          })
           if (failed) {
             await outgoingPayment
               .$query(knex)

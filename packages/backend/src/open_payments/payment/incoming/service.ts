@@ -33,7 +33,7 @@ export interface CreateIncomingPaymentOptions {
 }
 
 export interface IncomingPaymentService {
-  get(id: string, clientId?: string): Promise<IncomingPayment | undefined>
+  get(options: GetByIdOptions): Promise<IncomingPayment | undefined>
   create(
     options: CreateIncomingPaymentOptions,
     trx?: Knex.Transaction
@@ -65,34 +65,51 @@ export async function createIncomingPaymentService(
     logger: log
   }
   return {
-    get: (id, clientId) => getIncomingPayment(deps, 'id', id, clientId),
+    get: (options) => getIncomingPayment(deps, options),
     create: (options, trx) => createIncomingPayment(deps, options, trx),
     complete: (id) => completeIncomingPayment(deps, id),
     getPaymentPointerPage: (paymentPointerId, pagination, clientId) =>
       getPaymentPointerPage(deps, paymentPointerId, pagination, clientId),
     processNext: () => processNextIncomingPayment(deps),
     getByConnection: (connectionId) =>
-      getIncomingPayment(deps, 'connectionId', connectionId)
+      getIncomingPayment(deps, { connectionId })
   }
 }
 
+interface GetByIdOptions {
+  id: string
+  clientId?: string
+  paymentPointerId?: string
+  connectionId?: never
+}
+
+interface GetByConnectionOptions {
+  connectionId: string
+  id?: never
+  clientId?: never
+  paymentPointerId?: never
+}
+
+type GetOptions = GetByIdOptions | GetByConnectionOptions
+
 async function getIncomingPayment(
   deps: ServiceDependencies,
-  key: string,
-  value: string,
-  clientId?: string
+  { id, paymentPointerId, clientId, connectionId }: GetOptions
 ): Promise<IncomingPayment | undefined> {
-  let incomingPayment: IncomingPayment
+  const query = id
+    ? IncomingPayment.query(deps.knex).findById(id)
+    : IncomingPayment.query(deps.knex).findOne({ connectionId })
+  if (paymentPointerId) {
+    query.where({ paymentPointerId })
+  }
   if (!clientId) {
-    incomingPayment = await IncomingPayment.query(deps.knex)
-      .findOne(key, value)
-      .withGraphFetched('[asset, paymentPointer]')
+    query.withGraphFetched('[asset, paymentPointer]')
   } else {
-    incomingPayment = await IncomingPayment.query(deps.knex)
-      .findOne(`incomingPayments.${key}`, value)
+    query
       .withGraphJoined('[asset, paymentPointer, grantRef]')
       .where('grantRef.clientId', clientId)
   }
+  const incomingPayment = await query
   if (incomingPayment) return await addReceivedAmount(deps, incomingPayment)
   else return
 }

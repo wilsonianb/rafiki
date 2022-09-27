@@ -110,22 +110,39 @@ describe('Incoming Payment Routes', (): void => {
       ${false}  | ${'without grant'}
       ${true}   | ${'with grant'}
     `('$description', ({ withGrant }): void => {
-      test('returns 404 on unknown incoming payment', async (): Promise<void> => {
-        const ctx = setup<ReadContext>({
-          reqOpts: {
-            headers: { Accept: 'application/json' }
-          },
-          params: {
-            id: uuid()
-          },
-          paymentPointer,
-          grant: withGrant ? grant : undefined
-        })
-        await expect(incomingPaymentRoutes.get(ctx)).rejects.toMatchObject({
-          status: 404,
-          message: 'Not Found'
-        })
-      })
+      test.each`
+        id           | clientId     | paymentPointerId | description
+        ${uuid()}    | ${undefined} | ${undefined}     | ${'unknown incoming payment'}
+        ${undefined} | ${uuid()}    | ${undefined}     | ${'conflicting clientId'}
+        ${undefined} | ${undefined} | ${uuid()}        | ${'conflicting payment pointer'}
+      `(
+        'returns 404 on $description',
+        async ({ id, clientId, paymentPointerId }): Promise<void> => {
+          if (clientId) {
+            grant = new Grant({
+              ...grant,
+              clientId
+            })
+          }
+          if (paymentPointerId) {
+            paymentPointer.id = paymentPointerId
+          }
+          const ctx = setup<ReadContext>({
+            reqOpts: {
+              headers: { Accept: 'application/json' }
+            },
+            params: {
+              id: id || incomingPayment.id
+            },
+            paymentPointer,
+            grant: withGrant || clientId ? grant : undefined
+          })
+          await expect(incomingPaymentRoutes.get(ctx)).rejects.toMatchObject({
+            status: 404,
+            message: 'Not Found'
+          })
+        }
+      )
 
       test('returns 200 with an open payments incoming payment', async (): Promise<void> => {
         const ctx = setup<ReadContext>({

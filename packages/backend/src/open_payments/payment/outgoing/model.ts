@@ -26,7 +26,7 @@ export class OutgoingPayment
   public stateAttempts!: number
 
   public grantId?: string
-  public grantRef?: GrantReference
+  private grantRef?: GrantReference
 
   public get receiver(): string {
     return this.quote.receiver
@@ -106,6 +106,13 @@ export class OutgoingPayment
         this.stateAttempts = 0
       }
     }
+  }
+
+  static async afterFind(args) {
+    args.result.forEach(async (payment) => {
+      payment.grantRef = undefined
+    })
+    return args.result
   }
 
   public toData({

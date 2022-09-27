@@ -101,7 +101,7 @@ export class IncomingPayment
   public connectionId?: string | null
 
   public grantId?: string
-  public grantRef?: GrantReference
+  private grantRef?: GrantReference
 
   public processAt!: Date | null
 
@@ -224,6 +224,13 @@ export class IncomingPayment
     ) {
       this.connectionId = null
     }
+  }
+
+  static async afterFind(args) {
+    args.result.forEach(async (payment) => {
+      payment.grantRef = undefined
+    })
+    return args.result
   }
 
   $formatJson(json: Pojo): Pojo {

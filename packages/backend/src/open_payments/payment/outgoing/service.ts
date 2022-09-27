@@ -29,7 +29,7 @@ import { knex } from 'knex'
 import { GrantReferenceService } from '../../grantReference/service'
 
 export interface OutgoingPaymentService {
-  get(id: string, clientId?: string): Promise<OutgoingPayment | undefined>
+  get(options: GetOptions): Promise<OutgoingPayment | undefined>
   create(
     options: CreateOutgoingPaymentOptions
   ): Promise<OutgoingPayment | OutgoingPaymentError>
@@ -61,7 +61,7 @@ export async function createOutgoingPaymentService(
     logger: deps_.logger.child({ service: 'OutgoingPaymentService' })
   }
   return {
-    get: (id, clientId) => getOutgoingPayment(deps, id, clientId),
+    get: (options) => getOutgoingPayment(deps, options),
     create: (options: CreateOutgoingPaymentOptions) =>
       createOutgoingPayment(deps, options),
     fund: (options) => fundPayment(deps, options),
@@ -71,22 +71,28 @@ export async function createOutgoingPaymentService(
   }
 }
 
+interface GetOptions {
+  id: string
+  clientId?: string
+  paymentPointerId?: string
+}
+
 async function getOutgoingPayment(
   deps: ServiceDependencies,
-  id: string,
-  clientId?: string
+  { id, clientId, paymentPointerId }: GetOptions
 ): Promise<OutgoingPayment | undefined> {
-  let outgoingPayment: OutgoingPayment
+  const query = OutgoingPayment.query(deps.knex).findById(id)
+  if (paymentPointerId) {
+    query.where('outgoingPayments.paymentPointerId', paymentPointerId)
+  }
   if (!clientId) {
-    outgoingPayment = await OutgoingPayment.query(deps.knex)
-      .findById(id)
-      .withGraphJoined('quote.asset')
+    query.withGraphFetched('quote.asset')
   } else {
-    outgoingPayment = await OutgoingPayment.query(deps.knex)
-      .findById(id)
+    query
       .withGraphJoined('[quote.asset, grantRef]')
       .where('grantRef.clientId', clientId)
   }
+  const outgoingPayment = await query
   if (outgoingPayment) return await addSentAmount(deps, outgoingPayment)
   else return
 }

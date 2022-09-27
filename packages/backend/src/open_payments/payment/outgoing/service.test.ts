@@ -94,7 +94,9 @@ describe('OutgoingPaymentService', (): void => {
     expectedError?: string
   ): Promise<OutgoingPayment> {
     await expect(outgoingPaymentService.processNext()).resolves.toBe(paymentId)
-    const payment = await outgoingPaymentService.get(paymentId)
+    const payment = await outgoingPaymentService.get({
+      id: paymentId
+    })
     if (!payment) throw 'no payment'
     if (expectState) expect(payment.state).toBe(expectState)
     expect(payment.error).toEqual(expectedError || null)
@@ -284,9 +286,107 @@ describe('OutgoingPaymentService', (): void => {
     await appContainer.shutdown()
   })
 
+  enum GetOption {
+    Matching = 'matching',
+    Conflicting = 'conflicting',
+    Unspecified = 'unspecified'
+  }
+
   describe('get', (): void => {
-    it('returns undefined when no payment exists', async () => {
-      await expect(outgoingPaymentService.get(uuid())).resolves.toBeUndefined()
+    describe.each`
+      withGrant | description
+      ${true}   | ${'with grant'}
+      ${false}  | ${'without grant'}
+    `('outgoing payment ($description)', ({ withGrant }): void => {
+      const grantClientId = uuid()
+
+      describe.each`
+        clientId         | match    | description
+        ${grantClientId} | ${true}  | ${GetOption.Matching}
+        ${uuid()}        | ${false} | ${GetOption.Conflicting}
+        ${undefined}     | ${true}  | ${GetOption.Unspecified}
+      `('$description clientId', ({ clientId, match, description }): void => {
+        // Do not test matching clientId if incoming payment has no grant
+        if (withGrant || description !== GetOption.Matching) {
+          let outgoingPayment: OutgoingPayment
+
+          // This beforeEach needs to be inside the above if statement to avoid:
+          // Invalid: beforeEach() may not be used in a describe block containing no tests.
+          beforeEach(async (): Promise<void> => {
+            const grantRef = await grantReferenceService.create({
+              id: uuid(),
+              clientId: grantClientId
+            })
+
+            const grant = new Grant({
+              active: true,
+              clientId: grantRef.clientId,
+              grant: grantRef.id,
+              access: [
+                {
+                  type: AccessType.OutgoingPayment,
+                  actions: [AccessAction.Create, AccessAction.Read]
+                }
+              ]
+            })
+
+            outgoingPayment = await createOutgoingPayment(deps, {
+              paymentPointerId,
+              receiver,
+              grant: withGrant ? grant : undefined,
+              description: 'Test outgoing payment',
+              externalRef: '#123',
+              validDestination: false
+            })
+          })
+          describe.each`
+            match    | description
+            ${match} | ${GetOption.Matching}
+            ${false} | ${GetOption.Conflicting}
+          `('$description id', ({ match, description }): void => {
+            let id: string
+            beforeEach((): void => {
+              id =
+                description === GetOption.Matching ? outgoingPayment.id : uuid()
+            })
+            describe.each`
+              match    | description
+              ${match} | ${GetOption.Matching}
+              ${false} | ${GetOption.Conflicting}
+              ${match} | ${GetOption.Unspecified}
+            `(
+              '$description paymentPointerId',
+              ({ match, description }): void => {
+                let paymentPointerId: string
+                beforeEach((): void => {
+                  switch (description) {
+                    case GetOption.Matching:
+                      paymentPointerId = outgoingPayment.paymentPointerId
+                      break
+                    case GetOption.Conflicting:
+                      paymentPointerId = uuid()
+                      break
+                    case GetOption.Unspecified:
+                      paymentPointerId = undefined
+                      break
+                  }
+                })
+                test(`${
+                  match ? '' : 'cannot '
+                }get an outgoing payment`, async (): Promise<void> => {
+                  await expect(
+                    outgoingPaymentService.get({
+                      id,
+                      clientId,
+                      paymentPointerId
+                    })
+                  ).resolves.toEqual(match ? outgoingPayment : undefined)
+                })
+              }
+            )
+          })
+        }
+      })
     })
   })
 
@@ -341,9 +441,11 @@ describe('OutgoingPaymentService', (): void => {
             peerId: outgoingPeer ? peer.id : null
           })
 
-          await expect(outgoingPaymentService.get(payment.id)).resolves.toEqual(
-            payment
-          )
+          await expect(
+            outgoingPaymentService.get({
+              id: payment.id
+            })
+          ).resolves.toEqual(payment)
 
           const expectedPaymentData: Partial<PaymentData['payment']> = {
             id: payment.id
@@ -1162,7 +1264,9 @@ describe('OutgoingPaymentService', (): void => {
         state: OutgoingPaymentState.Sending
       })
 
-      const after = await outgoingPaymentService.get(payment.id)
+      const after = await outgoingPaymentService.get({
+        id: payment.id
+      })
       expect(after?.state).toBe(OutgoingPaymentState.Sending)
       await expectOutcome(payment, { accountBalance: quoteAmount })
     })
@@ -1176,7 +1280,9 @@ describe('OutgoingPaymentService', (): void => {
         })
       ).resolves.toEqual(FundingError.InvalidAmount)
 
-      const after = await outgoingPaymentService.get(payment.id)
+      const after = await outgoingPaymentService.get({
+        id: payment.id
+      })
       expect(after?.state).toBe(OutgoingPaymentState.Funding)
       await expectOutcome(payment, { accountBalance: BigInt(0) })
     })
@@ -1193,7 +1299,9 @@ describe('OutgoingPaymentService', (): void => {
           })
         ).resolves.toEqual(FundingError.WrongState)
 
-        const after = await outgoingPaymentService.get(payment.id)
+        const after = await outgoingPaymentService.get({
+          id: payment.id
+        })
         expect(after?.state).toBe(startState)
       })
     })
