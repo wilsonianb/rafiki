@@ -22,6 +22,7 @@ import {
   createPaymentPointer,
   MockPaymentPointer
 } from '../../tests/paymentPointer'
+import { createQuote } from '../../tests/quote'
 import { truncateTables } from '../../tests/tableManager'
 import { AssetOptions } from '../../asset/service'
 import { Amount, AmountJSON, serializeAmount } from '../amount'
@@ -127,9 +128,67 @@ describe('QuoteService', (): void => {
     await appContainer.shutdown()
   })
 
+  enum GetOption {
+    Matching = 'matching',
+    Conflicting = 'conflicting',
+    Unspecified = 'unspecified'
+  }
+
   describe('get', (): void => {
-    it('returns undefined when no quote exists', async () => {
-      await expect(quoteService.get(uuid())).resolves.toBeUndefined()
+    let quote: Quote
+
+    beforeEach(async (): Promise<void> => {
+      quote = await createQuote(deps, {
+        paymentPointerId,
+        receiver: `${receivingPaymentPointer.url}/incoming-payments/${uuid()}`,
+        sendAmount: {
+          value: BigInt(56),
+          assetCode: asset.code,
+          assetScale: asset.scale
+        },
+        validDestination: false
+      })
+    })
+    describe.each`
+      match    | description
+      ${true}  | ${GetOption.Matching}
+      ${false} | ${GetOption.Conflicting}
+    `('$description id', ({ match, description }): void => {
+      let id: string
+      beforeEach((): void => {
+        id = description === GetOption.Matching ? quote.id : uuid()
+      })
+      describe.each`
+        match    | description
+        ${match} | ${GetOption.Matching}
+        ${false} | ${GetOption.Conflicting}
+        ${match} | ${GetOption.Unspecified}
+      `('$description paymentPointerId', ({ match, description }): void => {
+        let paymentPointerId: string
+        beforeEach((): void => {
+          switch (description) {
+            case GetOption.Matching:
+              paymentPointerId = quote.paymentPointerId
+              break
+            case GetOption.Conflicting:
+              paymentPointerId = uuid()
+              break
+            case GetOption.Unspecified:
+              paymentPointerId = undefined
+              break
+          }
+        })
+        test(`${
+          match ? '' : 'cannot '
+        }get a quote`, async (): Promise<void> => {
+          await expect(
+            quoteService.get({
+              id,
+              paymentPointerId
+            })
+          ).resolves.toEqual(match ? quote : undefined)
+        })
+      })
     })
   })
 
@@ -300,7 +359,9 @@ describe('QuoteService', (): void => {
                 0.500000000001
               )
 
-              await expect(quoteService.get(quote.id)).resolves.toEqual(quote)
+              await expect(quoteService.get({ id: quote.id })).resolves.toEqual(
+                quote
+              )
             })
 
             if (incomingAmount) {
@@ -359,7 +420,9 @@ describe('QuoteService', (): void => {
                 expect(quote.highEstimatedExchangeRate.valueOf()).toBe(
                   0.500000000001
                 )
-                await expect(quoteService.get(quote.id)).resolves.toEqual(quote)
+                await expect(
+                  quoteService.get({ id: quote.id })
+                ).resolves.toEqual(quote)
               })
             }
           }
@@ -396,7 +459,9 @@ describe('QuoteService', (): void => {
                 0.500000000001
               )
 
-              await expect(quoteService.get(quote.id)).resolves.toEqual(quote)
+              await expect(quoteService.get({ id: quote.id })).resolves.toEqual(
+                quote
+              )
             })
 
             it.each`
@@ -453,7 +518,9 @@ describe('QuoteService', (): void => {
                 0.500000000001
               )
 
-              await expect(quoteService.get(quote.id)).resolves.toEqual(quote)
+              await expect(quoteService.get({ id: quote.id })).resolves.toEqual(
+                quote
+              )
             })
 
             it.each`

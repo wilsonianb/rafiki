@@ -16,6 +16,7 @@ import { Quote } from './model'
 import { QuoteRoutes, CreateBody } from './routes'
 import { Amount } from '../amount'
 import { PaymentPointer } from '../payment_pointer/model'
+import { setup } from '../../shared/routes.test'
 import { randomAsset } from '../../tests/asset'
 import { createPaymentPointer } from '../../tests/paymentPointer'
 import { createQuote } from '../../tests/quote'
@@ -82,6 +83,40 @@ describe('Quote Routes', (): void => {
 
   describe('get', (): void => {
     test('returns 404 for nonexistent quote', async (): Promise<void> => {
+      test.each`
+        id           | clientId     | paymentPointerId | description
+        ${uuid()}    | ${undefined} | ${undefined}     | ${'unknown outgoing payment'}
+        ${undefined} | ${uuid()}    | ${undefined}     | ${'conflicting clientId'}
+        ${undefined} | ${undefined} | ${uuid()}        | ${'conflicting payment pointer'}
+      `(
+        'returns 404 on $description',
+        async ({ id, clientId, paymentPointerId }): Promise<void> => {
+          if (clientId) {
+            grant = new Grant({
+              ...grant,
+              clientId
+            })
+          }
+          if (paymentPointerId) {
+            paymentPointer.id = paymentPointerId
+          }
+          const ctx = setup<ReadContext>({
+            reqOpts: {
+              headers: { Accept: 'application/json' }
+            },
+            params: {
+              id: id || outgoingPayment.id
+            },
+            paymentPointer,
+            grant: withGrant || clientId ? grant : undefined
+          })
+          await expect(outgoingPaymentRoutes.get(ctx)).rejects.toMatchObject({
+            status: 404,
+            message: 'Not Found'
+          })
+        }
+      )
+
       const ctx = createContext<ReadContext>(
         {
           headers: { Accept: 'application/json' }

@@ -18,7 +18,7 @@ import { IlpPlugin, IlpPluginOptions } from '../../shared/ilp_plugin'
 const MAX_INT64 = BigInt('9223372036854775807')
 
 export interface QuoteService {
-  get(id: string): Promise<Quote | undefined>
+  get(options: GetOptions): Promise<Quote | undefined>
   create(options: CreateQuoteOptions): Promise<Quote | QuoteError>
   getPaymentPointerPage(
     paymentPointerId: string,
@@ -47,18 +47,27 @@ export async function createQuoteService(
     logger: deps_.logger.child({ service: 'QuoteService' })
   }
   return {
-    get: (id) => getQuote(deps, id),
+    get: (options) => getQuote(deps, options),
     create: (options: CreateQuoteOptions) => createQuote(deps, options),
     getPaymentPointerPage: (paymentPointerId, pagination) =>
       getPaymentPointerPage(deps, paymentPointerId, pagination)
   }
 }
 
+interface GetOptions {
+  id: string
+  paymentPointerId?: string
+}
+
 async function getQuote(
   deps: ServiceDependencies,
-  id: string
+  { id, paymentPointerId }: GetOptions
 ): Promise<Quote | undefined> {
-  return Quote.query(deps.knex).findById(id).withGraphJoined('asset')
+  const query = Quote.query(deps.knex).findById(id).withGraphFetched('asset')
+  if (paymentPointerId) {
+    query.where({ paymentPointerId })
+  }
+  return await query
 }
 
 export interface CreateQuoteOptions {
