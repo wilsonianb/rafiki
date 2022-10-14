@@ -2,12 +2,12 @@ import { Transaction, TransactionOrKnex } from 'objection'
 
 import { BaseService } from '../shared/baseService'
 import { Access } from './model'
-import { AccessRequest } from './types'
+import { Access as AccessJSON } from './types'
 
 export interface AccessService {
   createAccess(
     grantId: string,
-    accessRequests: AccessRequest[],
+    accesses: AccessJSON[],
     trx?: Transaction
   ): Promise<Access[]>
   getByGrant(grantId: string): Promise<Access[]>
@@ -31,22 +31,19 @@ export async function createAccessService({
   }
 
   return {
-    createAccess: (
-      grantId: string,
-      accessRequests: AccessRequest[],
-      trx?: Transaction
-    ) => createAccess(deps, grantId, accessRequests, trx),
-    getByGrant: (grantId: string) => getByGrant(grantId)
+    createAccess: (grantId, accesses, trx) =>
+      createAccess(deps, grantId, accesses, trx),
+    getByGrant: (grantId) => getByGrant(grantId)
   }
 }
 
 async function createAccess(
   deps: ServiceDependencies,
   grantId: string,
-  accessRequests: AccessRequest[],
+  accesses: AccessJSON[],
   trx?: Transaction
 ): Promise<Access[]> {
-  const accessRequestsWithGrant = accessRequests.map((access) => {
+  const accessRequestsWithGrant = accesses.map((access) => {
     return { grantId, ...access }
   })
 
