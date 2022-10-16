@@ -1,11 +1,9 @@
+import { components } from './generated/types'
+
+export type AmountJSON = components['schemas']['amount']
+
 export interface Amount {
   value: bigint
-  assetCode: string
-  assetScale: number
-}
-
-export interface AmountJSON {
-  value: string
   assetCode: string
   assetScale: number
 }

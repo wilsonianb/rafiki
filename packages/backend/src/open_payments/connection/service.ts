@@ -4,14 +4,9 @@ import { StreamCredentials, StreamServer } from '@interledger/stream-receiver'
 
 import { BaseService } from '../../shared/baseService'
 import { IncomingPayment } from '../payment/incoming/model'
+import { components } from '../generated/types'
 
-export type ConnectionJSON = {
-  id: string
-  ilpAddress: IlpAddress
-  sharedSecret: string
-  assetCode: string
-  assetScale: number
-}
+export type ConnectionJSON = components['schemas']['ilp-stream-connection']
 
 export abstract class ConnectionBase {
   protected constructor(

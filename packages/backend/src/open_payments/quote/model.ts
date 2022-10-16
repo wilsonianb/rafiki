@@ -2,7 +2,8 @@ import assert from 'assert'
 import { Model, Pojo } from 'objection'
 import * as Pay from '@interledger/pay'
 
-import { Amount, AmountJSON } from '../amount'
+import { Amount } from '../amount'
+import { components } from '../generated/types'
 import { PaymentPointer } from '../payment_pointer/model'
 import { Asset } from '../../asset/model'
 import { BaseModel } from '../../shared/baseModel'
@@ -158,12 +159,4 @@ export class Quote extends BaseModel {
   }
 }
 
-export type QuoteJSON = {
-  id: string
-  paymentPointerId: string
-  receiver: string
-  sendAmount: AmountJSON
-  receiveAmount: AmountJSON
-  createdAt: string
-  expiresAt: string
-}
+export type QuoteJSON = components['schemas']['quote']
