@@ -6,7 +6,7 @@ RUN apt update
 RUN apt install -y curl xz-utils python3 build-essential
 
 # version in curl is not the version used. Dependent on the last command
-RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@7.9.3
+RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@7.13.4
 
 # pnpm fetch does require only lockfile
 COPY pnpm-lock.yaml ./
