@@ -313,7 +313,7 @@ describe('Auth Middleware', (): void => {
       })
       await expect(middleware(ctx, next)).resolves.toBeUndefined()
       expect(next).toHaveBeenCalled()
-      expect(ctx.grant).toEqual(grant)
+      expect(ctx.grantId).toEqual(grant.id)
       scope.done()
     }
   )
@@ -413,7 +413,7 @@ describe('Auth Middleware', (): void => {
     const scope = mockAuthServer(grant.toJSON())
     await expect(middleware(ctx, next)).resolves.toBeUndefined()
     expect(next).toHaveBeenCalled()
-    expect(ctx.grant).toEqual(grant)
+    expect(ctx.grantId).toEqual(grant.grant)
     scope.done()
   })
 
