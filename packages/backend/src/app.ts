@@ -28,6 +28,7 @@ import { PaymentPointerService } from './open_payments/payment_pointer/service'
 import { AccessType, AccessAction, Grant } from './open_payments/auth/grant'
 import { createAuthMiddleware } from './open_payments/auth/middleware'
 import { AuthService } from './open_payments/auth/service'
+import { AuthServerService } from './open_payments/authServer/service'
 import { RatesService } from './rates/service'
 import { SPSPRoutes } from './spsp/routes'
 import { IncomingPaymentRoutes } from './open_payments/payment/incoming/routes'
@@ -135,6 +136,7 @@ export interface AppServices {
   accountingService: Promise<AccountingService>
   peerService: Promise<PeerService>
   authService: Promise<AuthService>
+  authServerService: Promise<AuthServerService>
   paymentPointerService: Promise<PaymentPointerService>
   spspRoutes: Promise<SPSPRoutes>
   incomingPaymentRoutes: Promise<IncomingPaymentRoutes>
