@@ -32,13 +32,55 @@ describe('Open Payments Client Service', (): void => {
   })
 
   afterEach(async (): Promise<void> => {
-    jest.useRealTimers()
+    jest.restoreAllMocks()
     await truncateTables(knex)
   })
 
   afterAll(async (): Promise<void> => {
     await appContainer.shutdown()
   })
+
+  describe('paymentPointer.get', (): void => {
+    test.each`
+      local    | description
+      ${true}  | ${'local'}
+      ${false} | ${'remote'}
+    `(
+      'resolves payment pointer from $description Open Payments server',
+      async ({ local }): Promise<void> => {
+        const paymentPointer = await createPaymentPointer(deps, {
+          mockServerPort: appContainer.openPaymentsPort
+        })
+        let spy: jest.SpyInstance
+        if (!local) {
+          const paymentPointerService = await deps.use('paymentPointerService')
+          spy = jest
+            .spyOn(paymentPointerService, 'getByUrl')
+            .mockResolvedValueOnce(undefined)
+        }
+        await expect(
+          clientService.paymentPointer.get(paymentPointer.url)
+        ).resolves.toEqual({
+          id: paymentPointer.url,
+          publicName: paymentPointer.publicName ?? undefined,
+          assetCode: paymentPointer.asset.code,
+          assetScale: paymentPointer.asset.scale,
+          authServer: Config.authServerGrantUrl
+        })
+        if (!local) {
+          expect(spy).toHaveBeenCalledWith(paymentPointer.url)
+        }
+        expect(local).not.toEqual(paymentPointer.scope.isDone())
+      }
+    )
+
+    test('returns undefined for unknown payment pointer', async (): Promise<void> => {
+      await expect(
+        clientService.paymentPointer.get(faker.internet.url())
+      ).resolves.toBeUndefined()
+    })
+  })
+
   describe.each`
     local    | description
     ${true}  | ${'local'}
@@ -125,7 +167,8 @@ describe('Open Payments Client Service', (): void => {
                 .mockResolvedValueOnce(undefined)
             }
             const receiver = await clientService.receiver.get(
-              incomingPayment.url
+              incomingPayment.url,
+              Config.devAccessToken
             )
             if (!local) {
               expect(spy).toHaveBeenCalledWith(paymentPointer.url)

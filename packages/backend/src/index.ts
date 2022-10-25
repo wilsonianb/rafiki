@@ -267,12 +267,12 @@ export function initIocContainer(
     const config = await deps.use('config')
     return await createOpenPaymentsClientService({
       logger: await deps.use('logger'),
-      // TODO: https://github.com/interledger/rafiki/issues/583
-      accessToken: config.devAccessToken,
       connectionRoutes: await deps.use('connectionRoutes'),
       incomingPaymentRoutes: await deps.use('incomingPaymentRoutes'),
       openApi: await deps.use('openApi'),
+      authOpenApi: await deps.use('authOpenApi'),
       openPaymentsUrl: config.openPaymentsUrl,
+      paymentPointerRoutes: await deps.use('paymentPointerRoutes'),
       paymentPointerService: await deps.use('paymentPointerService')
     })
   })
@@ -315,6 +315,7 @@ export function initIocContainer(
     const config = await deps.use('config')
     return await createQuoteService({
       slippage: config.slippage,
+      authServer: config.authServerGrantUrl,
       quoteLifespan: config.quoteLifespan,
       quoteUrl: config.quoteUrl,
       signatureSecret: config.signatureSecret,
@@ -323,6 +324,7 @@ export function initIocContainer(
       knex: await deps.use('knex'),
       makeIlpPlugin: await deps.use('makeIlpPlugin'),
       clientService: await deps.use('openPaymentsClientService'),
+      grantService: await deps.use('grantService'),
       paymentPointerService: await deps.use('paymentPointerService'),
       ratesService: await deps.use('ratesService')
     })

@@ -92,6 +92,14 @@ export class PaymentPointerEvent extends WebhookEvent {
   public data!: PaymentPointerData
 }
 
+export interface PaymentPointerJSON {
+  id: string
+  assetCode: string
+  assetScale: number
+  publicName?: string
+  authServer: string
+}
+
 export interface GetOptions {
   id: string
   clientId?: string
