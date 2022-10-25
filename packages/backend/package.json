@@ -1,7 +1,7 @@
 {
   "name": "backend",
   "scripts": {
-    "test": "jest --passWithNoTests --maxWorkers=50%",
+    "test": "jest src/open_payments/auth/m* --passWithNoTests --maxWorkers=50%",
     "knex": "knex",
     "generate": "graphql-codegen --config codegen.yml",
     "build:deps": "pnpm --filter openapi build && pnpm --filter auth build",

@@ -107,7 +107,7 @@ export const Config = {
   ),
   authServerSpec: envString(
     'AUTH_SERVER_SPEC',
-    'https://raw.githubusercontent.com/interledger/open-payments/77462cd0872be8d0fa487a4b233defe2897a7ee4/auth-server-open-api-spec.yaml'
+    'https://raw.githubusercontent.com/interledger/open-payments/e45aaab9e02c82a4c7f13a79061fff6396822aab/auth-server-open-api-spec.yaml'
   ),
 
   /** Frontend **/

@@ -1,0 +1,12 @@
+diff --git a/dist/index.js b/dist/index.js
+index 72c73f6eebe31832447d86e7386b1a6ccb01cbe5..efcd64a0dfcc61b7bf21834c8abd3d01e8ec0b81 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1,6 +1,6 @@
+ "use strict";
+ exports.__esModule = true;
+-var ajv_1 = require("ajv");
++var ajv_1 = require("ajv/dist/2020");
+ var LOCAL_DEFINITION_REGEX = /^#\/([^\/]+)\/([^\/]+)$/;
+ var OpenAPIResponseValidator = /** @class */ (function () {
+     function OpenAPIResponseValidator(args) {
