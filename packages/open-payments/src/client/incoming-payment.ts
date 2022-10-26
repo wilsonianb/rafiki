@@ -1,15 +1,10 @@
 import { HttpMethod } from 'openapi'
 import { ClientDeps } from '.'
 import { IncomingPayment, getPath } from '../types'
-import { get } from './requests'
-
-interface GetArgs {
-  url: string
-  accessToken: string
-}
+import { get, AuthGetArgs } from './requests'
 
 export interface IncomingPaymentRoutes {
-  get(args: GetArgs): Promise<IncomingPayment>
+  get(args: AuthGetArgs): Promise<IncomingPayment>
 }
 
 export const createIncomingPaymentRoutes = (
@@ -24,7 +19,7 @@ export const createIncomingPaymentRoutes = (
     })
 
   return {
-    get: (args: GetArgs) =>
+    get: (args: AuthGetArgs) =>
       get({ axiosInstance, logger }, args, getIncomingPaymentValidator)
   }
 }

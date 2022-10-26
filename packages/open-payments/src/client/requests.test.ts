@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 import { createAxiosInstance, get } from './requests'
+import { generateKeyPairSync } from 'crypto'
 import nock from 'nock'
 import { silentLogger } from '../test/helpers'
 
@@ -31,14 +32,37 @@ describe('requests', (): void => {
       jest.spyOn(axiosInstance, 'get')
     })
 
+    afterEach(() => {
+      jest.useRealTimers()
+    })
+
     test('sets headers properly if accessToken provided', async (): Promise<void> => {
       nock(baseUrl).get('/incoming-payment').reply(200)
+
+      const keyId = 'myId'
+
+      // https://github.com/nock/nock/issues/2200#issuecomment-1280957462
+      jest
+        .useFakeTimers({
+          doNotFake: [
+            'nextTick',
+            'setImmediate',
+            'clearImmediate',
+            'setInterval',
+            'clearInterval',
+            'setTimeout',
+            'clearTimeout'
+          ]
+        })
+        .setSystemTime(new Date())
 
       await get(
         { axiosInstance, logger },
         {
           url: `${baseUrl}/incoming-payment`,
-          accessToken: 'accessToken'
+          accessToken: 'accessToken',
+          privateKey: generateKeyPairSync('ed25519').privateKey,
+          keyId
         },
         successfulValidator
       )
@@ -48,11 +72,15 @@ describe('requests', (): void => {
         {
           headers: {
             Authorization: 'GNAP accessToken',
-            Signature: 'TODO',
-            'Signature-Input': 'TODO'
+            Signature: expect.stringMatching(/sig1=:([a-zA-Z0-9+/]){86}==:/),
+            'Signature-Input': `sig1=("@method" "@target-uri" "authorization");created=${Math.floor(
+              Date.now() / 1000
+            )};keyid="${keyId}";alg="ed25519"`
           }
         }
       )
+
+      // TODO: verify signature
     })
 
     test('sets headers properly if accessToken is not provided', async (): Promise<void> => {

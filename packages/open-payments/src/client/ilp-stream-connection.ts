@@ -1,11 +1,7 @@
 import { HttpMethod } from 'openapi'
 import { ClientDeps } from '.'
 import { getPath, ILPStreamConnection } from '../types'
-import { get } from './requests'
-
-interface GetArgs {
-  url: string
-}
+import { get, GetArgs } from './requests'
 
 export interface ILPStreamConnectionRoutes {
   get(args: GetArgs): Promise<ILPStreamConnection>
