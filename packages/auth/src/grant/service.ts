@@ -4,7 +4,7 @@ import { Transaction, TransactionOrKnex } from 'objection'
 
 import { BaseService } from '../shared/baseService'
 import { Grant, GrantState, StartMethod, FinishMethod } from './model'
-import { AccessRequest } from '../access/types'
+import { Access } from '../access/types'
 import { ClientInfo } from '../client/service'
 import { AccessService } from '../access/service'
 
@@ -33,7 +33,7 @@ interface ServiceDependencies extends BaseService {
 // datatracker.ietf.org/doc/html/draft-ietf-gnap-core-protocol#section-2
 export interface GrantRequest {
   access_token: {
-    access: AccessRequest[]
+    access: Access[]
   }
   client: ClientInfo
   interact?: {

@@ -10,7 +10,12 @@ import { initIocContainer } from '../'
 import { AppServices } from '../app'
 import { AccessService } from './service'
 import { Grant, GrantState, StartMethod, FinishMethod } from '../grant/model'
-import { Action, AccessType, AccessRequest } from './types'
+import {
+  Action,
+  AccessType,
+  IncomingPaymentAccess,
+  OutgoingPaymentAccess
+} from './types'
 
 describe('Access Service', (): void => {
   let deps: IocContract<AppServices>
@@ -54,7 +59,7 @@ describe('Access Service', (): void => {
       ...BASE_GRANT
     })
 
-    const incomingPaymentAccess: AccessRequest = {
+    const incomingPaymentAccess: IncomingPaymentAccess = {
       type: AccessType.IncomingPayment,
       actions: [Action.Create, Action.Read, Action.List]
     }
@@ -84,7 +89,7 @@ describe('Access Service', (): void => {
       receiver: 'https://wallet.com/alice'
     }
 
-    const outgoingPaymentAccess: AccessRequest = {
+    const outgoingPaymentAccess: OutgoingPaymentAccess = {
       type: AccessType.OutgoingPayment,
       actions: [Action.Create, Action.Read, Action.List],
       limits: outgoingPaymentLimit

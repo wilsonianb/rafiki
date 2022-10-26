@@ -1,4 +1,5 @@
 import assert from 'assert'
+import { AccessType, AccessAction } from 'auth'
 import axios from 'axios'
 import { createHmac } from 'crypto'
 import { ModelObject, TransactionOrKnex } from 'objection'
@@ -8,7 +9,13 @@ import { BaseService } from '../../shared/baseService'
 import { QuoteError, isQuoteError } from './errors'
 import { Quote } from './model'
 import { Amount, parseAmount } from '../amount'
-import { OpenPaymentsClientService, Receiver } from '../client/service'
+import {
+  OpenPaymentsClientService,
+  Receiver,
+  parseIncomingPaymentUrl
+} from '../client/service'
+import { Grant } from '../grant/model'
+import { GrantService } from '../grant/service'
 import {
   PaymentPointer,
   GetOptions,
@@ -29,12 +36,14 @@ export interface QuoteService extends PaymentPointerSubresourceService<Quote> {
 
 export interface ServiceDependencies extends BaseService {
   knex: TransactionOrKnex
+  authServer: string
   slippage: number
   quoteUrl: string
   quoteLifespan: number // milliseconds
   signatureSecret?: string
   signatureVersion: number
   clientService: OpenPaymentsClientService
+  grantService: GrantService
   paymentPointerService: PaymentPointerService
   ratesService: RatesService
   makeIlpPlugin: (options: IlpPluginOptions) => IlpPlugin
@@ -97,7 +106,8 @@ async function createQuote(
   }
 
   try {
-    const receiver = await resolveReceiver(deps, options)
+    const grant = await getReceiverGrant(deps, options.receiver)
+    const receiver = await resolveReceiver(deps, options, grant?.accessToken)
     const ilpQuote = await startQuote(deps, {
       ...options,
       paymentPointer,
@@ -110,6 +120,7 @@ async function createQuote(
           paymentPointerId: options.paymentPointerId,
           assetId: paymentPointer.assetId,
           receiver: options.receiver,
+          receiverGrantId: grant?.id,
           sendAmount: {
             value: ilpQuote.maxSourceAmount,
             assetCode: paymentPointer.asset.code,
@@ -163,11 +174,45 @@ async function createQuote(
   }
 }
 
-export async function resolveReceiver(
+async function getReceiverGrant(
   deps: ServiceDependencies,
-  options: CreateQuoteOptions
+  receiver: string
+): Promise<Grant | undefined> {
+  // Get grant to read remote incoming payment receiver
+  const parts = parseIncomingPaymentUrl(receiver)
+  if (!parts) {
+    return undefined
+  }
+  const paymentPointer = await deps.clientService.paymentPointer.get(
+    parts.paymentPointerUrl
+  )
+  if (!paymentPointer) {
+    throw QuoteError.InvalidReceiver
+  }
+  if (paymentPointer.authServer === deps.authServer) {
+    return undefined
+  }
+  const grant = await deps.grantService.get({
+    authServer: paymentPointer.authServer,
+    accessType: AccessType.IncomingPayment,
+    accessActions: [AccessAction.ReadAll]
+  })
+  if (grant) {
+    return grant
+  } else {
+    // TODO: send grant request
+  }
+}
+
+async function resolveReceiver(
+  deps: ServiceDependencies,
+  options: CreateQuoteOptions,
+  accessToken?: string
 ): Promise<Receiver> {
-  const receiver = await deps.clientService.receiver.get(options.receiver)
+  const receiver = await deps.clientService.receiver.get(
+    options.receiver,
+    accessToken
+  )
   if (!receiver) {
     throw QuoteError.InvalidReceiver
   }

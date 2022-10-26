@@ -1,6 +1,12 @@
 import { Model } from 'objection'
 import { BaseModel } from '../shared/baseModel'
-import { LimitData, AccessType, Action } from './types'
+import {
+  LimitData,
+  AccessType,
+  Action,
+  Access as AccessJSON,
+  isOutgoingPaymentAccess
+} from './types'
 import { join } from 'path'
 
 export class Access extends BaseModel {
@@ -25,7 +31,17 @@ export class Access extends BaseModel {
   public type!: AccessType
   public actions!: Action[]
   public identifier?: string
-  public locations?: string[]
-  public interval?: string
   public limits?: LimitData
+
+  public toBody(): AccessJSON {
+    const access: AccessJSON = {
+      type: this.type,
+      actions: this.actions,
+      identifier: this.identifier ?? undefined
+    }
+    if (isOutgoingPaymentAccess(access)) {
+      access.limits = this.limits ?? undefined
+    }
+    return access
+  }
 }

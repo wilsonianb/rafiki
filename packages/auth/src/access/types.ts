@@ -1,5 +1,4 @@
 export enum AccessType {
-  Account = 'account',
   IncomingPayment = 'incoming-payment',
   OutgoingPayment = 'outgoing-payment',
   Quote = 'quote'
@@ -8,42 +7,33 @@ export enum AccessType {
 export enum Action {
   Create = 'create',
   Read = 'read',
+  ReadAll = 'read-all',
   List = 'list',
+  ListAll = 'list-all',
   Complete = 'complete'
 }
 
-interface BaseAccessRequest {
+interface BaseAccess {
   actions: Action[]
-  locations?: string[]
   identifier?: string
-  interval?: string
 }
 
-export interface IncomingPaymentRequest extends BaseAccessRequest {
+export interface IncomingPaymentAccess extends BaseAccess {
   type: AccessType.IncomingPayment
   limits?: never
 }
 
-interface OutgoingPaymentRequest extends BaseAccessRequest {
+interface OutgoingPaymentAccess extends BaseAccess {
   type: AccessType.OutgoingPayment
   limits?: OutgoingPaymentLimit
 }
 
-interface AccountRequest extends BaseAccessRequest {
-  type: AccessType.Account
-  limits?: never
-}
-
-interface QuoteRequest extends BaseAccessRequest {
+interface QuoteAccess extends BaseAccess {
   type: AccessType.Quote
   limits?: never
 }
 
-export type AccessRequest =
-  | IncomingPaymentRequest
-  | OutgoingPaymentRequest
-  | AccountRequest
-  | QuoteRequest
+export type Access = IncomingPaymentAccess | OutgoingPaymentAccess | QuoteAccess
 
 export function isAccessType(accessType: AccessType): accessType is AccessType {
   return Object.values(AccessType).includes(accessType)
@@ -58,54 +48,39 @@ export function isAction(actions: Action[]): actions is Action[] {
   return true
 }
 
-export function isIncomingPaymentAccessRequest(
-  accessRequest: IncomingPaymentRequest
-): accessRequest is IncomingPaymentRequest {
+export function isIncomingPaymentAccess(
+  access: IncomingPaymentAccess
+): access is IncomingPaymentAccess {
   return (
-    accessRequest.type === AccessType.IncomingPayment &&
-    isAction(accessRequest.actions) &&
-    !accessRequest.limits
+    access.type === AccessType.IncomingPayment &&
+    isAction(access.actions) &&
+    !access.limits
   )
 }
 
-function isOutgoingPaymentAccessRequest(
-  accessRequest: OutgoingPaymentRequest
-): accessRequest is OutgoingPaymentRequest {
+export function isOutgoingPaymentAccess(
+  access: Access
+): access is OutgoingPaymentAccess {
   return (
-    accessRequest.type === AccessType.OutgoingPayment &&
-    isAction(accessRequest.actions) &&
-    (!accessRequest.limits || isOutgoingPaymentLimit(accessRequest.limits))
+    access.type === AccessType.OutgoingPayment &&
+    isAction(access.actions) &&
+    (!access.limits || isOutgoingPaymentLimit(access.limits))
   )
 }
 
-function isAccountAccessRequest(
-  accessRequest: AccountRequest
-): accessRequest is AccountRequest {
+function isQuoteAccess(access: QuoteAccess): access is QuoteAccess {
   return (
-    accessRequest.type === AccessType.Account &&
-    isAction(accessRequest.actions) &&
-    !accessRequest.limits
+    access.type === AccessType.Quote &&
+    isAction(access.actions) &&
+    !access.limits
   )
 }
 
-function isQuoteAccessRequest(
-  accessRequest: QuoteRequest
-): accessRequest is QuoteRequest {
+export function isAccess(access: Access): access is Access {
   return (
-    accessRequest.type === AccessType.Quote &&
-    isAction(accessRequest.actions) &&
-    !accessRequest.limits
-  )
-}
-
-export function isAccessRequest(
-  accessRequest: AccessRequest
-): accessRequest is AccessRequest {
-  return (
-    isIncomingPaymentAccessRequest(accessRequest as IncomingPaymentRequest) ||
-    isOutgoingPaymentAccessRequest(accessRequest as OutgoingPaymentRequest) ||
-    isAccountAccessRequest(accessRequest as AccountRequest) ||
-    isQuoteAccessRequest(accessRequest as QuoteRequest)
+    isIncomingPaymentAccess(access as IncomingPaymentAccess) ||
+    isOutgoingPaymentAccess(access as OutgoingPaymentAccess) ||
+    isQuoteAccess(access as QuoteAccess)
   )
 }
 
@@ -121,6 +96,7 @@ export type OutgoingPaymentLimit = {
   receiver: string
   sendAmount?: PaymentAmount
   receiveAmount?: PaymentAmount
+  interval?: string
 }
 
 export type LimitData = OutgoingPaymentLimit

@@ -7,13 +7,13 @@ import { Access } from '../access/model'
 import { ClientService } from '../client/service'
 import { BaseService } from '../shared/baseService'
 import {
-  IncomingPaymentRequest,
-  isIncomingPaymentAccessRequest
+  Access as AccessJSON,
+  IncomingPaymentAccess,
+  isIncomingPaymentAccess
 } from '../access/types'
 import { IAppConfig } from '../config/app'
 import { AccessTokenService } from '../accessToken/service'
 import { AccessService } from '../access/service'
-import { accessToBody } from '../shared/utils'
 import { AccessToken } from '../accessToken/model'
 
 interface ServiceDependencies extends BaseService {
@@ -92,7 +92,7 @@ async function createGrantInitiation(
     !deps.config.incomingPaymentInteraction &&
     body.access_token.access
       .map((acc) => {
-        return isIncomingPaymentAccessRequest(acc as IncomingPaymentRequest)
+        return isIncomingPaymentAccess(acc as IncomingPaymentAccess)
       })
       .every((el) => el === true)
   ) {
@@ -412,13 +412,32 @@ async function continueGrant(
   const accessToken = await accessTokenService.create(grant.id)
   const access = await accessService.getByGrant(grant.id)
 
-  // TODO: add "continue" to response if additional grant request steps are added
   ctx.body = createGrantBody({
     domain: config.authServerDomain,
     grant,
     access,
     accessToken
   })
+}
+
+export interface AccessTokenResponse {
+  value: string
+  manage: string
+  access: AccessJSON[]
+  expires_in: number
+}
+
+export interface GrantContinuation {
+  uri: string
+  wait?: number
+  access_token: {
+    value: string
+  }
+}
+
+export interface ApprovedGrant {
+  access_token: AccessTokenResponse
+  continue: GrantContinuation
 }
 
 function createGrantBody({
@@ -431,13 +450,13 @@ function createGrantBody({
   grant: Grant
   access: Access[]
   accessToken: AccessToken
-}) {
+}): ApprovedGrant {
   return {
     access_token: {
       value: accessToken.value,
       manage: domain + `/token/${accessToken.managementId}`,
-      access: access.map((a: Access) => accessToBody(a)),
-      expiresIn: accessToken.expiresIn
+      access: access.map((a: Access) => a.toBody()),
+      expires_in: accessToken.expiresIn
     },
     continue: {
       access_token: {

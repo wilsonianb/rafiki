@@ -24,7 +24,9 @@ import { createAssetService } from './asset/service'
 import { createAccountingService } from './accounting/service'
 import { createPeerService } from './peer/service'
 import { createAuthService } from './open_payments/auth/service'
+import { createAuthServerService } from './open_payments/authServer/service'
 import { createOpenPaymentsClientService } from './open_payments/client/service'
+import { createGrantService } from './open_payments/grant/service'
 import { createPaymentPointerService } from './open_payments/payment_pointer/service'
 import { createSPSPRoutes } from './spsp/routes'
 import { createClientKeysRoutes } from './clientKeys/routes'
@@ -83,6 +85,24 @@ export function initIocContainer(
       db.client.driver.types.builtins.INT8,
       'text',
       BigInt
+    )
+
+    // Set type parser for array of custom access_action enum type
+    const { textArrayOid } = await db
+      .first('typarray as textArrayOid')
+      .from('pg_type')
+      .where({
+        typname: 'text'
+      })
+    const { accessActionArrayOid } = await db
+      .first('typarray as accessActionArrayOid')
+      .from('pg_type')
+      .where({
+        typname: 'access_action'
+      })
+    db.client.driver.types.setTypeParser(
+      accessActionArrayOid,
+      db.client.driver.types.getTypeParser(textArrayOid)
     )
     return db
   })
@@ -162,6 +182,19 @@ export function initIocContainer(
       authOpenApi: await deps.use('authOpenApi')
     })
   })
+  container.singleton('authServerService', async (deps) => {
+    return await createAuthServerService({
+      logger: await deps.use('logger'),
+      knex: await deps.use('knex')
+    })
+  })
+  container.singleton('grantService', async (deps) => {
+    return await createGrantService({
+      authServerService: await deps.use('authServerService'),
+      logger: await deps.use('logger'),
+      knex: await deps.use('knex')
+    })
+  })
   container.singleton('paymentPointerService', async (deps) => {
     const logger = await deps.use('logger')
     const assetService = await deps.use('assetService')
@@ -204,8 +237,9 @@ export function initIocContainer(
     })
   })
   container.singleton('paymentPointerRoutes', async (deps) => {
+    const config = await deps.use('config')
     return createPaymentPointerRoutes({
-      config: await deps.use('config')
+      authServer: config.authServerGrantUrl
     })
   })
   container.singleton('clientKeysRoutes', async (deps) => {
@@ -233,12 +267,12 @@ export function initIocContainer(
     const config = await deps.use('config')
     return await createOpenPaymentsClientService({
       logger: await deps.use('logger'),
-      // TODO: https://github.com/interledger/rafiki/issues/583
-      accessToken: config.devAccessToken,
       connectionRoutes: await deps.use('connectionRoutes'),
       incomingPaymentRoutes: await deps.use('incomingPaymentRoutes'),
       openApi: await deps.use('openApi'),
+      authOpenApi: await deps.use('authOpenApi'),
       openPaymentsUrl: config.openPaymentsUrl,
+      paymentPointerRoutes: await deps.use('paymentPointerRoutes'),
       paymentPointerService: await deps.use('paymentPointerService')
     })
   })
@@ -281,6 +315,7 @@ export function initIocContainer(
     const config = await deps.use('config')
     return await createQuoteService({
       slippage: config.slippage,
+      authServer: config.authServerGrantUrl,
       quoteLifespan: config.quoteLifespan,
       quoteUrl: config.quoteUrl,
       signatureSecret: config.signatureSecret,
@@ -289,6 +324,7 @@ export function initIocContainer(
       knex: await deps.use('knex'),
       makeIlpPlugin: await deps.use('makeIlpPlugin'),
       clientService: await deps.use('openPaymentsClientService'),
+      grantService: await deps.use('grantService'),
       paymentPointerService: await deps.use('paymentPointerService'),
       ratesService: await deps.use('ratesService')
     })

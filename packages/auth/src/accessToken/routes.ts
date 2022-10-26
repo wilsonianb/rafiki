@@ -3,7 +3,6 @@ import { Access } from '../access/model'
 import { AppContext } from '../app'
 import { IAppConfig } from '../config/app'
 import { AccessTokenService, Introspection } from './service'
-import { accessToBody } from '../shared/utils'
 import { ClientService } from '../client/service'
 
 interface ServiceDependencies {
@@ -59,7 +58,7 @@ function introspectionToBody(result: Introspection) {
     return {
       active: result.active,
       grant: result.id,
-      access: result.access?.map((a: Access) => accessToBody(a)),
+      access: result.access?.map((a: Access) => a.toBody()),
       key: result.key,
       client_id: result.clientId
     }
@@ -85,7 +84,7 @@ async function rotateToken(
     ctx.status = 200
     ctx.body = {
       access_token: {
-        access: result.access.map((a) => accessToBody(a)),
+        access: result.access.map((a) => a.toBody()),
         value: result.value,
         manage: deps.config.authServerDomain + `/token/${result.managementId}`,
         expires_in: result.expiresIn
