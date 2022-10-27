@@ -1,4 +1,4 @@
-FROM node:16-slim as builder
+FROM node:18-slim as builder
 
 WORKDIR /workspace
 
@@ -6,7 +6,7 @@ RUN apt update
 RUN apt install -y curl xz-utils python3 build-essential
 
 # version in curl is not the version used. Dependent on the last command
-RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@7.9.3
+RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@7.14.2
 
 # pnpm fetch does require only lockfile
 COPY pnpm-lock.yaml ./
