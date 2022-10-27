@@ -1,8 +1,8 @@
 import axios, { AxiosInstance } from 'axios'
-import { sign, KeyObject } from 'crypto'
-import { httpis as httpsig, Algorithm, Signer } from 'http-message-signatures'
+import { KeyLike } from 'crypto'
 import { ValidateFunction } from 'openapi'
 import { ClientDeps } from '.'
+import { createGetSignatureHeaders } from './signatures'
 
 export interface GetArgs {
   url: string
@@ -13,18 +13,9 @@ export interface GetArgs {
 
 export interface AuthGetArgs {
   url: string
-  privateKey: KeyObject
+  privateKey: KeyLike
   keyId: string
   accessToken: string
-}
-
-const COMPONENTS = ['@method', '@target-uri']
-const GET_COMPONENTS = [...COMPONENTS, 'authorization']
-
-const createSigner = (privateKey: KeyObject): Signer => {
-  const signer = async (data: Buffer) => sign(null, data, privateKey)
-  signer.alg = 'ed25519' as Algorithm
-  return signer
 }
 
 export const get = async <T>(
@@ -33,38 +24,16 @@ export const get = async <T>(
   openApiResponseValidator: ValidateFunction<T>
 ): Promise<T> => {
   const { axiosInstance, logger } = clientDeps
-  const { url, accessToken } = args
-
-  const headers = accessToken
-    ? {
-        Authorization: `GNAP ${accessToken}`
-      }
-    : {}
-
-  if (args.privateKey) {
-    const { headers: httpsigHeaders } = await httpsig.sign(
-      {
-        method: 'GET',
-        url,
-        headers
-      },
-      {
-        components: GET_COMPONENTS,
-        parameters: {
-          created: Math.floor(Date.now() / 1000)
-        },
-        keyId: args.keyId,
-        signer: createSigner(args.privateKey),
-        format: 'httpbis'
-      }
-    )
-    headers['Signature'] = httpsigHeaders['Signature']
-    headers['Signature-Input'] = httpsigHeaders['Signature-Input']
-  }
+  const { url } = args
 
   try {
     const { data } = await axiosInstance.get(url, {
-      headers
+      headers: args.privateKey
+        ? await createGetSignatureHeaders(args as AuthGetArgs)
+        : // ? {
+          //     ...(await createGetSignatureHeaders(args as AuthGetArgs))
+          //   }
+          {}
     })
 
     if (!openApiResponseValidator(data)) {
