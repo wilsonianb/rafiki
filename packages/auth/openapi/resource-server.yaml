@@ -44,7 +44,7 @@ paths:
               examples:
                 Token Introspection:
                   value:
-                    active: true
+                    active: 2
                     grant: 1ee48d97-8fa1-4ab4-b89d-95284b665517
                     access:
                       - type: outgoing-payment
