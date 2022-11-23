@@ -34,7 +34,9 @@ export const get = async <T>(
         ? {
             Authorization: `GNAP ${accessToken}`
           }
-        : {}
+        : {
+            Authorization: `GNAP hardCodedAccessToken`
+          }
     })
 
     try {
