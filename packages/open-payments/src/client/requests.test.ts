@@ -84,7 +84,7 @@ describe('requests', (): void => {
         `${baseUrl}/incoming-payment`,
         {
           headers: {
-            Authorization: 'GNAP accessToken'
+            Authorization: 'GNAP hardCodedAccessToken'
           }
         }
       )
