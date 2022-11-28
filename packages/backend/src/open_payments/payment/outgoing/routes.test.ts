@@ -38,7 +38,7 @@ describe('Outgoing Payment Routes', (): void => {
 
   const createPayment = async (options: {
     paymentPointerId: string
-    grant?: Grant
+    grantId?: string
     description?: string
     externalRef?: string
   }): Promise<OutgoingPayment> => {
@@ -97,7 +97,7 @@ describe('Outgoing Payment Routes', (): void => {
       createModel: async ({ grant }) => {
         const outgoingPayment = await createPayment({
           paymentPointerId: paymentPointer.id,
-          grant,
+          grantId: grant.grant,
           description: 'rent',
           externalRef: '202201'
         })
@@ -143,7 +143,8 @@ describe('Outgoing Payment Routes', (): void => {
 
   describe('create', (): void => {
     const setup = (
-      options: Omit<CreateOutgoingPaymentOptions, 'paymentPointerId'>
+      options: Omit<CreateOutgoingPaymentOptions, 'paymentPointerId'>,
+      grant?: Grant
     ): CreateContext<CreateBody> =>
       setupContext<CreateContext<CreateBody>>({
         reqOpts: {
@@ -156,7 +157,8 @@ describe('Outgoing Payment Routes', (): void => {
           body: options
         },
         paymentPointer,
-        grant: options.grant
+        grantId: grant.grant,
+        clientId: grant.clientId
       })
 
     describe.each`
@@ -188,17 +190,16 @@ describe('Outgoing Payment Routes', (): void => {
         async ({ description, externalRef }): Promise<void> => {
           const payment = await createPayment({
             paymentPointerId: paymentPointer.id,
-            grant,
+            grantId: grant.grant,
             description,
             externalRef
           })
           const options = {
             quoteId: `${paymentPointer.url}/quotes/${payment.quote.id}`,
-            grant,
             description,
             externalRef
           }
-          const ctx = setup(options)
+          const ctx = setup(options, grant)
           const createSpy = jest
             .spyOn(outgoingPaymentService, 'create')
             .mockResolvedValueOnce(payment)
@@ -210,7 +211,7 @@ describe('Outgoing Payment Routes', (): void => {
             quoteId: payment.quote.id,
             description,
             externalRef,
-            grant
+            grantId: grant.grant
           })
           expect(ctx.response).toSatisfyApiSpec()
           const outgoingPaymentId = (

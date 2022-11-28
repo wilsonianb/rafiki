@@ -76,7 +76,8 @@ async function createOutgoingPayment(
     quoteId,
     description: body.description,
     externalRef: body.externalRef,
-    grant: ctx.grant
+    grantId: ctx.grantId,
+    grantLimits: ctx.limits
   })
 
   if (isOutgoingPaymentError(paymentOrErr)) {

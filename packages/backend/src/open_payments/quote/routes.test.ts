@@ -130,7 +130,7 @@ describe('Quote Routes', (): void => {
       ctx.request.body = {
         ...options
       }
-      ctx.grant = grant
+      ctx.grantId = grant.grant
       return ctx
     }
 

@@ -75,7 +75,8 @@ export function createAuthMiddleware({
           )
         }
       })
-      ctx.grant = grant
+      ctx.grantId = grant.grant
+      ctx.limits = access.limits
 
       // Unless the relevant grant action is ReadAll/ListAll add the
       // clientId to ctx for Read/List filtering

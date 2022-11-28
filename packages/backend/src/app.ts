@@ -25,7 +25,11 @@ import { PeerService } from './peer/service'
 import { createPaymentPointerMiddleware } from './open_payments/payment_pointer/middleware'
 import { PaymentPointer } from './open_payments/payment_pointer/model'
 import { PaymentPointerService } from './open_payments/payment_pointer/service'
-import { AccessType, AccessAction, Grant } from './open_payments/auth/grant'
+import {
+  AccessType,
+  AccessAction,
+  AccessLimits
+} from './open_payments/auth/grant'
 import { createAuthMiddleware } from './open_payments/auth/middleware'
 import { AuthService } from './open_payments/auth/service'
 import { RatesService } from './rates/service'
@@ -76,11 +80,22 @@ export type AppRequest<ParamsT extends string = string> = Omit<
   params: Record<ParamsT, string>
 }
 
-export interface PaymentPointerContext extends AppContext {
-  paymentPointer: PaymentPointer
-  grant?: Grant
-  clientId?: string
+interface NoAuthContext {
+  grantId?: never
+  clientId?: never
+  limits?: never
 }
+
+interface AuthContext {
+  grantId: string
+  clientId?: string
+  limits?: AccessLimits
+}
+
+export type PaymentPointerContext = AppContext &
+  (NoAuthContext | AuthContext) & {
+    paymentPointer: PaymentPointer
+  }
 
 // Payment pointer subresources
 type CollectionRequest<BodyT = never, QueryT = ParsedUrlQuery> = Omit<

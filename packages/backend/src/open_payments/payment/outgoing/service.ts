@@ -18,7 +18,7 @@ import {
 } from './model'
 import { AccountingService } from '../../../accounting/service'
 import { PeerService } from '../../../peer/service'
-import { Grant, AccessLimits, getInterval } from '../../auth/grant'
+import { AccessLimits, getInterval } from '../../auth/grant'
 import { ReceiverService } from '../../receiver/service'
 import { GetOptions, ListOptions } from '../../payment_pointer/model'
 import { PaymentPointerSubresourceService } from '../../payment_pointer/service'
@@ -81,10 +81,19 @@ async function getOutgoingPayment(
   else return
 }
 
-export interface CreateOutgoingPaymentOptions {
+interface AuthOptions {
+  grantId: string
+  grantLimits?: AccessLimits
+}
+
+interface NoAuthOptions {
+  grantId?: never
+  grantLimits?: never
+}
+
+export type CreateOutgoingPaymentOptions = (AuthOptions | NoAuthOptions) & {
   paymentPointerId: string
   quoteId: string
-  grant?: Grant
   description?: string
   externalRef?: string
   callback?: (f: unknown) => NodeJS.Timeout
@@ -94,7 +103,6 @@ async function createOutgoingPayment(
   deps: ServiceDependencies,
   options: CreateOutgoingPaymentOptions
 ): Promise<OutgoingPayment | OutgoingPaymentError> {
-  const grantId = options.grant ? options.grant.grant : undefined
   try {
     return await OutgoingPayment.transaction(deps.knex, async (trx) => {
       const payment = await OutgoingPayment.query(trx)
@@ -104,7 +112,7 @@ async function createOutgoingPayment(
           description: options.description,
           externalRef: options.externalRef,
           state: OutgoingPaymentState.Funding,
-          grantId
+          grantId: options.grantId
         })
         .withGraphFetched('[quote.asset]')
 
@@ -115,15 +123,15 @@ async function createOutgoingPayment(
         throw OutgoingPaymentError.InvalidQuote
       }
 
-      if (options.grant) {
+      if (options.grantLimits) {
         if (
-          !(await validateGrant(
+          !(await validateGrantLimits(
             {
               ...deps,
               knex: trx
             },
             payment,
-            options.grant,
+            options.grantLimits,
             options.callback
           ))
         ) {
@@ -167,7 +175,7 @@ async function createOutgoingPayment(
     } else if (isOutgoingPaymentError(err)) {
       return err
     } else if (err instanceof knex.KnexTimeoutError) {
-      deps.logger.error({ grant: grantId }, 'grant locked')
+      deps.logger.error({ grant: options.grantId }, 'grant locked')
     }
     throw err
   }
@@ -227,17 +235,13 @@ interface PaymentLimits extends AccessLimits {
 }
 
 // "payment" is locked by the "deps.knex" transaction.
-async function validateGrant(
+async function validateGrantLimits(
   deps: ServiceDependencies,
   payment: OutgoingPayment,
-  grant: Grant,
+  limits: AccessLimits,
   callback?: (f: unknown) => NodeJS.Timeout
 ): Promise<boolean> {
-  const grantAccess = grant.access[0]
-  if (!grantAccess.limits) {
-    return true
-  }
-  const paymentLimits = validateAccessLimits(payment, grantAccess.limits)
+  const paymentLimits = validateAccessLimits(payment, limits)
   if (!paymentLimits) {
     return false
   }
@@ -253,13 +257,13 @@ async function validateGrant(
   }
 
   //lock grant
-  await deps.grantReferenceService.lock(grant.grant, deps.knex)
+  await deps.grantReferenceService.lock(payment.grantId, deps.knex)
 
   if (callback) await new Promise(callback)
 
   const grantPayments = await OutgoingPayment.query(deps.knex)
     .where({
-      grantId: grant.grant
+      grantId: payment.grantId
     })
     .andWhereNot({
       id: payment.id

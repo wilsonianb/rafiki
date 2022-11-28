@@ -12,7 +12,7 @@ import { CreateOutgoingPaymentOptions } from '../open_payments/payment/outgoing/
 export async function createOutgoingPayment(
   deps: IocContract<AppServices>,
   options: Omit<
-    CreateOutgoingPaymentOptions & CreateTestQuoteOptions,
+    CreateOutgoingPaymentOptions & Omit<CreateTestQuoteOptions, 'grantId'>,
     'quoteId'
   >
 ): Promise<OutgoingPayment> {
