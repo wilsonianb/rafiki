@@ -313,7 +313,7 @@ describe('Auth Middleware', (): void => {
       })
       await expect(middleware(ctx, next)).resolves.toBeUndefined()
       expect(next).toHaveBeenCalled()
-      expect(ctx.grantId).toEqual(grant.id)
+      expect(ctx.grantId).toEqual(grant.grant)
       scope.done()
     }
   )

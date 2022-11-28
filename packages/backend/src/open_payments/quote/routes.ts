@@ -60,7 +60,7 @@ async function createQuote(
       receiver: body.receiver,
       sendAmount: body.sendAmount && parseAmount(body.sendAmount),
       receiveAmount: body.receiveAmount && parseAmount(body.receiveAmount),
-      grantId: ctx.grant?.grant
+      grantId: ctx.grantId
     })
 
     if (isQuoteError(quoteOrErr)) {

@@ -301,7 +301,7 @@ describe('OutgoingPaymentService', (): void => {
       createModel: ({ grant }: { grant?: Grant }) =>
         createOutgoingPayment(deps, {
           paymentPointerId,
-          grant,
+          grantId: grant.grant,
           receiver,
           sendAmount,
           validDestination: false
@@ -515,7 +515,7 @@ describe('OutgoingPaymentService', (): void => {
           quoteId: quote.id,
           description: 'rent',
           externalRef: '202201',
-          grant,
+          grantId: grant.grant,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           callback: (f: any) => setTimeout(f, 5000)
         }
@@ -570,7 +570,11 @@ describe('OutgoingPaymentService', (): void => {
           ]
         })
         await expect(
-          outgoingPaymentService.create({ ...options, grant })
+          outgoingPaymentService.create({
+            ...options,
+            grantId: grant.grant,
+            grantLimits: grant.access[0].limits
+          })
         ).resolves.toEqual(OutgoingPaymentError.InsufficientGrant)
       })
       test.each`
@@ -596,7 +600,11 @@ describe('OutgoingPaymentService', (): void => {
             ]
           })
           await expect(
-            outgoingPaymentService.create({ ...options, grant })
+            outgoingPaymentService.create({
+              ...options,
+              grantId: grant.grant,
+              grantLimits: grant.access[0].limits
+            })
           ).resolves.toEqual(OutgoingPaymentError.InsufficientGrant)
         }
       )
@@ -638,7 +646,11 @@ describe('OutgoingPaymentService', (): void => {
             ]
           })
           await expect(
-            outgoingPaymentService.create({ ...options, grant })
+            outgoingPaymentService.create({
+              ...options,
+              grantId: grant.grant,
+              grantLimits: grant.access[0].limits
+            })
           ).resolves.toEqual(OutgoingPaymentError.InsufficientGrant)
         }
       )
@@ -688,7 +700,7 @@ describe('OutgoingPaymentService', (): void => {
             }/${uuid()}/incoming-payments/${uuid()}`,
             sendAmount: sendAmount ? paymentAmount : undefined,
             receiveAmount: sendAmount ? undefined : paymentAmount,
-            grant,
+            grantId: grant.grant,
             validDestination: false
           })
           assert.ok(firstPayment)
@@ -703,7 +715,11 @@ describe('OutgoingPaymentService', (): void => {
           }
 
           await expect(
-            outgoingPaymentService.create({ ...options, grant })
+            outgoingPaymentService.create({
+              ...options,
+              grantId: grant.grant,
+              grantLimits: grant.access[0].limits
+            })
           ).resolves.toEqual(OutgoingPaymentError.InsufficientGrant)
         }
       )
@@ -728,7 +744,11 @@ describe('OutgoingPaymentService', (): void => {
             ]
           })
           await expect(
-            outgoingPaymentService.create({ ...options, grant })
+            outgoingPaymentService.create({
+              ...options,
+              grantId: grant.grant,
+              grantLimits: grant.access[0].limits
+            })
           ).resolves.toBeInstanceOf(OutgoingPayment)
         }
       )
@@ -793,7 +813,8 @@ describe('OutgoingPaymentService', (): void => {
               }/${uuid()}/incoming-payments/${uuid()}`,
               sendAmount: sendAmount ? paymentAmount : undefined,
               receiveAmount: sendAmount ? undefined : paymentAmount,
-              grant,
+              grantId: grant.grant,
+              grantLimits: grant.access[0].limits,
               validDestination: false
             })
             assert.ok(firstPayment)
@@ -809,7 +830,11 @@ describe('OutgoingPaymentService', (): void => {
             }
           }
           await expect(
-            outgoingPaymentService.create({ ...options, grant })
+            outgoingPaymentService.create({
+              ...options,
+              grantId: grant.grant,
+              grantLimits: grant.access[0].limits
+            })
           ).resolves.toBeInstanceOf(OutgoingPayment)
         }
       )
