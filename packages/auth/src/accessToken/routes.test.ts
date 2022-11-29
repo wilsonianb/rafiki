@@ -112,7 +112,7 @@ describe('Access Token Routes', (): void => {
       const openApi = await deps.use('openApi')
       jestOpenAPI(openApi.resourceServerSpec)
     })
-    test('Cannot introspect fake token', async (): Promise<void> => {
+    test('Successfully introspects fake token', async (): Promise<void> => {
       const ctx = createContext(
         {
           headers: {
@@ -124,26 +124,20 @@ describe('Access Token Routes', (): void => {
         {}
       )
       ctx.request.body = {
-        access_token: v4(),
-        resource_server: 'test'
+        access_token: v4()
       }
       await expect(accessTokenRoutes.introspect(ctx)).resolves.toBeUndefined()
-      expect(ctx.status).toBe(404)
-      expect(ctx.body).toMatchObject({
-        error: 'invalid_request',
-        message: 'token not found'
+      expect(ctx.response).toSatisfyApiSpec()
+      expect(ctx.status).toBe(200)
+      expect(ctx.response.get('Content-Type')).toBe(
+        'application/json; charset=utf-8'
+      )
+      expect(ctx.body).toEqual({
+        active: false
       })
     })
 
     test('Successfully introspects valid token', async (): Promise<void> => {
-      const clientId = crypto.createHash('sha256').update(CLIENT).digest('hex')
-
-      const scope = nock(CLIENT)
-        .get('/jwks.json')
-        .reply(200, {
-          keys: [testJwk]
-        })
-
       const ctx = createContext(
         {
           headers: {
@@ -156,8 +150,7 @@ describe('Access Token Routes', (): void => {
       )
 
       ctx.request.body = {
-        access_token: token.value,
-        resource_server: 'test'
+        access_token: token.value
       }
       await expect(accessTokenRoutes.introspect(ctx)).resolves.toBeUndefined()
       expect(ctx.response).toSatisfyApiSpec()
@@ -177,21 +170,11 @@ describe('Access Token Routes', (): void => {
             identifier: access.identifier
           }
         ],
-        key: {
-          proof: 'httpsig',
-          jwk: testJwk
-        },
-        client_id: clientId
+        client: grant.client
       })
-      scope.done()
     })
 
     test('Successfully introspects expired token', async (): Promise<void> => {
-      const scope = nock(CLIENT)
-        .get('/jwks.json')
-        .reply(200, {
-          keys: [testJwk]
-        })
       const tokenCreatedDate = new Date(token.createdAt)
       const now = new Date(
         tokenCreatedDate.getTime() + (token.expiresIn + 1) * 1000
@@ -210,8 +193,7 @@ describe('Access Token Routes', (): void => {
       )
 
       ctx.request.body = {
-        access_token: token.value,
-        resource_server: 'test'
+        access_token: token.value
       }
       await expect(accessTokenRoutes.introspect(ctx)).resolves.toBeUndefined()
       expect(ctx.response).toSatisfyApiSpec()
@@ -222,8 +204,6 @@ describe('Access Token Routes', (): void => {
       expect(ctx.body).toEqual({
         active: false
       })
-
-      scope.isDone()
     })
   })
 
@@ -284,9 +264,7 @@ describe('Access Token Routes', (): void => {
       )
 
       ctx.request.body = {
-        access_token: token.value,
-        proof: 'httpsig',
-        resource_server: 'test'
+        access_token: token.value
       }
       await token.$query(trx).patch({ expiresIn: 10000 })
       await accessTokenRoutes.revoke(ctx)
@@ -313,9 +291,7 @@ describe('Access Token Routes', (): void => {
       )
 
       ctx.request.body = {
-        access_token: token.value,
-        proof: 'httpsig',
-        resource_server: 'test'
+        access_token: token.value
       }
       await token.$query(trx).patch({ expiresIn: -1 })
       await accessTokenRoutes.revoke(ctx)
