@@ -4,7 +4,6 @@ import { Transaction, TransactionOrKnex } from 'objection'
 
 import { BaseService } from '../shared/baseService'
 import { Grant, GrantState } from '../grant/model'
-import { ClientService, JWKWithRequired } from '../client/service'
 import { AccessToken } from './model'
 import { IAppConfig } from '../config/app'
 import { Access } from '../access/model'
@@ -12,7 +11,7 @@ import { Access } from '../access/model'
 export interface AccessTokenService {
   get(token: string): Promise<AccessToken>
   getByManagementId(managementId: string): Promise<AccessToken>
-  introspect(token: string): Promise<Introspection | undefined>
+  introspect(token: string): Promise<Grant | undefined>
   revoke(id: string): Promise<void>
   create(grantId: string, opts?: AccessTokenOpts): Promise<AccessToken>
   rotate(managementId: string): Promise<Rotation>
@@ -20,19 +19,7 @@ export interface AccessTokenService {
 
 interface ServiceDependencies extends BaseService {
   knex: TransactionOrKnex
-  clientService: ClientService
   config: IAppConfig
-}
-
-export interface KeyInfo {
-  proof: string
-  jwk: JWKWithRequired
-}
-
-export interface Introspection extends Partial<Grant> {
-  active: boolean
-  key?: KeyInfo
-  clientId?: string
 }
 
 interface AccessTokenOpts {
@@ -56,8 +43,7 @@ export type Rotation =
 export async function createAccessTokenService({
   logger,
   knex,
-  config,
-  clientService
+  config
 }: ServiceDependencies): Promise<AccessTokenService> {
   const log = logger.child({
     service: 'TokenService'
@@ -66,7 +52,6 @@ export async function createAccessTokenService({
   const deps: ServiceDependencies = {
     logger: log,
     knex,
-    clientService,
     config
   }
 
@@ -99,40 +84,16 @@ async function getByManagementId(managementId: string): Promise<AccessToken> {
 async function introspect(
   deps: ServiceDependencies,
   value: string
-): Promise<Introspection | undefined> {
+): Promise<Grant | undefined> {
   const token = await AccessToken.query(deps.knex).findOne({ value })
 
-  if (!token) return
-  if (isTokenExpired(token)) {
-    return { active: false }
+  if (!token || isTokenExpired(token)) {
+    return undefined
   } else {
     const grant = await Grant.query(deps.knex)
       .findById(token.grantId)
       .withGraphFetched('access')
-    if (grant.state === GrantState.Revoked) {
-      return { active: false }
-    }
-
-    const jwk = await deps.clientService.getKey({
-      client: grant.client,
-      keyId: grant.clientKeyId
-    })
-
-    if (!jwk) {
-      return { active: false }
-    }
-
-    const clientId = crypto
-      .createHash('sha256')
-      .update(grant.client)
-      .digest('hex')
-
-    return {
-      active: true,
-      ...grant,
-      key: { proof: 'httpsig', jwk },
-      clientId
-    }
+    return grant.state === GrantState.Revoked ? undefined : grant
   }
 }
 
