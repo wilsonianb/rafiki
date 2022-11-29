@@ -7,5 +7,5 @@ export class GrantReference extends DbErrors(Model) {
   }
   public static readonly tableName = 'grantReferences'
   public id!: string
-  public clientId!: string
+  public client!: string
 }

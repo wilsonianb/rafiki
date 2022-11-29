@@ -1,4 +1,5 @@
 import assert from 'assert'
+import { faker } from '@faker-js/faker'
 import { Knex } from 'knex'
 import { v4 as uuid } from 'uuid'
 
@@ -80,7 +81,7 @@ describe('Incoming Payment Service', (): void => {
     test('An incoming payment with corresponding grant can be created', async (): Promise<void> => {
       const grant = await grantReferenceService.create({
         id: uuid(),
-        clientId: uuid()
+        client: faker.internet.url()
       })
       const incomingPayment = await incomingPaymentService.create({
         paymentPointerId,

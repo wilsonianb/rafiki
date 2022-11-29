@@ -1,3 +1,4 @@
+import { faker } from '@faker-js/faker'
 import { Knex } from 'knex'
 import { gql } from 'apollo-server-koa'
 
@@ -55,7 +56,7 @@ describe('Incoming Payment Resolver', (): void => {
       paymentPointerId = (await createPaymentPointer(deps, { asset })).id
       grantRef = await grantReferenceService.create({
         id: uuid(),
-        clientId: uuid()
+        client: faker.internet.url()
       })
     })
 

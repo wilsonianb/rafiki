@@ -61,7 +61,7 @@ async function getIncomingPayment(
   try {
     incomingPayment = await deps.incomingPaymentService.get({
       id: ctx.params.id,
-      clientId: ctx.clientId,
+      client: ctx.client,
       paymentPointerId: ctx.paymentPointer.id
     })
   } catch (err) {

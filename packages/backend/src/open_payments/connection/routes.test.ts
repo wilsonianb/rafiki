@@ -1,4 +1,5 @@
 import { IocContract } from '@adonisjs/fold'
+import { faker } from '@faker-js/faker'
 import { Knex } from 'knex'
 import jestOpenAPI from 'jest-openapi'
 import { v4 as uuid } from 'uuid'
@@ -54,7 +55,7 @@ describe('Connection Routes', (): void => {
     paymentPointer = await createPaymentPointer(deps, { asset })
     grantRef = await grantReferenceService.create({
       id: uuid(),
-      clientId: uuid()
+      client: faker.internet.url()
     })
     incomingPayment = await createIncomingPayment(deps, {
       paymentPointerId: paymentPointer.id,

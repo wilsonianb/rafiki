@@ -1,4 +1,5 @@
 import assert from 'assert'
+import { TokenInfo } from 'auth'
 import { Interval, Duration, DateTime, Settings } from 'luxon'
 
 import { Amount } from '../amount'
@@ -54,30 +55,61 @@ export type GrantAccessJSON = Omit<GrantAccess, 'limits'> & {
 export interface GrantOptions {
   active: boolean
   grant: string
-  clientId: string
+  client: string
   access?: GrantAccess[]
 }
 
 export interface GrantJSON {
-  active: boolean
   grant: string
-  client_id: string
+  client: string
   access?: GrantAccessJSON[]
 }
 
 export class Grant {
-  constructor(options: GrantOptions) {
-    assert.ok(options.access || !options.active)
-    this.active = options.active
-    this.grant = options.grant
-    this.access = options.access || []
-    this.clientId = options.clientId
+  static fromTokenInfo(tokenInfo: TokenInfo): Grant {
+    return new this({
+      grant: tokenInfo.grant,
+      client: tokenInfo.client,
+      access: tokenInfo.access.map((access) => {
+        const options: GrantAccess = {
+          type: access.type,
+          actions: access.actions,
+          identifier: access.identifier,
+          interval: access.interval
+        }
+        if (access.limits) {
+          options.limits = {
+            receiver: access.limits.receiver
+          }
+          if (access.limits.sendAmount) {
+            options.limits.sendAmount = {
+              value: BigInt(access.limits.sendAmount.value),
+              assetCode: access.limits.sendAmount.assetCode,
+              assetScale: access.limits.sendAmount.assetScale
+            }
+          }
+          if (access.limits.receiveAmount) {
+            options.limits.receiveAmount = {
+              value: BigInt(access.limits.receiveAmount.value),
+              assetCode: access.limits.receiveAmount.assetCode,
+              assetScale: access.limits.receiveAmount.assetScale
+            }
+          }
+        }
+        return options
+      })
+    })
   }
 
-  public readonly active: boolean
+  constructor(options: GrantOptions) {
+    this.grant = options.grant
+    this.access = options.access || []
+    this.client = options.client
+  }
+
   public readonly grant: string
   public readonly access: GrantAccess[]
-  public readonly clientId: string
+  public readonly client: string
 
   public findAccess({
     type,
@@ -100,11 +132,11 @@ export class Grant {
     )
   }
 
-  public toJSON(): GrantJSON {
+  public toTokenInfo(): TokenInfo {
     return {
-      active: this.active,
+      active: true,
       grant: this.grant,
-      client_id: this.clientId,
+      client: this.client,
       access: this.access?.map((access) => {
         return {
           ...access,
