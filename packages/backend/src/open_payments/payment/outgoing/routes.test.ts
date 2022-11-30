@@ -19,7 +19,6 @@ import {
   getRouteTests,
   setup as setupContext
 } from '../../payment_pointer/model.test'
-import { createGrant } from '../../../tests/grant'
 import { createOutgoingPayment } from '../../../tests/outgoingPayment'
 import { createPaymentPointer } from '../../../tests/paymentPointer'
 import { AccessAction, AccessType, Grant } from '../../auth/grant'
@@ -171,7 +170,10 @@ describe('Outgoing Payment Routes', (): void => {
 
       beforeEach(async (): Promise<void> => {
         grant = withGrant
-          ? await createGrant(deps, {
+          ? new Grant({
+              active: true,
+              grant: uuid(),
+              clientId: uuid(),
               access: [
                 {
                   type: AccessType.OutgoingPayment,

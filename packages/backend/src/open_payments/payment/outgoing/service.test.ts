@@ -285,7 +285,19 @@ describe('OutgoingPaymentService', (): void => {
       createModel: ({ clientId }) =>
         createOutgoingPayment(deps, {
           paymentPointerId,
-          clientId,
+          grant: clientId
+            ? new Grant({
+                active: true,
+                clientId,
+                grant: uuid(),
+                access: [
+                  {
+                    type: AccessType.OutgoingPayment,
+                    actions: [AccessAction.Create, AccessAction.Read]
+                  }
+                ]
+              })
+            : undefined,
           receiver,
           sendAmount,
           validDestination: false

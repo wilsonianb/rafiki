@@ -55,7 +55,6 @@ describe('Incoming Payment Resolver', (): void => {
       createModel: () =>
         createIncomingPayment(deps, {
           paymentPointerId,
-          clientId: uuid(),
           incomingAmount: {
             value: BigInt(123),
             assetCode: asset.code,
