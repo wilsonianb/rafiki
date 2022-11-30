@@ -83,18 +83,21 @@ describe('Outgoing Payment Routes', (): void => {
     ${true}  | ${' failed'}
   `('get/list$description outgoing payment', ({ failed }): void => {
     getRouteTests({
-      createGrant: async ({ clientId }) =>
-        createGrant(deps, {
-          clientId,
-          access: [
-            {
-              type: AccessType.OutgoingPayment,
-              actions: [AccessAction.Create, AccessAction.Read]
-            }
-          ]
-        }),
       getPaymentPointer: async () => paymentPointer,
-      createModel: async ({ grant }) => {
+      createModel: async ({ clientId }) => {
+        const grant = clientId
+          ? new Grant({
+              active: true,
+              clientId,
+              grant: uuid(),
+              access: [
+                {
+                  type: AccessType.OutgoingPayment,
+                  actions: [AccessAction.Create, AccessAction.Read]
+                }
+              ]
+            })
+          : undefined
         const outgoingPayment = await createPayment({
           paymentPointerId: paymentPointer.id,
           grant,

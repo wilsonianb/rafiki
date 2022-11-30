@@ -42,10 +42,10 @@ describe('Quote Routes', (): void => {
 
   const createPaymentPointerQuote = async ({
     paymentPointerId,
-    grantId
+    clientId
   }: {
     paymentPointerId: string
-    grantId: string
+    clientId: string
   }): Promise<Quote> => {
     return await createQuote(deps, {
       paymentPointerId,
@@ -55,7 +55,7 @@ describe('Quote Routes', (): void => {
         assetCode: asset.code,
         assetScale: asset.scale
       },
-      grantId,
+      clientId,
       validDestination: false
     })
   }
@@ -90,12 +90,11 @@ describe('Quote Routes', (): void => {
 
   describe('get', (): void => {
     getRouteTests({
-      createGrant: async (options) => createGrant(deps, options),
       getPaymentPointer: async () => paymentPointer,
-      createModel: async ({ grant }) =>
+      createModel: async ({ clientId }) =>
         createPaymentPointerQuote({
           paymentPointerId: paymentPointer.id,
-          grantId: grant?.grant
+          clientId
         }),
       get: (ctx) => quoteRoutes.get(ctx),
       getBody: (quote) => ({
@@ -211,7 +210,7 @@ describe('Quote Routes', (): void => {
               quote = await createQuote(deps, {
                 ...opts,
                 validDestination: false,
-                grantId: grant?.grant
+                clientId: grant?.clientId
               })
               return quote
             })
@@ -227,7 +226,7 @@ describe('Quote Routes', (): void => {
               ...options.receiveAmount,
               value: BigInt(options.receiveAmount.value)
             },
-            grantId: grant?.grant
+            clientId: grant?.clientId
           })
           expect(ctx.response).toSatisfyApiSpec()
           const quoteId = (
@@ -266,7 +265,7 @@ describe('Quote Routes', (): void => {
             quote = await createQuote(deps, {
               ...opts,
               validDestination: false,
-              grantId: grant?.grant
+              clientId: grant?.clientId
             })
             return quote
           })
@@ -274,7 +273,7 @@ describe('Quote Routes', (): void => {
         expect(quoteSpy).toHaveBeenCalledWith({
           paymentPointerId: paymentPointer.id,
           receiver,
-          grantId: grant?.grant
+          clientId: grant?.clientId
         })
         expect(ctx.response).toSatisfyApiSpec()
         const quoteId = (

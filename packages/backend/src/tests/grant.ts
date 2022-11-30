@@ -14,11 +14,6 @@ export async function createGrant(
     active,
     access
   })
-  const grantReferenceService = await deps.use('grantReferenceService')
-  await grantReferenceService.create({
-    id: grant.grant,
-    clientId: grant.clientId
-  })
 
   return grant
 }
