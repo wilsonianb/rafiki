@@ -1,3 +1,4 @@
+import { faker } from '@faker-js/faker'
 import jestOpenAPI from 'jest-openapi'
 import { Knex } from 'knex'
 import { v4 as uuid } from 'uuid'
@@ -36,7 +37,8 @@ describe('Incoming Payment Routes', (): void => {
     deps = await initIocContainer(config)
     appContainer = await createTestApp(deps)
     knex = await deps.use('knex')
-    jestOpenAPI(await deps.use('openApi'))
+    const { resourceServerSpec } = await deps.use('openApi')
+    jestOpenAPI(resourceServerSpec)
   })
 
   const asset = {
@@ -67,7 +69,7 @@ describe('Incoming Payment Routes', (): void => {
     externalRef = '#123'
     grantRef = await GrantModel.query().insert({
       id: uuid(),
-      clientId: uuid()
+      client: faker.internet.url()
     })
   })
 
@@ -171,9 +173,8 @@ describe('Incoming Payment Routes', (): void => {
       }): Promise<void> => {
         const grant = withGrant
           ? new Grant({
-              active: true,
               grant: grantRef.id,
-              clientId: grantRef.clientId,
+              client: grantRef.client,
               access: [
                 {
                   type: AccessType.IncomingPayment,

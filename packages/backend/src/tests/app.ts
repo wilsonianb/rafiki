@@ -62,7 +62,6 @@ export const createTestApp = async (
   await start(container, app)
 
   const grant = new Grant({
-    active: true,
     clientId: uuid(),
     grant: 'PRY5NM33OM4TB8N6BW7',
     access: [
@@ -80,8 +79,7 @@ export const createTestApp = async (
   const authServerIntrospectionUrl = new URL(config.authServerIntrospectionUrl)
   nock(authServerIntrospectionUrl.origin)
     .post(authServerIntrospectionUrl.pathname, {
-      access_token: testAccessToken,
-      resource_server: '7C7C4AZ9KHRS6X63AJAO'
+      access_token: testAccessToken
     })
     .reply(200, grant.toJSON())
     .persist()

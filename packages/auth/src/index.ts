@@ -16,7 +16,6 @@ import { createGrantRoutes } from './grant/routes'
 import { createOpenAPI } from 'openapi'
 import { createUnauthenticatedClient as createOpenPaymentsClient } from 'open-payments'
 
-export { KeyInfo } from './accessToken/service'
 export { JWKWithRequired } from './client/service'
 export { HttpSigContext, verifySigAndChallenge } from './signature/middleware'
 const container = initIocContainer(Config)
@@ -134,8 +133,7 @@ export function initIocContainer(
       return await createAccessTokenService({
         logger: await deps.use('logger'),
         config: await deps.use('config'),
-        knex: await deps.use('knex'),
-        clientService: await deps.use('clientService')
+        knex: await deps.use('knex')
       })
     }
   )
@@ -145,8 +143,7 @@ export function initIocContainer(
       return await createAccessTokenRoutes({
         config: await deps.use('config'),
         logger: await deps.use('logger'),
-        accessTokenService: await deps.use('accessTokenService'),
-        clientService: await deps.use('clientService')
+        accessTokenService: await deps.use('accessTokenService')
       })
     }
   )

@@ -24,7 +24,7 @@ async function getGrantReference(grantId: string, trx: Transaction) {
 
 interface CreateGrantReferenceOptions {
   id: string
-  clientId: string
+  client: string
 }
 
 async function createGrantReference(

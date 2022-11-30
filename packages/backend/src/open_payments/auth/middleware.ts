@@ -34,7 +34,7 @@ export function createAuthMiddleware({
       }
       const authService = await ctx.container.use('authService')
       const grant = await authService.introspect(token)
-      if (!grant || !grant.active) {
+      if (!grant) {
         ctx.throw(401, 'Invalid Token')
       }
       const access = grant.findAccess({
@@ -58,18 +58,18 @@ export function createAuthMiddleware({
       await GrantReference.transaction(async (trx: Transaction) => {
         const grantRef = await grantReferenceService.get(grant.grant, trx)
         if (grantRef) {
-          if (grantRef.clientId !== grant.clientId) {
+          if (grantRef.client !== grant.client) {
             logger.debug(
-              `clientID ${grant.clientId} for grant ${grant.grant} does not match internal reference clientId ${grantRef.clientId}.`
+              `client ${grant.client} for grant ${grant.grant} does not match internal reference client ${grantRef.client}.`
             )
             ctx.throw(500)
           }
         } else if (action === AccessAction.Create) {
-          // Grant and client ID's are only stored for create routes
+          // Grants and clients are only stored for create routes
           await grantReferenceService.create(
             {
               id: grant.grant,
-              clientId: grant.clientId
+              client: grant.client
             },
             trx
           )
@@ -78,9 +78,9 @@ export function createAuthMiddleware({
       ctx.grant = grant
 
       // Unless the relevant grant action is ReadAll/ListAll add the
-      // clientId to ctx for Read/List filtering
+      // client to ctx for Read/List filtering
       if (access.actions.includes(action)) {
-        ctx.clientId = grant.clientId
+        ctx.client = grant.client
       }
 
       await next()

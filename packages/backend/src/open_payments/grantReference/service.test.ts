@@ -1,3 +1,4 @@
+import { faker } from '@faker-js/faker'
 import { Knex } from 'knex'
 import { v4 as uuid } from 'uuid'
 
@@ -42,7 +43,7 @@ describe('Grant Reference Service', (): void => {
         const grantRef = await grantReferenceService.create(
           {
             id,
-            clientId: uuid()
+            client: faker.internet.url()
           },
           trx
         )
@@ -64,7 +65,7 @@ describe('Grant Reference Service', (): void => {
     test('a grant reference can be locked', async (): Promise<void> => {
       const grantRef = await grantReferenceService.create({
         id: uuid(),
-        clientId: uuid()
+        client: faker.internet.url()
       })
       const lock = async (): Promise<void> => {
         return await GrantReference.transaction(async (trx) => {
