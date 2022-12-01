@@ -1,13 +1,13 @@
 import { Grant, AccessType, AccessAction, getInterval } from './grant'
+import { faker } from '@faker-js/faker'
 import { Interval } from 'luxon'
-import { v4 as uuid } from 'uuid'
 
 describe('Grant', (): void => {
   describe('findAccess', (): void => {
     let grant: Grant
     const type = AccessType.IncomingPayment
     const action = AccessAction.Create
-    const clientId = uuid()
+    const client = faker.internet.url()
 
     describe.each`
       identifier                        | description
@@ -16,9 +16,8 @@ describe('Grant', (): void => {
     `('$description', ({ identifier }): void => {
       beforeAll((): void => {
         grant = new Grant({
-          active: true,
           grant: 'PRY5NM33OM4TB8N6BW7',
-          clientId,
+          client,
           access: [
             {
               type: AccessType.OutgoingPayment,
@@ -51,9 +50,8 @@ describe('Grant', (): void => {
         'Returns true for $description super access',
         async ({ superAction, subAction }): Promise<void> => {
           const grant = new Grant({
-            active: true,
             grant: 'PRY5NM33OM4TB8N6BW7',
-            clientId,
+            client,
             access: [
               {
                 type,

@@ -14,6 +14,7 @@ import { CreateOutgoingPaymentOptions, OutgoingPaymentService } from './service'
 import { createTestApp, TestContainer } from '../../../tests/app'
 import { Config } from '../../../config/app'
 import { CreateQuoteOptions } from '../../quote/service'
+import { mockGrant } from '../../../tests/grant'
 import { createIncomingPayment } from '../../../tests/incomingPayment'
 import { createOutgoingPayment } from '../../../tests/outgoingPayment'
 import {
@@ -59,7 +60,7 @@ describe('OutgoingPaymentService', (): void => {
   let amtDelivered: bigint
   let trx: Knex.Transaction
   let grantId: string
-  let clientId: string
+  let client: string
 
   const asset: AssetOptions = {
     scale: 9,
@@ -261,7 +262,7 @@ describe('OutgoingPaymentService', (): void => {
     ).resolves.toBeUndefined()
 
     grantId = uuid()
-    clientId = appContainer.clientId
+    client = appContainer.client
     incomingPayment = await createIncomingPayment(deps, {
       paymentPointerId: receiverPaymentPointer.id
     })
@@ -282,14 +283,12 @@ describe('OutgoingPaymentService', (): void => {
 
   describe('get/getPaymentPointerPage', (): void => {
     getTests({
-      createModel: ({ clientId }) =>
+      createModel: ({ client }) =>
         createOutgoingPayment(deps, {
           paymentPointerId,
-          grant: clientId
-            ? new Grant({
-                active: true,
-                clientId,
-                grant: uuid(),
+          grant: client
+            ? mockGrant({
+                client,
                 access: [
                   {
                     type: AccessType.OutgoingPayment,
@@ -496,8 +495,7 @@ describe('OutgoingPaymentService', (): void => {
 
       test('fails to create if grant is locked', async () => {
         const grant = new Grant({
-          active: true,
-          clientId,
+          client,
           grant: grantId,
           access: [
             {
@@ -574,8 +572,7 @@ describe('OutgoingPaymentService', (): void => {
         test('fails if grant limits interval does not cover now', async (): Promise<void> => {
           const start = new Date(Date.now() + 24 * 60 * 60 * 1000)
           const grant = new Grant({
-            active: true,
-            clientId,
+            client,
             grant: grantId,
             access: [
               {
@@ -602,8 +599,7 @@ describe('OutgoingPaymentService', (): void => {
           'fails if grant limits do not match payment - $description',
           async ({ limits }): Promise<void> => {
             const grant = new Grant({
-              active: true,
-              clientId,
+              client,
               grant: grantId,
               access: [
                 {
@@ -636,8 +632,7 @@ describe('OutgoingPaymentService', (): void => {
                 : quote.receiveAmount.assetScale
             }
             const grant = new Grant({
-              active: true,
-              clientId,
+              client,
               grant: grantId,
               access: [
                 {
@@ -680,8 +675,7 @@ describe('OutgoingPaymentService', (): void => {
                 : quote.receiveAmount.assetScale
             }
             const grant = new Grant({
-              active: true,
-              clientId,
+              client,
               grant: grantId,
               access: [
                 {
@@ -736,8 +730,7 @@ describe('OutgoingPaymentService', (): void => {
           'succeeds if grant access $description',
           async ({ limits }): Promise<void> => {
             const grant = new Grant({
-              active: true,
-              clientId,
+              client,
               grant: grantId,
               access: [
                 {
@@ -782,8 +775,7 @@ describe('OutgoingPaymentService', (): void => {
                 : quote.receiveAmount.assetScale
             }
             const grant = new Grant({
-              active: true,
-              clientId,
+              client,
               grant: grantId,
               access: [
                 {

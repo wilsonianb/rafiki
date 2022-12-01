@@ -78,7 +78,7 @@ export type AppRequest<ParamsT extends string = string> = Omit<
 export interface PaymentPointerContext extends AppContext {
   paymentPointer: PaymentPointer
   grant?: Grant
-  clientId?: string
+  client?: string
 }
 
 // Payment pointer subresources

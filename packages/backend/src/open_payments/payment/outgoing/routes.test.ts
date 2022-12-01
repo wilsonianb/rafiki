@@ -19,6 +19,7 @@ import {
   getRouteTests,
   setup as setupContext
 } from '../../payment_pointer/model.test'
+import { mockGrant } from '../../../tests/grant'
 import { createOutgoingPayment } from '../../../tests/outgoingPayment'
 import { createPaymentPointer } from '../../../tests/paymentPointer'
 import { AccessAction, AccessType, Grant } from '../../auth/grant'
@@ -84,12 +85,10 @@ describe('Outgoing Payment Routes', (): void => {
   `('get/list$description outgoing payment', ({ failed }): void => {
     getRouteTests({
       getPaymentPointer: async () => paymentPointer,
-      createModel: async ({ clientId }) => {
-        const grant = clientId
-          ? new Grant({
-              active: true,
-              clientId,
-              grant: uuid(),
+      createModel: async ({ client }) => {
+        const grant = client
+          ? mockGrant({
+              client,
               access: [
                 {
                   type: AccessType.OutgoingPayment,
@@ -171,10 +170,7 @@ describe('Outgoing Payment Routes', (): void => {
 
       beforeEach(async (): Promise<void> => {
         grant = withGrant
-          ? new Grant({
-              active: true,
-              grant: uuid(),
-              clientId: uuid(),
+          ? mockGrant({
               access: [
                 {
                   type: AccessType.OutgoingPayment,

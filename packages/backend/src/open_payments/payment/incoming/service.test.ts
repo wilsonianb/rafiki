@@ -1,4 +1,5 @@
 import assert from 'assert'
+import { faker } from '@faker-js/faker'
 import { Knex } from 'knex'
 import { v4 as uuid } from 'uuid'
 
@@ -60,9 +61,9 @@ describe('Incoming Payment Service', (): void => {
     }
 
     test.each`
-      clientId     | incomingAmount | expiresAt                        | description                | externalRef
-      ${undefined} | ${undefined}   | ${undefined}                     | ${undefined}               | ${undefined}
-      ${uuid()}    | ${amount}      | ${new Date(Date.now() + 30_000)} | ${'Test incoming payment'} | ${'#123'}
+      client                  | incomingAmount | expiresAt                        | description                | externalRef
+      ${undefined}            | ${undefined}   | ${undefined}                     | ${undefined}               | ${undefined}
+      ${faker.internet.url()} | ${amount}      | ${new Date(Date.now() + 30_000)} | ${'Test incoming payment'} | ${'#123'}
     `('An incoming payment can be created', async (options): Promise<void> => {
       const incomingPayment = await incomingPaymentService.create({
         paymentPointerId,
@@ -169,10 +170,10 @@ describe('Incoming Payment Service', (): void => {
 
   describe('get/getPaymentPointerPage', (): void => {
     getTests({
-      createModel: ({ clientId }) =>
+      createModel: ({ client }) =>
         createIncomingPayment(deps, {
           paymentPointerId,
-          clientId,
+          client,
           incomingAmount: {
             value: BigInt(123),
             assetCode: asset.code,

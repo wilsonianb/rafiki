@@ -111,7 +111,7 @@ async function createOutgoingPayment(
           description: options.description,
           externalRef: options.externalRef,
           state: OutgoingPaymentState.Funding,
-          clientId: options.grant?.clientId,
+          client: options.grant?.client,
           grantId
         })
         .withGraphFetched('[quote.asset]')

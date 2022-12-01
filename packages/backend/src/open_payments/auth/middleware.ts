@@ -28,7 +28,7 @@ export function createAuthMiddleware({
       }
       const authService = await ctx.container.use('authService')
       const grant = await authService.introspect(token)
-      if (!grant || !grant.active) {
+      if (!grant) {
         ctx.throw(401, 'Invalid Token')
       }
       const access = grant.findAccess({
@@ -40,6 +40,7 @@ export function createAuthMiddleware({
         ctx.throw(403, 'Insufficient Grant')
       }
       if (!config.bypassSignatureValidation) {
+        // TODO: get client key
         try {
           if (!(await verifySigAndChallenge(grant.key.jwk, ctx))) {
             ctx.throw(401, 'Invalid signature')
@@ -52,9 +53,9 @@ export function createAuthMiddleware({
       ctx.grant = grant
 
       // Unless the relevant grant action is ReadAll/ListAll add the
-      // clientId to ctx for Read/List filtering
+      // client to ctx for Read/List filtering
       if (access.actions.includes(action)) {
-        ctx.clientId = grant.clientId
+        ctx.client = grant.client
       }
 
       await next()

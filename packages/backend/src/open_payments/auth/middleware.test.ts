@@ -4,7 +4,7 @@ import { URL } from 'url'
 import { v4 as uuid } from 'uuid'
 
 import { createAuthMiddleware } from './middleware'
-import { GrantJSON, AccessType, AccessAction } from './grant'
+import { AccessType, AccessAction } from './grant'
 import { Config } from '../../config/app'
 import { IocContract } from '@adonisjs/fold'
 import { initIocContainer } from '../../'
@@ -12,12 +12,12 @@ import { AppServices } from '../../app'
 import { Body, RequestMethod } from 'node-mocks-http'
 import { HttpMethod, RequestValidator } from 'openapi'
 import { createTestApp, TestContainer } from '../../tests/app'
+import { mockGrant } from '../../tests/grant'
 import { createPaymentPointer } from '../../tests/paymentPointer'
 import { truncateTables } from '../../tests/tableManager'
 import { setup, SetupOptions } from '../payment_pointer/model.test'
-import { HttpSigContext, JWKWithRequired, KeyInfo } from 'auth'
+import { HttpSigContext, JWKWithRequired, TokenInfo } from 'auth'
 import { generateTestKeys, generateSigHeaders } from 'auth/src/tests/signature'
-import { TokenInfo, TokenInfoJSON } from './service'
 
 type AppMiddleware = (
   ctx: HttpSigContext,
@@ -37,7 +37,6 @@ describe('Auth Middleware', (): void => {
   let ctx: HttpSigContext
   let next: jest.MockedFunction<() => Promise<void>>
   let validateRequest: RequestValidator<IntrospectionBody>
-  let mockKeyInfo: KeyInfo
   const token = 'OS9M2PMHKUR64TB8N6BW7OZB8CDFONP219RP1LT0'
   let generatedKeyPair: {
     keyId: string
@@ -109,10 +108,6 @@ describe('Auth Middleware', (): void => {
     })
     ctx.container = deps
     next = jest.fn()
-    mockKeyInfo = {
-      jwk: requestJwk,
-      proof: 'httpsig'
-    }
   }
 
   beforeAll(async (): Promise<void> => {
@@ -150,7 +145,7 @@ describe('Auth Middleware', (): void => {
   })
 
   function mockAuthServer(
-    grant: GrantJSON | TokenInfoJSON | string | undefined = undefined
+    grant: TokenInfo | undefined = undefined
   ): nock.Scope {
     return nock(authServerIntrospectionUrl.origin)
       .post(
@@ -212,18 +207,17 @@ describe('Auth Middleware', (): void => {
   })
 
   test('returns 403 for unauthorized request', async (): Promise<void> => {
-    const scope = mockAuthServer({
-      active: true,
-      client_id: uuid(),
-      grant: uuid(),
-      access: [
-        {
-          type: AccessType.OutgoingPayment,
-          actions: [AccessAction.Create],
-          identifier: ctx.paymentPointer.url
-        }
-      ]
-    })
+    const scope = mockAuthServer(
+      mockGrant({
+        access: [
+          {
+            type: AccessType.OutgoingPayment,
+            actions: [AccessAction.Create],
+            identifier: ctx.paymentPointer.url
+          }
+        ]
+      }).toTokenInfo
+    )
     await expect(middleware(ctx, next)).rejects.toMatchObject({
       status: 403,
       message: 'Insufficient Grant'
@@ -239,42 +233,36 @@ describe('Auth Middleware', (): void => {
   `(
     'sets the context grant and calls next (limitAccount: $limitAccount)',
     async ({ limitAccount }): Promise<void> => {
-      const grant = new TokenInfo(
-        {
-          active: true,
-          clientId: uuid(),
-          grant: uuid(),
-          access: [
-            {
-              type: AccessType.IncomingPayment,
-              actions: [AccessAction.Read],
-              identifier: limitAccount ? ctx.paymentPointer.url : undefined
-            },
-            {
-              type: AccessType.OutgoingPayment,
-              actions: [AccessAction.Create, AccessAction.Read],
-              identifier: ctx.paymentPointer.url,
-              interval: 'R/2022-03-01T13:00:00Z/P1M',
-              limits: {
-                receiveAmount: {
-                  value: BigInt(500),
-                  assetCode: 'EUR',
-                  assetScale: 2
-                },
-                sendAmount: {
-                  value: BigInt(811),
-                  assetCode: 'USD',
-                  assetScale: 2
-                },
-                receiver:
-                  'https://wallet2.example/bob/incoming-payments/aa9da466-12ba-4760-9aa0-8c06061f333b'
-              }
+      const grant = mockGrant({
+        access: [
+          {
+            type: AccessType.IncomingPayment,
+            actions: [AccessAction.Read],
+            identifier: limitAccount ? ctx.paymentPointer.url : undefined
+          },
+          {
+            type: AccessType.OutgoingPayment,
+            actions: [AccessAction.Create, AccessAction.Read],
+            identifier: ctx.paymentPointer.url,
+            interval: 'R/2022-03-01T13:00:00Z/P1M',
+            limits: {
+              receiveAmount: {
+                value: BigInt(500),
+                assetCode: 'EUR',
+                assetScale: 2
+              },
+              sendAmount: {
+                value: BigInt(811),
+                assetCode: 'USD',
+                assetScale: 2
+              },
+              receiver:
+                'https://wallet2.example/bob/incoming-payments/aa9da466-12ba-4760-9aa0-8c06061f333b'
             }
-          ]
-        },
-        mockKeyInfo
-      )
-      const scope = mockAuthServer(grant.toJSON())
+          }
+        ]
+      })
+      const scope = mockAuthServer(grant.toTokenInfo())
       const next = jest.fn()
       await expect(middleware(ctx, next)).resolves.toBeUndefined()
       expect(next).toHaveBeenCalled()
@@ -294,44 +282,32 @@ describe('Auth Middleware', (): void => {
 
   test('returns 200 with valid http signature without body', async (): Promise<void> => {
     await prepareTest(false)
-    const grant = new TokenInfo(
-      {
-        active: true,
-        clientId: uuid(),
-        grant: uuid(),
-        access: [
-          {
-            type: AccessType.IncomingPayment,
-            actions: [AccessAction.Read],
-            identifier: ctx.paymentPointer.url
-          }
-        ]
-      },
-      mockKeyInfo
-    )
-    const scope = mockAuthServer(grant.toJSON())
+    const grant = mockGrant({
+      access: [
+        {
+          type: AccessType.IncomingPayment,
+          actions: [AccessAction.Read],
+          identifier: ctx.paymentPointer.url
+        }
+      ]
+    })
+    const scope = mockAuthServer(grant.toTokenInfo())
     await expect(middleware(ctx, next)).resolves.not.toThrow()
     expect(next).toHaveBeenCalled()
     scope.done()
   })
 
   test('returns 200 with valid http signature with body', async (): Promise<void> => {
-    const grant = new TokenInfo(
-      {
-        active: true,
-        clientId: uuid(),
-        grant: uuid(),
-        access: [
-          {
-            type: AccessType.IncomingPayment,
-            actions: [AccessAction.Read],
-            identifier: ctx.paymentPointer.url
-          }
-        ]
-      },
-      mockKeyInfo
-    )
-    const scope = mockAuthServer(grant.toJSON())
+    const grant = mockGrant({
+      access: [
+        {
+          type: AccessType.IncomingPayment,
+          actions: [AccessAction.Read],
+          identifier: ctx.paymentPointer.url
+        }
+      ]
+    })
+    const scope = mockAuthServer(grant.toTokenInfo())
     await expect(middleware(ctx, next)).resolves.not.toThrow()
     expect(next).toHaveBeenCalled()
     scope.done()
@@ -352,22 +328,16 @@ describe('Auth Middleware', (): void => {
       paymentPointer: await createPaymentPointer(deps)
     })
     ctx.container = deps
-    const grant = new TokenInfo(
-      {
-        active: true,
-        clientId: uuid(),
-        grant: uuid(),
-        access: [
-          {
-            type: AccessType.IncomingPayment,
-            actions: [AccessAction.Read],
-            identifier: ctx.paymentPointer.url
-          }
-        ]
-      },
-      mockKeyInfo
-    )
-    const scope = mockAuthServer(grant.toJSON())
+    const grant = mockGrant({
+      access: [
+        {
+          type: AccessType.IncomingPayment,
+          actions: [AccessAction.Read],
+          identifier: ctx.paymentPointer.url
+        }
+      ]
+    })
+    const scope = mockAuthServer(grant.toTokenInfo())
     await expect(middleware(ctx, next)).resolves.toBeUndefined()
     expect(ctx.headers.signature).toBe('aaaaaaaaaa=')
     expect(ctx.status).toBe(401)
@@ -393,22 +363,16 @@ describe('Auth Middleware', (): void => {
       paymentPointer: await createPaymentPointer(deps)
     })
     ctx.container = deps
-    const grant = new TokenInfo(
-      {
-        active: true,
-        clientId: uuid(),
-        grant: uuid(),
-        access: [
-          {
-            type: AccessType.IncomingPayment,
-            actions: [AccessAction.Read],
-            identifier: ctx.paymentPointer.url
-          }
-        ]
-      },
-      mockKeyInfo
-    )
-    const scope = mockAuthServer(grant.toJSON())
+    const grant = mockGrant({
+      access: [
+        {
+          type: AccessType.IncomingPayment,
+          actions: [AccessAction.Read],
+          identifier: ctx.paymentPointer.url
+        }
+      ]
+    })
+    const scope = mockAuthServer(grant.toTokenInfo())
     await expect(middleware(ctx, next)).resolves.toBeUndefined()
     expect(ctx.status).toBe(401)
     expect(next).not.toHaveBeenCalled()
@@ -417,23 +381,17 @@ describe('Auth Middleware', (): void => {
 
   test('returns 401 for invalid key type without body', async (): Promise<void> => {
     await prepareTest(false)
-    mockKeyInfo.jwk.kty = 'EC'
-    const grant = new TokenInfo(
-      {
-        active: true,
-        clientId: uuid(),
-        grant: uuid(),
-        access: [
-          {
-            type: AccessType.IncomingPayment,
-            actions: [AccessAction.Read],
-            identifier: ctx.paymentPointer.url
-          }
-        ]
-      },
-      mockKeyInfo
-    )
-    const scope = mockAuthServer(grant.toJSON())
+    // mockKeyInfo.jwk.kty = 'EC'
+    const grant = mockGrant({
+      access: [
+        {
+          type: AccessType.IncomingPayment,
+          actions: [AccessAction.Read],
+          identifier: ctx.paymentPointer.url
+        }
+      ]
+    })
+    const scope = mockAuthServer(grant.toTokenInfo())
     await expect(middleware(ctx, next)).resolves.toBeUndefined()
     expect(ctx.status).toBe(401)
     expect(next).not.toHaveBeenCalled()
@@ -441,23 +399,17 @@ describe('Auth Middleware', (): void => {
   })
 
   test('returns 401 for invalid key type with body', async (): Promise<void> => {
-    mockKeyInfo.jwk.kty = 'EC'
-    const grant = new TokenInfo(
-      {
-        active: true,
-        clientId: uuid(),
-        grant: uuid(),
-        access: [
-          {
-            type: AccessType.IncomingPayment,
-            actions: [AccessAction.Read],
-            identifier: ctx.paymentPointer.url
-          }
-        ]
-      },
-      mockKeyInfo
-    )
-    const scope = mockAuthServer(grant.toJSON())
+    // mockKeyInfo.jwk.kty = 'EC'
+    const grant = mockGrant({
+      access: [
+        {
+          type: AccessType.IncomingPayment,
+          actions: [AccessAction.Read],
+          identifier: ctx.paymentPointer.url
+        }
+      ]
+    })
+    const scope = mockAuthServer(grant.toTokenInfo())
     await expect(middleware(ctx, next)).resolves.toBeUndefined()
     expect(ctx.status).toBe(401)
     expect(next).not.toHaveBeenCalled()
@@ -466,22 +418,16 @@ describe('Auth Middleware', (): void => {
 
   test('returns 401 if any signature keyid does not match the jwk key id without body', async (): Promise<void> => {
     await prepareTest(false)
-    const grant = new TokenInfo(
-      {
-        active: true,
-        clientId: uuid(),
-        grant: uuid(),
-        access: [
-          {
-            type: AccessType.IncomingPayment,
-            actions: [AccessAction.Read],
-            identifier: ctx.paymentPointer.url
-          }
-        ]
-      },
-      mockKeyInfo
-    )
-    const scope = mockAuthServer(grant.toJSON())
+    const grant = mockGrant({
+      access: [
+        {
+          type: AccessType.IncomingPayment,
+          actions: [AccessAction.Read],
+          identifier: ctx.paymentPointer.url
+        }
+      ]
+    })
+    const scope = mockAuthServer(grant.toTokenInfo())
     ctx.request.headers['signature-input'] = ctx.request.headers[
       'signature-input'
     ].replace('gnap-key', 'mismatched-key')
@@ -492,22 +438,16 @@ describe('Auth Middleware', (): void => {
   })
 
   test('returns 401 if any signature keyid does not match the jwk key id with body', async (): Promise<void> => {
-    const grant = new TokenInfo(
-      {
-        active: true,
-        clientId: uuid(),
-        grant: uuid(),
-        access: [
-          {
-            type: AccessType.IncomingPayment,
-            actions: [AccessAction.Read],
-            identifier: ctx.paymentPointer.url
-          }
-        ]
-      },
-      mockKeyInfo
-    )
-    const scope = mockAuthServer(grant.toJSON())
+    const grant = mockGrant({
+      access: [
+        {
+          type: AccessType.IncomingPayment,
+          actions: [AccessAction.Read],
+          identifier: ctx.paymentPointer.url
+        }
+      ]
+    })
+    const scope = mockAuthServer(grant.toTokenInfo())
     ctx.request.headers['signature-input'] = ctx.request.headers[
       'signature-input'
     ].replace('gnap-key', 'mismatched-key')
@@ -535,22 +475,16 @@ describe('Auth Middleware', (): void => {
       paymentPointer: await createPaymentPointer(deps)
     })
     ctx.container = deps
-    const grant = new TokenInfo(
-      {
-        active: true,
-        clientId: uuid(),
-        grant: uuid(),
-        access: [
-          {
-            type: AccessType.IncomingPayment,
-            actions: [AccessAction.Read],
-            identifier: ctx.paymentPointer.url
-          }
-        ]
-      },
-      mockKeyInfo
-    )
-    const scope = mockAuthServer(grant.toJSON())
+    const grant = mockGrant({
+      access: [
+        {
+          type: AccessType.IncomingPayment,
+          actions: [AccessAction.Read],
+          identifier: ctx.paymentPointer.url
+        }
+      ]
+    })
+    const scope = mockAuthServer(grant.toTokenInfo())
     await expect(middleware(ctx, next)).resolves.toBeUndefined()
     expect(ctx.status).toBe(401)
     expect(next).not.toHaveBeenCalled()

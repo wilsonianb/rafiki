@@ -1,6 +1,5 @@
 import jestOpenAPI from 'jest-openapi'
 import { Knex } from 'knex'
-import { v4 as uuid } from 'uuid'
 
 import { Amount, serializeAmount } from '../../amount'
 import { PaymentPointer } from '../../payment_pointer/model'
@@ -18,9 +17,10 @@ import {
 import { truncateTables } from '../../../tests/tableManager'
 import { IncomingPayment } from './model'
 import { IncomingPaymentRoutes, CreateBody, MAX_EXPIRY } from './routes'
+import { mockGrant } from '../../../tests/grant'
 import { createIncomingPayment } from '../../../tests/incomingPayment'
 import { createPaymentPointer } from '../../../tests/paymentPointer'
-import { AccessAction, AccessType, Grant } from '../../auth/grant'
+import { AccessAction, AccessType } from '../../auth/grant'
 
 describe('Incoming Payment Routes', (): void => {
   let deps: IocContract<AppServices>
@@ -76,10 +76,10 @@ describe('Incoming Payment Routes', (): void => {
   describe('get/list', (): void => {
     getRouteTests({
       getPaymentPointer: async () => paymentPointer,
-      createModel: async ({ clientId }) =>
+      createModel: async ({ client }) =>
         createIncomingPayment(deps, {
           paymentPointerId: paymentPointer.id,
-          clientId,
+          client,
           description,
           expiresAt,
           incomingAmount,
@@ -163,10 +163,7 @@ describe('Incoming Payment Routes', (): void => {
         expiresAt
       }): Promise<void> => {
         const grant = withGrant
-          ? new Grant({
-              active: true,
-              grant: uuid(),
-              clientId: uuid(),
+          ? mockGrant({
               access: [
                 {
                   type: AccessType.IncomingPayment,

@@ -56,14 +56,14 @@ export const listSubresource = async <M extends PaymentPointerSubresource>({
   const page = await getPaymentPointerPage({
     paymentPointerId: ctx.paymentPointer.id,
     pagination,
-    clientId: ctx.clientId
+    client: ctx.client
   })
   const pageInfo = await getPageInfo(
     (pagination) =>
       getPaymentPointerPage({
         paymentPointerId: ctx.paymentPointer.id,
         pagination,
-        clientId: ctx.clientId
+        client: ctx.client
       }),
     page
   )

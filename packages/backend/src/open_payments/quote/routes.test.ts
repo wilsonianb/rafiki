@@ -1,4 +1,5 @@
 import assert from 'assert'
+import { faker } from '@faker-js/faker'
 import jestOpenAPI from 'jest-openapi'
 import * as httpMocks from 'node-mocks-http'
 import { Knex } from 'knex'
@@ -19,6 +20,7 @@ import { AccessAction, AccessType, Grant } from '../auth/grant'
 import { PaymentPointer } from '../payment_pointer/model'
 import { getRouteTests } from '../payment_pointer/model.test'
 import { randomAsset } from '../../tests/asset'
+import { mockGrant } from '../../tests/grant'
 import { createPaymentPointer } from '../../tests/paymentPointer'
 import { createQuote } from '../../tests/quote'
 
@@ -41,10 +43,10 @@ describe('Quote Routes', (): void => {
 
   const createPaymentPointerQuote = async ({
     paymentPointerId,
-    clientId
+    client
   }: {
     paymentPointerId: string
-    clientId: string
+    client: string
   }): Promise<Quote> => {
     return await createQuote(deps, {
       paymentPointerId,
@@ -54,7 +56,7 @@ describe('Quote Routes', (): void => {
         assetCode: asset.code,
         assetScale: asset.scale
       },
-      clientId,
+      client,
       validDestination: false
     })
   }
@@ -91,10 +93,10 @@ describe('Quote Routes', (): void => {
   describe('get', (): void => {
     getRouteTests({
       getPaymentPointer: async () => paymentPointer,
-      createModel: async ({ clientId }) =>
+      createModel: async ({ client }) =>
         createPaymentPointerQuote({
           paymentPointerId: paymentPointer.id,
-          clientId
+          client
         }),
       get: (ctx) => quoteRoutes.get(ctx),
       getBody: (quote) => ({
@@ -161,16 +163,14 @@ describe('Quote Routes', (): void => {
     })
 
     describe.each`
-      clientId     | description
-      ${uuid()}    | ${'clientId'}
-      ${undefined} | ${'no clientId'}
-    `('returns the quote on success ($description)', ({ clientId }): void => {
+      client                  | description
+      ${faker.internet.url()} | ${'client'}
+      ${undefined}            | ${'no client'}
+    `('returns the quote on success ($description)', ({ client }): void => {
       beforeEach(async (): Promise<void> => {
-        grant = clientId
-          ? new Grant({
-              active: true,
-              clientId,
-              grant: uuid(),
+        grant = client
+          ? mockGrant({
+              client,
               access: [
                 {
                   type: AccessType.Quote,
@@ -213,7 +213,7 @@ describe('Quote Routes', (): void => {
               quote = await createQuote(deps, {
                 ...opts,
                 validDestination: false,
-                clientId
+                client
               })
               return quote
             })
@@ -229,7 +229,7 @@ describe('Quote Routes', (): void => {
               ...options.receiveAmount,
               value: BigInt(options.receiveAmount.value)
             },
-            clientId
+            client
           })
           expect(ctx.response).toSatisfyApiSpec()
           const quoteId = (
@@ -268,7 +268,7 @@ describe('Quote Routes', (): void => {
             quote = await createQuote(deps, {
               ...opts,
               validDestination: false,
-              clientId
+              client
             })
             return quote
           })
@@ -276,7 +276,7 @@ describe('Quote Routes', (): void => {
         expect(quoteSpy).toHaveBeenCalledWith({
           paymentPointerId: paymentPointer.id,
           receiver,
-          clientId
+          client
         })
         expect(ctx.response).toSatisfyApiSpec()
         const quoteId = (
