@@ -1,7 +1,8 @@
+import { faker } from '@faker-js/faker'
 import jestOpenAPI from 'jest-openapi'
 import { Knex } from 'knex'
 
-import { Amount, serializeAmount } from '../../amount'
+import { Amount, parseAmount, serializeAmount } from '../../amount'
 import { PaymentPointer } from '../../payment_pointer/model'
 import { getRouteTests, setup } from '../../payment_pointer/model.test'
 import { createTestApp, TestContainer } from '../../../tests/app'
@@ -17,10 +18,9 @@ import {
 import { truncateTables } from '../../../tests/tableManager'
 import { IncomingPayment } from './model'
 import { IncomingPaymentRoutes, CreateBody, MAX_EXPIRY } from './routes'
-import { mockGrant } from '../../../tests/grant'
+import { IncomingPaymentService } from './service'
 import { createIncomingPayment } from '../../../tests/incomingPayment'
 import { createPaymentPointer } from '../../../tests/paymentPointer'
-import { AccessAction, AccessType } from '../../auth/grant'
 
 describe('Incoming Payment Routes', (): void => {
   let deps: IocContract<AppServices>
@@ -28,6 +28,7 @@ describe('Incoming Payment Routes', (): void => {
   let knex: Knex
   let config: IAppConfig
   let incomingPaymentRoutes: IncomingPaymentRoutes
+  let incomingPaymentService: IncomingPaymentService
 
   beforeAll(async (): Promise<void> => {
     config = Config
@@ -51,6 +52,7 @@ describe('Incoming Payment Routes', (): void => {
   beforeEach(async (): Promise<void> => {
     config = await deps.use('config')
     incomingPaymentRoutes = await deps.use('incomingPaymentRoutes')
+    incomingPaymentService = await deps.use('incomingPaymentService')
 
     expiresAt = new Date(Date.now() + 30_000)
     paymentPointer = await createPaymentPointer(deps, {
@@ -114,7 +116,6 @@ describe('Incoming Payment Routes', (): void => {
     })
 
     test('returns 500 for unexpected error', async (): Promise<void> => {
-      const incomingPaymentService = await deps.use('incomingPaymentService')
       jest
         .spyOn(incomingPaymentService, 'getPaymentPointerPage')
         .mockRejectedValueOnce(new Error('unexpected'))
@@ -131,11 +132,7 @@ describe('Incoming Payment Routes', (): void => {
     })
   })
 
-  describe.each`
-    withGrant | description
-    ${false}  | ${'without grant'}
-    ${true}   | ${'with grant'}
-  `('create - $description', ({ withGrant }): void => {
+  describe('create', (): void => {
     test('returns error on distant-future expiresAt', async (): Promise<void> => {
       const ctx = setup<CreateContext<CreateBody>>({
         reqOpts: { body: {} },
@@ -151,27 +148,18 @@ describe('Incoming Payment Routes', (): void => {
     })
 
     test.each`
-      incomingAmount                                     | description  | externalRef  | expiresAt
-      ${{ value: '2', assetCode: 'USD', assetScale: 2 }} | ${'text'}    | ${'#123'}    | ${new Date(Date.now() + 30_000).toISOString()}
-      ${undefined}                                       | ${undefined} | ${undefined} | ${undefined}
+      client                  | incomingAmount                                     | description  | externalRef  | expiresAt
+      ${faker.internet.url()} | ${{ value: '2', assetCode: 'USD', assetScale: 2 }} | ${'text'}    | ${'#123'}    | ${new Date(Date.now() + 30_000).toISOString()}
+      ${undefined}            | ${undefined}                                       | ${undefined} | ${undefined} | ${undefined}
     `(
       'returns the incoming payment on success',
       async ({
+        client,
         incomingAmount,
         description,
         externalRef,
         expiresAt
       }): Promise<void> => {
-        const grant = withGrant
-          ? mockGrant({
-              access: [
-                {
-                  type: AccessType.IncomingPayment,
-                  actions: [AccessAction.Create]
-                }
-              ]
-            })
-          : undefined
         const ctx = setup<CreateContext<CreateBody>>({
           reqOpts: {
             body: {
@@ -184,9 +172,20 @@ describe('Incoming Payment Routes', (): void => {
             url: `/incoming-payments`
           },
           paymentPointer,
-          grant
+          client
         })
+        const createSpy = jest.spyOn(incomingPaymentService, 'create')
         await expect(incomingPaymentRoutes.create(ctx)).resolves.toBeUndefined()
+        expect(createSpy).toHaveBeenCalledWith({
+          paymentPointerId: paymentPointer.id,
+          incomingAmount: incomingAmount
+            ? parseAmount(incomingAmount)
+            : undefined,
+          description,
+          externalRef,
+          expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+          client
+        })
         expect(ctx.response).toSatisfyApiSpec()
         const incomingPaymentId = (
           (ctx.response.body as Record<string, unknown>)['id'] as string

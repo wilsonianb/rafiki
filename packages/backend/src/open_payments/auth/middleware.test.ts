@@ -23,11 +23,6 @@ type AppMiddleware = (
   next: () => Promise<void>
 ) => Promise<void>
 
-type IntrospectionBody = {
-  access_token: string
-  resource_server: string
-}
-
 describe('Auth Middleware', (): void => {
   let deps: IocContract<AppServices>
   let appContainer: TestContainer
@@ -126,9 +121,7 @@ describe('Auth Middleware', (): void => {
     generatedKeyPair = await generateTestKeys()
     requestMethod = HttpMethod.POST.toUpperCase() as RequestMethod
     requestBody = {
-      access_token: token,
-      proof: 'httpsig',
-      resource_server: 'test'
+      access_token: token
     }
     requestAuthorization = `GNAP ${token}`
     requestUrl = Config.authServerGrantUrl + requestPath //'http://127.0.0.1:3006/introspect'

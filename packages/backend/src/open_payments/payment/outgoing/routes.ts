@@ -76,6 +76,7 @@ async function createOutgoingPayment(
     quoteId,
     description: body.description,
     externalRef: body.externalRef,
+    client: ctx.client,
     grant: ctx.grant
   })
 

@@ -1,10 +1,6 @@
-import {
-  AccessType,
-  AccessAction,
-  findAccess,
-  parseAccessLimits
-} from './grant'
+import { AccessType, AccessAction } from './grant'
 import { getSigInputKeyId, HttpSigContext, verifySigAndChallenge } from 'auth'
+import { parseLimits } from '../payment/outgoing/limits'
 
 export function createAuthMiddleware({
   type,
@@ -36,11 +32,26 @@ export function createAuthMiddleware({
       if (!tokenInfo) {
         ctx.throw(401, 'Invalid Token')
       }
-      const access = findAccess(tokenInfo, {
-        type,
-        action,
-        identifier: ctx.paymentPointer.url
-      })
+      const access = tokenInfo.access.find(
+        (access) =>
+          access.type == type &&
+          (!access['identifier'] ||
+            access['identifier'] === ctx.paymentPointer.url) &&
+          access.actions.find((tokenAction) => {
+            if (tokenAction == action) {
+              // Unless the relevant grant action is ReadAll/ListAll add the
+              // client to ctx for Read/List filtering
+              ctx.client = tokenInfo.client
+              return true
+            }
+            return (
+              (action === AccessAction.Read &&
+                tokenAction == AccessAction.ReadAll) ||
+              (action === AccessAction.List &&
+                tokenAction == AccessAction.ListAll)
+            )
+          })
+      )
       if (!access) {
         ctx.throw(403, 'Insufficient Grant')
       }
@@ -75,9 +86,7 @@ export function createAuthMiddleware({
       ) {
         ctx.grant = {
           id: tokenInfo.grant,
-          limits: access['limits']
-            ? parseAccessLimits(access['limits'])
-            : undefined
+          limits: access['limits'] ? parseLimits(access['limits']) : undefined
         }
       }
 
