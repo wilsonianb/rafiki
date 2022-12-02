@@ -1,10 +1,14 @@
 import {
+  OPEN_PAYMENTS_AS_OPEN_API_URL
+} from './config'
+import {
   components as RSComponents,
   paths as RSPaths,
   operations as RSOperations
 } from './generated/resource-server-types'
 import {
   components as ASComponents,
+  external as ASExternal
   paths as ASPaths,
   operations as ASOperations
 } from './generated/auth-server-types'
@@ -48,3 +52,7 @@ export const isInteractiveGrant = (
 export const isNonInteractiveGrant = (
   grant: InteractiveGrant | NonInteractiveGrant
 ): grant is NonInteractiveGrant => !!(grant as NonInteractiveGrant).access_token
+
+export type IncomingPaymentAccess = ASExternal[OPEN_PAYMENTS_AS_OPEN_API_URL]['components']['schemas']['access-incoming']
+export type OutgoingPaymentAccess = ASExternal[OPEN_PAYMENTS_AS_OPEN_API_URL]['components']['schemas']['access-outgoing']
+export type QuoteAccess = ASExternal[OPEN_PAYMENTS_AS_OPEN_API_URL]['components']['schemas']['access-quote']
