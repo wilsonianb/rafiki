@@ -1,4 +1,3 @@
-import assert from 'assert'
 import nock, { Definition } from 'nock'
 import { URL } from 'url'
 import { v4 as uuid } from 'uuid'
@@ -151,12 +150,10 @@ describe('Auth Middleware', (): void => {
       .post(
         authServerIntrospectionUrl.pathname,
         function (this: Definition, body) {
-          assert.ok(
-            validateRequest({
-              ...this,
-              body
-            })
-          )
+          validateRequest({
+            ...this,
+            body
+          })
           expect(body.access_token).toEqual(token)
           return true
         }

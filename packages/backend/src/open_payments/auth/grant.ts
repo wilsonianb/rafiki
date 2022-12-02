@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { Introspection, TokenInfo } from 'auth'
+import { Access, TokenInfo } from 'auth'
 import { Interval, Duration, DateTime, Settings } from 'luxon'
 
 import { Amount, parseAmount } from '../amount'
@@ -29,118 +29,31 @@ export interface AccessLimits {
   interval?: string
 }
 
-// export interface GrantAccess {
-//   type: AccessType
-//   actions: AccessAction[]
-//   identifier?: string
-//   limits?: AccessLimits
-// }
-
-type GrantAccess = Omit<TokenInfo['access'][number], 'limits'> & {
-  limits?: AccessLimits
-}
-
-export interface GrantOptions {
-  grant: string
-  client: string
-  access: GrantAccess[]
-}
-
-export class Grant {
-  static fromTokenInfo(tokenInfo: TokenInfo): Grant | undefined {
-    if (!tokenInfo.active) {
-      return undefined
-    }
-    return new this({
-      grant: tokenInfo.grant,
-      client: tokenInfo.client,
-      access: tokenInfo.access.map((access) => {
-        switch(access.type) {
-          case AccessType.IncomingPayment: {
-            return {
-              type: AccessType.IncomingPayment,
-              actions: access.actions,
-              identifier: access.identifier
-            }
-          }
-          case AccessType.OutgoingPayment: {
-            return {
-              type: AccessType.OutgoingPayment,
-              actions: access.actions,
-              identifier: access.identifier,
-              limits: access.limits && {
-                ...access.limits,
-                sendAmount: access.limits.sendAmount && parseAmount(access.limits.sendAmount),
-                receiveAmount: access.limits.receiveAmount && parseAmount(access.limits.receiveAmount)
-              }
-            }
-          }
-          case AccessType.Quote: {
-            return {
-              type: AccessType.Quote,
-              actions: access.actions
-            }
-          }
-        }
-      })
-    })
-  }
-
-  constructor(options: GrantOptions) {
-    this.grant = options.grant
-    this.access = options.access
-    this.client = options.client
-  }
-
-  public readonly grant: string
-  public readonly access: GrantAccess[]
-  public readonly client: string
-
-  public findAccess({
-    type,
-    action,
-    identifier
-  }: {
+export const findAccess = (
+  tokenInfo: TokenInfo,
+  access: {
     type: AccessType
     action: AccessAction
     identifier: string
-  }): GrantAccess | undefined {
-    return this.access?.find(
-      (access) =>
-        access.type == type &&
-        (!access.identifier || access.identifier === identifier) &&
-        (access.actions.includes(action) ||
-          (action === AccessAction.Read &&
-            access.actions.includes(AccessAction.ReadAll)) ||
-          (action === AccessAction.List &&
-            access.actions.includes(AccessAction.ListAll)))
-    )
   }
+): Access | undefined =>
+  tokenInfo.access?.find(
+    (tokenAccess) =>
+      tokenAccess.type == access.type &&
+      (!tokenAccess['identifier'] ||
+        tokenAccess['identifier'] === access.identifier) &&
+      (tokenAccess.actions.includes(access.action) ||
+        (access.action === AccessAction.Read &&
+          tokenAccess.actions.includes(AccessAction.ReadAll)) ||
+        (access.action === AccessAction.List &&
+          tokenAccess.actions.includes(AccessAction.ListAll)))
+  )
 
-  public toTokenInfo(): TokenInfo {
-    return {
-      active: true,
-      grant: this.grant,
-      client: this.client,
-      access: this.access?.map((access) => {
-        return {
-          ...access,
-          limits: access.limits && {
-            ...access.limits,
-            sendAmount: access.limits.sendAmount && {
-              ...access.limits.sendAmount,
-              value: access.limits.sendAmount.value.toString()
-            },
-            receiveAmount: access.limits.receiveAmount && {
-              ...access.limits.receiveAmount,
-              value: access.limits.receiveAmount.value.toString()
-            }
-          }
-        }
-      })
-    }
-  }
-}
+export const parseAccessLimits = (limits: Access['limits']): AccessLimits => ({
+  ...limits,
+  sendAmount: limits.sendAmount && parseAmount(limits.sendAmount),
+  receiveAmount: limits.receiveAmount && parseAmount(limits.receiveAmount)
+})
 
 // Export for testing
 export function getInterval(

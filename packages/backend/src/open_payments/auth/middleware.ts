@@ -1,5 +1,10 @@
-import { AccessType, AccessAction } from './grant'
-import { HttpSigContext, verifySigAndChallenge } from 'auth'
+import {
+  AccessType,
+  AccessAction,
+  findAccess,
+  parseAccessLimits
+} from './grant'
+import { getSigInputKeyId, HttpSigContext, verifySigAndChallenge } from 'auth'
 
 export function createAuthMiddleware({
   type,
@@ -27,11 +32,11 @@ export function createAuthMiddleware({
         return
       }
       const authService = await ctx.container.use('authService')
-      const grant = await authService.introspect(token)
-      if (!grant) {
+      const tokenInfo = await authService.introspect(token)
+      if (!tokenInfo) {
         ctx.throw(401, 'Invalid Token')
       }
-      const access = grant.findAccess({
+      const access = findAccess(tokenInfo, {
         type,
         action,
         identifier: ctx.paymentPointer.url
@@ -40,9 +45,23 @@ export function createAuthMiddleware({
         ctx.throw(403, 'Insufficient Grant')
       }
       if (!config.bypassSignatureValidation) {
+        const sigInput = ctx.headers['signature-input']
+        const keyId = getSigInputKeyId(sigInput)
+        if (!keyId) {
+          ctx.throw(401, 'Invalid signature input')
+        }
         // TODO: get client key
+        const openPaymentsClient = await ctx.container.use('openPaymentsClient')
+        const keys = await openPaymentsClient.paymentPointer.getKeys()
+        if (!keys) {
+          ctx.throw(401, 'Invalid signature input')
+        }
+        const key = keys.find((key) => key.kid === keyId)
+        if (!key) {
+          ctx.throw(401, 'Invalid signature input')
+        }
         try {
-          if (!(await verifySigAndChallenge(grant.key.jwk, ctx))) {
+          if (!(await verifySigAndChallenge(key, ctx))) {
             ctx.throw(401, 'Invalid signature')
           }
         } catch (e) {
@@ -50,12 +69,20 @@ export function createAuthMiddleware({
           ctx.throw(401, `Invalid signature`)
         }
       }
-      ctx.grant = grant
+      if (
+        type === AccessType.OutgoingPayment &&
+        action === AccessAction.Create
+      ) {
+        ctx.grant = {
+          id: tokenInfo.grant,
+          limits: access.limits ? parseAccessLimits(access.limits) : undefined
+        }
+      }
 
       // Unless the relevant grant action is ReadAll/ListAll add the
       // client to ctx for Read/List filtering
       if (access.actions.includes(action)) {
-        ctx.client = grant.client
+        ctx.client = tokenInfo.client
       }
 
       await next()

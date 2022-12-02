@@ -4,5 +4,6 @@ import {
 } from './generated/resource-server-types'
 
 export type TokenInfo = RSComponents['schemas']['token-info']
+export type Access = RSComponents['schemas']['token-info']['access'][number]
 export type Introspection =
   RSOperations['post-introspect']['responses']['200']['content']['application/json']

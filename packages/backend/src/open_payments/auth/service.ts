@@ -1,9 +1,7 @@
-import assert from 'assert'
 import axios from 'axios'
-import { TokenInfo } from 'auth'
+import { Introspection, TokenInfo } from 'auth'
 import { Logger } from 'pino'
 
-import { Grant } from './grant'
 import { OpenAPI, HttpMethod, ResponseValidator } from 'openapi'
 
 export interface AuthService {
@@ -14,7 +12,7 @@ interface ServiceDependencies {
   authServerIntrospectionUrl: string
   authServerSpec: OpenAPI
   logger: Logger
-  validateResponse: ResponseValidator<TokenInfo>
+  validateResponse: ResponseValidator<Introspection>
 }
 
 export async function createAuthService(
@@ -24,7 +22,7 @@ export async function createAuthService(
     service: 'AuthService'
   })
   const validateResponse =
-    deps_.authServerSpec.createResponseValidator<TokenInfo>({
+    deps_.authServerSpec.createResponseValidator<Introspection>({
       path: '/introspect',
       method: HttpMethod.POST
     })
@@ -41,7 +39,7 @@ export async function createAuthService(
 async function introspectToken(
   deps: ServiceDependencies,
   token: string
-): Promise<Grant | undefined> {
+): Promise<TokenInfo | undefined> {
   try {
     const { status, data } = await axios.post(
       deps.authServerIntrospectionUrl,
@@ -56,13 +54,11 @@ async function introspectToken(
       }
     )
 
-    assert.ok(
-      deps.validateResponse({
-        status,
-        body: data
-      })
-    )
-    return Grant.fromTokenInfo(data)
+    deps.validateResponse({
+      status,
+      body: data
+    })
+    return data.active ? data : undefined
   } catch (err) {
     if (err.errors) {
       deps.logger.warn({ err }, 'invalid token introspection')
