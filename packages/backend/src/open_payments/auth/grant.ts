@@ -1,17 +1,12 @@
 import assert from 'assert'
-import { TokenInfo } from 'auth'
+import { Introspection, TokenInfo } from 'auth'
 import { Interval, Duration, DateTime, Settings } from 'luxon'
 
-import { Amount } from '../amount'
+import { Amount, parseAmount } from '../amount'
 
 Settings.defaultZone = 'utc'
 
-interface AmountJSON {
-  value: string
-  assetCode: string
-  assetScale: number
-}
-
+// export type AccessType = TokenInfo['access']['type']
 export enum AccessType {
   IncomingPayment = 'incoming-payment',
   OutgoingPayment = 'outgoing-payment',
@@ -34,22 +29,15 @@ export interface AccessLimits {
   interval?: string
 }
 
-interface AccessLimitsJSON {
-  receiver?: string
-  sendAmount?: AmountJSON
-  receiveAmount?: AmountJSON
-}
+// export interface GrantAccess {
+//   type: AccessType
+//   actions: AccessAction[]
+//   identifier?: string
+//   limits?: AccessLimits
+// }
 
-export interface GrantAccess {
-  type: AccessType
-  actions: AccessAction[]
-  identifier?: string
-  interval?: string
+type GrantAccess = Omit<TokenInfo['access'][number], 'limits'> & {
   limits?: AccessLimits
-}
-
-export type GrantAccessJSON = Omit<GrantAccess, 'limits'> & {
-  limits?: AccessLimitsJSON
 }
 
 export interface GrantOptions {
@@ -67,40 +55,40 @@ export class Grant {
       grant: tokenInfo.grant,
       client: tokenInfo.client,
       access: tokenInfo.access.map((access) => {
-        const options: GrantAccess = {
-          type: access.type,
-          actions: access.actions,
-          identifier: access.identifier,
-          interval: access.interval
-        }
-        if (access.limits) {
-          options.limits = {
-            receiver: access.limits.receiver
-          }
-          if (access.limits.sendAmount) {
-            options.limits.sendAmount = {
-              value: BigInt(access.limits.sendAmount.value),
-              assetCode: access.limits.sendAmount.assetCode,
-              assetScale: access.limits.sendAmount.assetScale
+        switch(access.type) {
+          case AccessType.IncomingPayment: {
+            return {
+              type: AccessType.IncomingPayment,
+              actions: access.actions,
+              identifier: access.identifier
             }
           }
-          if (access.limits.receiveAmount) {
-            options.limits.receiveAmount = {
-              value: BigInt(access.limits.receiveAmount.value),
-              assetCode: access.limits.receiveAmount.assetCode,
-              assetScale: access.limits.receiveAmount.assetScale
+          case AccessType.OutgoingPayment: {
+            return {
+              type: AccessType.OutgoingPayment,
+              actions: access.actions,
+              identifier: access.identifier,
+              limits: access.limits && {
+                ...access.limits,
+                sendAmount: access.limits.sendAmount && parseAmount(access.limits.sendAmount),
+                receiveAmount: access.limits.receiveAmount && parseAmount(access.limits.receiveAmount)
+              }
+            }
+          }
+          case AccessType.Quote: {
+            return {
+              type: AccessType.Quote,
+              actions: access.actions
             }
           }
         }
-        return options
       })
     })
   }
 
   constructor(options: GrantOptions) {
-    assert.ok(options.access || !options.active)
     this.grant = options.grant
-    this.access = options.access || []
+    this.access = options.access
     this.client = options.client
   }
 
@@ -119,7 +107,7 @@ export class Grant {
   }): GrantAccess | undefined {
     return this.access?.find(
       (access) =>
-        access.type === type &&
+        access.type == type &&
         (!access.identifier || access.identifier === identifier) &&
         (access.actions.includes(action) ||
           (action === AccessAction.Read &&
@@ -131,7 +119,7 @@ export class Grant {
 
   public toTokenInfo(): TokenInfo {
     return {
-      active: this.active,
+      active: true,
       grant: this.grant,
       client: this.client,
       access: this.access?.map((access) => {
