@@ -17,7 +17,7 @@ import { createOpenAPI } from 'openapi'
 import { createUnauthenticatedClient as createOpenPaymentsClient } from 'open-payments'
 
 export { JWKWithRequired } from './client/service'
-export { Access, TokenInfo, Introspection } from './openapi/types'
+export { Access, AccessLimits, TokenInfo, Introspection } from './openapi/types'
 export {
   getSigInputKeyId,
   HttpSigContext,

@@ -75,13 +75,15 @@ export function createAuthMiddleware({
       ) {
         ctx.grant = {
           id: tokenInfo.grant,
-          limits: access.limits ? parseAccessLimits(access.limits) : undefined
+          limits: access['limits']
+            ? parseAccessLimits(access['limits'])
+            : undefined
         }
       }
 
       // Unless the relevant grant action is ReadAll/ListAll add the
       // client to ctx for Read/List filtering
-      if (access.actions.includes(action)) {
+      if (access.actions.find((accessAction) => accessAction == action)) {
         ctx.client = tokenInfo.client
       }
 

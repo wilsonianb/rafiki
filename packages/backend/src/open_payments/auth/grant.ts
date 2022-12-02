@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { Access, TokenInfo } from 'auth'
+import { Access, AccessLimits as OpenPaymentsLimits, TokenInfo } from 'auth'
 import { Interval, Duration, DateTime, Settings } from 'luxon'
 
 import { Amount, parseAmount } from '../amount'
@@ -42,14 +42,19 @@ export const findAccess = (
       tokenAccess.type == access.type &&
       (!tokenAccess['identifier'] ||
         tokenAccess['identifier'] === access.identifier) &&
-      (tokenAccess.actions.includes(access.action) ||
-        (access.action === AccessAction.Read &&
-          tokenAccess.actions.includes(AccessAction.ReadAll)) ||
-        (access.action === AccessAction.List &&
-          tokenAccess.actions.includes(AccessAction.ListAll)))
+      tokenAccess.actions.find(
+        (action) =>
+          action == access.action ||
+          (access.action === AccessAction.Read &&
+            action == AccessAction.ReadAll) ||
+          (access.action === AccessAction.List &&
+            action == AccessAction.ListAll)
+      )
   )
 
-export const parseAccessLimits = (limits: Access['limits']): AccessLimits => ({
+export const parseAccessLimits = (
+  limits: OpenPaymentsLimits
+): AccessLimits => ({
   ...limits,
   sendAmount: limits.sendAmount && parseAmount(limits.sendAmount),
   receiveAmount: limits.receiveAmount && parseAmount(limits.receiveAmount)
