@@ -41,7 +41,7 @@ async function getOutgoingPayment(
   try {
     outgoingPayment = await deps.outgoingPaymentService.get({
       id: ctx.params.id,
-      clientId: ctx.clientId,
+      client: ctx.client,
       paymentPointerId: ctx.paymentPointer.id
     })
   } catch (_) {
@@ -76,6 +76,7 @@ async function createOutgoingPayment(
     quoteId,
     description: body.description,
     externalRef: body.externalRef,
+    client: ctx.client,
     grant: ctx.grant
   })
 

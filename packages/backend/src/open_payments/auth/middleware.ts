@@ -1,5 +1,6 @@
 import { AccessType, AccessAction } from './grant'
-import { HttpSigContext, verifySigAndChallenge } from 'auth'
+import { getSigInputKeyId, HttpSigContext, verifySigAndChallenge } from 'auth'
+import { parseLimits } from '../payment/outgoing/limits'
 
 export function createAuthMiddleware({
   type,
@@ -27,34 +28,47 @@ export function createAuthMiddleware({
         return
       }
       const authService = await ctx.container.use('authService')
-      const grant = await authService.introspect(token)
-      if (!grant || !grant.active) {
+      const tokenInfo = await authService.introspect(token)
+      if (!tokenInfo) {
         ctx.throw(401, 'Invalid Token')
       }
-      const access = grant.findAccess({
-        type,
-        action,
-        identifier: ctx.paymentPointer.url
-      })
+      const access = tokenInfo.access.find(
+        (access) =>
+          access.type == type &&
+          (!access['identifier'] ||
+            access['identifier'] === ctx.paymentPointer.url) &&
+          access.actions.find((tokenAction) => {
+            if (tokenAction == action) {
+              // Unless the relevant grant action is ReadAll/ListAll add the
+              // client to ctx for Read/List filtering
+              ctx.client = tokenInfo.client
+              return true
+            }
+            return (
+              (action === AccessAction.Read &&
+                tokenAction == AccessAction.ReadAll) ||
+              (action === AccessAction.List &&
+                tokenAction == AccessAction.ListAll)
+            )
+          })
+      )
       if (!access) {
         ctx.throw(403, 'Insufficient Grant')
       }
-      if (!config.bypassSignatureValidation) {
-        try {
-          if (!(await verifySigAndChallenge(grant.key.jwk, ctx))) {
-            ctx.throw(401, 'Invalid signature')
-          }
-        } catch (e) {
-          ctx.status = 401
-          ctx.throw(401, `Invalid signature`)
+      if (
+        type === AccessType.OutgoingPayment &&
+        action === AccessAction.Create
+      ) {
+        ctx.grant = {
+          id: tokenInfo.grant,
+          limits: access['limits'] ? parseLimits(access['limits']) : undefined
         }
       }
-      ctx.grant = grant
 
       // Unless the relevant grant action is ReadAll/ListAll add the
-      // clientId to ctx for Read/List filtering
-      if (access.actions.includes(action)) {
-        ctx.clientId = grant.clientId
+      // client to ctx for Read/List filtering
+      if (access.actions.find((accessAction) => accessAction == action)) {
+        ctx.client = tokenInfo.client
       }
 
       await next()
@@ -67,5 +81,35 @@ export function createAuthMiddleware({
         throw err
       }
     }
+  }
+}
+
+export const httpsigMiddleware = async (
+  ctx: HttpSigContext,
+  next: () => Promise<unknown>
+): Promise<void> => {
+  const sigInput = ctx.headers['signature-input']
+  const keyId = getSigInputKeyId(sigInput)
+  if (!keyId) {
+    ctx.throw(401, 'Invalid signature input')
+  }
+  const openPaymentsClient = await ctx.container.use('openPaymentsClient')
+  const keys = await openPaymentsClient.paymentPointer.getKeys({
+    url: tokenInfo.client
+  })
+  if (!keys) {
+    ctx.throw(401, 'Invalid signature input')
+  }
+  const key = keys.find((key) => key.kid === keyId)
+  if (!key) {
+    ctx.throw(401, 'Invalid signature input')
+  }
+  try {
+    if (!(await verifySigAndChallenge(key, ctx))) {
+      ctx.throw(401, 'Invalid signature')
+    }
+  } catch (e) {
+    ctx.status = 401
+    ctx.throw(401, `Invalid signature`)
   }
 }

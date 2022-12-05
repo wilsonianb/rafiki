@@ -2,15 +2,14 @@ import { Logger } from 'pino'
 import { Access } from '../access/model'
 import { AppContext } from '../app'
 import { IAppConfig } from '../config/app'
-import { AccessTokenService, Introspection } from './service'
+import { AccessTokenService } from './service'
+import { Grant } from '../grant/model'
 import { accessToBody } from '../shared/utils'
-import { ClientService } from '../client/service'
 
 interface ServiceDependencies {
   config: IAppConfig
   logger: Logger
   accessTokenService: AccessTokenService
-  clientService: ClientService
 }
 
 export interface AccessTokenRoutes {
@@ -38,31 +37,20 @@ async function introspectToken(
   ctx: AppContext
 ): Promise<void> {
   const { body } = ctx.request
-  const introspectionResult = await deps.accessTokenService.introspect(
-    body['access_token']
-  )
-  if (introspectionResult) {
-    ctx.body = introspectionToBody(introspectionResult)
-  } else {
-    ctx.status = 404
-    ctx.body = {
-      error: 'invalid_request',
-      message: 'token not found'
-    }
-    return
-  }
+  const grant = await deps.accessTokenService.introspect(body['access_token'])
+  ctx.body = grant
+    ? grantToTokenInfo(grant)
+    : {
+        active: false
+      }
 }
 
-function introspectionToBody(result: Introspection) {
-  if (!result.active) return { active: result.active }
-  else {
-    return {
-      active: result.active,
-      grant: result.id,
-      access: result.access?.map((a: Access) => accessToBody(a)),
-      key: result.key,
-      client_id: result.clientId
-    }
+function grantToTokenInfo(grant: Grant) {
+  return {
+    active: true,
+    grant: grant.id,
+    access: grant.access?.map((a: Access) => accessToBody(a)),
+    client: grant.client
   }
 }
 

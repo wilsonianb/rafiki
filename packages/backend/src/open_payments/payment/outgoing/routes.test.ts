@@ -1,3 +1,4 @@
+import { faker } from '@faker-js/faker'
 import jestOpenAPI from 'jest-openapi'
 import { Knex } from 'knex'
 import { v4 as uuid } from 'uuid'
@@ -10,7 +11,11 @@ import { AppServices, CreateContext, ListContext } from '../../../app'
 import { truncateTables } from '../../../tests/tableManager'
 import { randomAsset } from '../../../tests/asset'
 import { errorToCode, errorToMessage, OutgoingPaymentError } from './errors'
-import { CreateOutgoingPaymentOptions, OutgoingPaymentService } from './service'
+import {
+  CreateOutgoingPaymentOptions,
+  OutgoingPaymentService,
+  Grant
+} from './service'
 import { OutgoingPayment, OutgoingPaymentState } from './model'
 import { OutgoingPaymentRoutes, CreateBody } from './routes'
 import { serializeAmount } from '../../amount'
@@ -21,7 +26,6 @@ import {
 } from '../../payment_pointer/model.test'
 import { createOutgoingPayment } from '../../../tests/outgoingPayment'
 import { createPaymentPointer } from '../../../tests/paymentPointer'
-import { AccessAction, AccessType, Grant } from '../../auth/grant'
 
 describe('Outgoing Payment Routes', (): void => {
   let deps: IocContract<AppServices>
@@ -37,6 +41,7 @@ describe('Outgoing Payment Routes', (): void => {
 
   const createPayment = async (options: {
     paymentPointerId: string
+    client?: string
     grant?: Grant
     description?: string
     externalRef?: string
@@ -61,7 +66,8 @@ describe('Outgoing Payment Routes', (): void => {
     config = await deps.use('config')
     outgoingPaymentRoutes = await deps.use('outgoingPaymentRoutes')
     outgoingPaymentService = await deps.use('outgoingPaymentService')
-    jestOpenAPI(await deps.use('openApi'))
+    const { resourceServerSpec } = await deps.use('openApi')
+    jestOpenAPI(resourceServerSpec)
   })
 
   beforeEach(async (): Promise<void> => {
@@ -83,23 +89,10 @@ describe('Outgoing Payment Routes', (): void => {
   `('get/list$description outgoing payment', ({ failed }): void => {
     getRouteTests({
       getPaymentPointer: async () => paymentPointer,
-      createModel: async ({ clientId }) => {
-        const grant = clientId
-          ? new Grant({
-              active: true,
-              clientId,
-              grant: uuid(),
-              access: [
-                {
-                  type: AccessType.OutgoingPayment,
-                  actions: [AccessAction.Create, AccessAction.Read]
-                }
-              ]
-            })
-          : undefined
+      createModel: async ({ client }) => {
         const outgoingPayment = await createPayment({
           paymentPointerId: paymentPointer.id,
-          grant,
+          client,
           description: 'rent',
           externalRef: '202201'
         })
@@ -158,32 +151,15 @@ describe('Outgoing Payment Routes', (): void => {
           body: options
         },
         paymentPointer,
+        client: options.client,
         grant: options.grant
       })
 
     describe.each`
-      withGrant | description
-      ${true}   | ${'grant'}
-      ${false}  | ${'no grant'}
-    `('create ($description)', ({ withGrant }): void => {
-      let grant: Grant | undefined
-
-      beforeEach(async (): Promise<void> => {
-        grant = withGrant
-          ? new Grant({
-              active: true,
-              grant: uuid(),
-              clientId: uuid(),
-              access: [
-                {
-                  type: AccessType.OutgoingPayment,
-                  actions: [AccessAction.Create, AccessAction.Read]
-                }
-              ]
-            })
-          : undefined
-      })
-
+      grant             | client                  | description
+      ${{ id: uuid() }} | ${faker.internet.url()} | ${'grant'}
+      ${undefined}      | ${undefined}            | ${'no grant'}
+    `('create ($description)', ({ grant, client }): void => {
       test.each`
         description  | externalRef  | desc
         ${'rent'}    | ${undefined} | ${'description'}
@@ -193,12 +169,14 @@ describe('Outgoing Payment Routes', (): void => {
         async ({ description, externalRef }): Promise<void> => {
           const payment = await createPayment({
             paymentPointerId: paymentPointer.id,
+            client,
             grant,
             description,
             externalRef
           })
           const options = {
             quoteId: `${paymentPointer.url}/quotes/${payment.quote.id}`,
+            client,
             grant,
             description,
             externalRef
@@ -215,6 +193,7 @@ describe('Outgoing Payment Routes', (): void => {
             quoteId: payment.quote.id,
             description,
             externalRef,
+            client,
             grant
           })
           expect(ctx.response).toSatisfyApiSpec()

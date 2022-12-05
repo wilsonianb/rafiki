@@ -1,43 +1,34 @@
-import assert from 'assert'
-import nock, { Definition } from 'nock'
-import { URL } from 'url'
+import { faker } from '@faker-js/faker'
 import { v4 as uuid } from 'uuid'
 
 import { createAuthMiddleware } from './middleware'
-import { GrantJSON, AccessType, AccessAction } from './grant'
+import { AccessType, AccessAction } from './grant'
+import { AuthService } from './service'
 import { Config } from '../../config/app'
 import { IocContract } from '@adonisjs/fold'
 import { initIocContainer } from '../../'
 import { AppServices } from '../../app'
 import { Body, RequestMethod } from 'node-mocks-http'
-import { HttpMethod, RequestValidator } from 'openapi'
+import { HttpMethod } from 'openapi'
 import { createTestApp, TestContainer } from '../../tests/app'
 import { createPaymentPointer } from '../../tests/paymentPointer'
 import { truncateTables } from '../../tests/tableManager'
 import { setup, SetupOptions } from '../payment_pointer/model.test'
-import { HttpSigContext, JWKWithRequired, KeyInfo } from 'auth'
+import { HttpSigContext, JWKWithRequired, TokenInfo } from 'auth'
 import { generateTestKeys, generateSigHeaders } from 'auth/src/tests/signature'
-import { TokenInfo, TokenInfoJSON } from './service'
 
 type AppMiddleware = (
   ctx: HttpSigContext,
   next: () => Promise<void>
 ) => Promise<void>
 
-type IntrospectionBody = {
-  access_token: string
-  resource_server: string
-}
-
 describe('Auth Middleware', (): void => {
   let deps: IocContract<AppServices>
   let appContainer: TestContainer
-  let authServerIntrospectionUrl: URL
   let middleware: AppMiddleware
+  let authService: AuthService
   let ctx: HttpSigContext
   let next: jest.MockedFunction<() => Promise<void>>
-  let validateRequest: RequestValidator<IntrospectionBody>
-  let mockKeyInfo: KeyInfo
   const token = 'OS9M2PMHKUR64TB8N6BW7OZB8CDFONP219RP1LT0'
   let generatedKeyPair: {
     keyId: string
@@ -74,6 +65,17 @@ describe('Auth Middleware', (): void => {
     return context as any
   }
 
+  const createTokenInfo = (access?: TokenInfo['access']): TokenInfo => ({
+    active: true,
+    grant: uuid(),
+    client: faker.internet.url(),
+    access: access ?? [
+      {
+        type: AccessType.IncomingPayment,
+        actions: [AccessAction.Read]
+      }
+    ]
+  })
   async function prepareTest(includeBody: boolean) {
     requestSignatureHeaders = await generateSigHeaders({
       privateKey: generatedKeyPair.privateKey,
@@ -109,32 +111,20 @@ describe('Auth Middleware', (): void => {
     })
     ctx.container = deps
     next = jest.fn()
-    mockKeyInfo = {
-      jwk: requestJwk,
-      proof: 'httpsig'
-    }
   }
 
   beforeAll(async (): Promise<void> => {
     deps = await initIocContainer(Config)
     appContainer = await createTestApp(deps)
-    authServerIntrospectionUrl = new URL(Config.authServerIntrospectionUrl)
     middleware = createAuthMiddleware({
       type: AccessType.IncomingPayment,
       action: AccessAction.Read
     })
-    const authOpenApi = await deps.use('authOpenApi')
-    requestPath = '/introspect'
-    validateRequest = authOpenApi.createRequestValidator({
-      path: requestPath,
-      method: HttpMethod.POST
-    })
+    authService = await deps.use('authService')
     generatedKeyPair = await generateTestKeys()
     requestMethod = HttpMethod.POST.toUpperCase() as RequestMethod
     requestBody = {
-      access_token: token,
-      proof: 'httpsig',
-      resource_server: 'test'
+      access_token: token
     }
     requestAuthorization = `GNAP ${token}`
     requestUrl = Config.authServerGrantUrl + requestPath //'http://127.0.0.1:3006/introspect'
@@ -148,26 +138,6 @@ describe('Auth Middleware', (): void => {
     await truncateTables(await deps.use('knex'))
     await appContainer.shutdown()
   })
-
-  function mockAuthServer(
-    grant: GrantJSON | TokenInfoJSON | string | undefined = undefined
-  ): nock.Scope {
-    return nock(authServerIntrospectionUrl.origin)
-      .post(
-        authServerIntrospectionUrl.pathname,
-        function (this: Definition, body) {
-          assert.ok(
-            validateRequest({
-              ...this,
-              body
-            })
-          )
-          expect(body.access_token).toEqual(token)
-          return true
-        }
-      )
-      .reply(grant ? 200 : 404, grant)
-  }
 
   test.each`
     authorization             | description
@@ -189,47 +159,37 @@ describe('Auth Middleware', (): void => {
     }
   )
 
-  const inactiveGrant = {
-    active: false,
-    grant: uuid()
-  }
-
-  test.each`
-    grant            | description
-    ${undefined}     | ${'unknown token/grant'}
-    ${'bad grant'}   | ${'invalid grant'}
-    ${inactiveGrant} | ${'inactive grant'}
-  `('Returns 401 for $description', async ({ grant }): Promise<void> => {
-    const scope = mockAuthServer(grant)
+  test('returns 401 for unsuccessful token introspection', async (): Promise<void> => {
+    const introspectSpy = jest
+      .spyOn(authService, 'introspect')
+      .mockResolvedValueOnce(undefined)
     await expect(middleware(ctx, next)).resolves.toBeUndefined()
+    expect(introspectSpy).toHaveBeenCalledWith(token)
     expect(ctx.status).toBe(401)
     expect(ctx.message).toEqual('Invalid Token')
     expect(ctx.response.get('WWW-Authenticate')).toBe(
       `GNAP as_uri=${Config.authServerGrantUrl}`
     )
     expect(next).not.toHaveBeenCalled()
-    scope.done()
   })
 
   test('returns 403 for unauthorized request', async (): Promise<void> => {
-    const scope = mockAuthServer({
-      active: true,
-      client_id: uuid(),
-      grant: uuid(),
-      access: [
-        {
-          type: AccessType.OutgoingPayment,
-          actions: [AccessAction.Create],
-          identifier: ctx.paymentPointer.url
-        }
-      ]
-    })
+    const tokenInfo = createTokenInfo([
+      {
+        type: AccessType.OutgoingPayment,
+        actions: [AccessAction.Create],
+        identifier: ctx.paymentPointer.url
+      }
+    ])
+    const introspectSpy = jest
+      .spyOn(authService, 'introspect')
+      .mockResolvedValueOnce(tokenInfo)
     await expect(middleware(ctx, next)).rejects.toMatchObject({
       status: 403,
       message: 'Insufficient Grant'
     })
+    expect(introspectSpy).toHaveBeenCalledWith(token)
     expect(next).not.toHaveBeenCalled()
-    scope.done()
   })
 
   test.each`
@@ -239,53 +199,51 @@ describe('Auth Middleware', (): void => {
   `(
     'sets the context grant and calls next (limitAccount: $limitAccount)',
     async ({ limitAccount }): Promise<void> => {
-      const grant = new TokenInfo(
-        {
-          active: true,
-          clientId: uuid(),
-          grant: uuid(),
-          access: [
-            {
-              type: AccessType.IncomingPayment,
-              actions: [AccessAction.Read],
-              identifier: limitAccount ? ctx.paymentPointer.url : undefined
-            },
-            {
-              type: AccessType.OutgoingPayment,
-              actions: [AccessAction.Create, AccessAction.Read],
-              identifier: ctx.paymentPointer.url,
-              interval: 'R/2022-03-01T13:00:00Z/P1M',
-              limits: {
-                receiveAmount: {
-                  value: BigInt(500),
-                  assetCode: 'EUR',
-                  assetScale: 2
-                },
-                sendAmount: {
-                  value: BigInt(811),
-                  assetCode: 'USD',
-                  assetScale: 2
-                },
-                receiver:
-                  'https://wallet2.example/bob/incoming-payments/aa9da466-12ba-4760-9aa0-8c06061f333b'
-              }
-            }
-          ]
+      const limits = {
+        receiveAmount: {
+          value: BigInt(500),
+          assetCode: 'EUR',
+          assetScale: 2
         },
-        mockKeyInfo
-      )
-      const scope = mockAuthServer(grant.toJSON())
+        sendAmount: {
+          value: BigInt(811),
+          assetCode: 'USD',
+          assetScale: 2
+        },
+        receiver:
+          'https://wallet2.example/bob/incoming-payments/aa9da466-12ba-4760-9aa0-8c06061f333b'
+      }
+      const tokenInfo = createTokenInfo([
+        {
+          type: AccessType.IncomingPayment,
+          actions: [AccessAction.Read],
+          identifier: limitAccount ? ctx.paymentPointer.url : undefined
+        },
+        {
+          type: AccessType.OutgoingPayment,
+          actions: [AccessAction.Create, AccessAction.Read],
+          identifier: ctx.paymentPointer.url,
+          interval: 'R/2022-03-01T13:00:00Z/P1M',
+          limits
+        }
+      ])
       const next = jest.fn()
+      const introspectSpy = jest
+        .spyOn(authService, 'introspect')
+        .mockResolvedValueOnce(tokenInfo)
       await expect(middleware(ctx, next)).resolves.toBeUndefined()
+      expect(introspectSpy).toHaveBeenCalledWith(token)
       expect(next).toHaveBeenCalled()
-      expect(ctx.grant).toEqual(grant)
-      scope.done()
+      expect(ctx.client).toEqual(tokenInfo.client)
+      expect(ctx.grant).toEqual({
+        id: tokenInfo.grant,
+        limits
+      })
     }
   )
 
   test('bypasses token introspection for configured DEV_ACCESS_TOKEN', async (): Promise<void> => {
     ctx.headers.authorization = `GNAP ${Config.devAccessToken}`
-    const authService = await deps.use('authService')
     const introspectSpy = jest.spyOn(authService, 'introspect')
     await expect(middleware(ctx, next)).resolves.toBeUndefined()
     expect(introspectSpy).not.toHaveBeenCalled()
@@ -294,47 +252,43 @@ describe('Auth Middleware', (): void => {
 
   test('returns 200 with valid http signature without body', async (): Promise<void> => {
     await prepareTest(false)
-    const grant = new TokenInfo(
+    const tokenInfo = createTokenInfo([
       {
-        active: true,
-        clientId: uuid(),
-        grant: uuid(),
-        access: [
-          {
-            type: AccessType.IncomingPayment,
-            actions: [AccessAction.Read],
-            identifier: ctx.paymentPointer.url
-          }
-        ]
-      },
-      mockKeyInfo
-    )
-    const scope = mockAuthServer(grant.toJSON())
-    await expect(middleware(ctx, next)).resolves.not.toThrow()
+        type: AccessType.IncomingPayment,
+        actions: [AccessAction.Read],
+        identifier: ctx.paymentPointer.url
+      }
+    ])
+    const introspectSpy = jest
+      .spyOn(authService, 'introspect')
+      .mockResolvedValueOnce(tokenInfo)
+    await expect(middleware(ctx, next)).resolves.toBeUndefined()
+    expect(introspectSpy).toHaveBeenCalledWith(token)
     expect(next).toHaveBeenCalled()
-    scope.done()
+    expect(ctx.client).toEqual(tokenInfo.client)
+    expect(ctx.grant).toEqual({
+      id: tokenInfo.grant
+    })
   })
 
   test('returns 200 with valid http signature with body', async (): Promise<void> => {
-    const grant = new TokenInfo(
+    const tokenInfo = createTokenInfo([
       {
-        active: true,
-        clientId: uuid(),
-        grant: uuid(),
-        access: [
-          {
-            type: AccessType.IncomingPayment,
-            actions: [AccessAction.Read],
-            identifier: ctx.paymentPointer.url
-          }
-        ]
-      },
-      mockKeyInfo
-    )
-    const scope = mockAuthServer(grant.toJSON())
-    await expect(middleware(ctx, next)).resolves.not.toThrow()
+        type: AccessType.IncomingPayment,
+        actions: [AccessAction.Read],
+        identifier: ctx.paymentPointer.url
+      }
+    ])
+    const introspectSpy = jest
+      .spyOn(authService, 'introspect')
+      .mockResolvedValueOnce(tokenInfo)
+    await expect(middleware(ctx, next)).resolves.toBeUndefined()
+    expect(introspectSpy).toHaveBeenCalledWith(token)
     expect(next).toHaveBeenCalled()
-    scope.done()
+    expect(ctx.client).toEqual(tokenInfo.client)
+    expect(ctx.grant).toEqual({
+      id: tokenInfo.grant
+    })
   })
 
   test('returns 401 for invalid http signature without body', async (): Promise<void> => {
@@ -352,27 +306,21 @@ describe('Auth Middleware', (): void => {
       paymentPointer: await createPaymentPointer(deps)
     })
     ctx.container = deps
-    const grant = new TokenInfo(
+    const tokenInfo = createTokenInfo([
       {
-        active: true,
-        clientId: uuid(),
-        grant: uuid(),
-        access: [
-          {
-            type: AccessType.IncomingPayment,
-            actions: [AccessAction.Read],
-            identifier: ctx.paymentPointer.url
-          }
-        ]
-      },
-      mockKeyInfo
-    )
-    const scope = mockAuthServer(grant.toJSON())
+        type: AccessType.IncomingPayment,
+        actions: [AccessAction.Read],
+        identifier: ctx.paymentPointer.url
+      }
+    ])
+    const introspectSpy = jest
+      .spyOn(authService, 'introspect')
+      .mockResolvedValueOnce(tokenInfo)
     await expect(middleware(ctx, next)).resolves.toBeUndefined()
+    expect(introspectSpy).toHaveBeenCalledWith(token)
     expect(ctx.headers.signature).toBe('aaaaaaaaaa=')
     expect(ctx.status).toBe(401)
     expect(next).not.toHaveBeenCalled()
-    scope.done()
   })
 
   test('returns 401 for invalid http signature with body', async (): Promise<void> => {
@@ -393,130 +341,102 @@ describe('Auth Middleware', (): void => {
       paymentPointer: await createPaymentPointer(deps)
     })
     ctx.container = deps
-    const grant = new TokenInfo(
+    const tokenInfo = createTokenInfo([
       {
-        active: true,
-        clientId: uuid(),
-        grant: uuid(),
-        access: [
-          {
-            type: AccessType.IncomingPayment,
-            actions: [AccessAction.Read],
-            identifier: ctx.paymentPointer.url
-          }
-        ]
-      },
-      mockKeyInfo
-    )
-    const scope = mockAuthServer(grant.toJSON())
+        type: AccessType.IncomingPayment,
+        actions: [AccessAction.Read],
+        identifier: ctx.paymentPointer.url
+      }
+    ])
+    const introspectSpy = jest
+      .spyOn(authService, 'introspect')
+      .mockResolvedValueOnce(tokenInfo)
     await expect(middleware(ctx, next)).resolves.toBeUndefined()
+    expect(introspectSpy).toHaveBeenCalledWith(token)
     expect(ctx.status).toBe(401)
     expect(next).not.toHaveBeenCalled()
-    scope.done()
   })
 
-  test('returns 401 for invalid key type without body', async (): Promise<void> => {
-    await prepareTest(false)
-    mockKeyInfo.jwk.kty = 'EC'
-    const grant = new TokenInfo(
-      {
-        active: true,
-        clientId: uuid(),
-        grant: uuid(),
-        access: [
-          {
-            type: AccessType.IncomingPayment,
-            actions: [AccessAction.Read],
-            identifier: ctx.paymentPointer.url
-          }
-        ]
-      },
-      mockKeyInfo
-    )
-    const scope = mockAuthServer(grant.toJSON())
-    await expect(middleware(ctx, next)).resolves.toBeUndefined()
-    expect(ctx.status).toBe(401)
-    expect(next).not.toHaveBeenCalled()
-    scope.done()
-  })
+  // test client.paymentPointer.getKeys
+  // test('returns 401 for invalid key type without body', async (): Promise<void> => {
+  //   await prepareTest(false)
+  //   // mockKeyInfo.jwk.kty = 'EC'
+  //   const grant = mockGrant({
+  //     access: [
+  //       {
+  //         type: AccessType.IncomingPayment,
+  //         actions: [AccessAction.Read],
+  //         identifier: ctx.paymentPointer.url
+  //       }
+  //     ]
+  //   })
+  //   const scope = mockAuthServer(grant.toTokenInfo())
+  //   await expect(middleware(ctx, next)).resolves.toBeUndefined()
+  //   expect(ctx.status).toBe(401)
+  //   expect(next).not.toHaveBeenCalled()
+  //   scope.done()
+  // })
 
-  test('returns 401 for invalid key type with body', async (): Promise<void> => {
-    mockKeyInfo.jwk.kty = 'EC'
-    const grant = new TokenInfo(
-      {
-        active: true,
-        clientId: uuid(),
-        grant: uuid(),
-        access: [
-          {
-            type: AccessType.IncomingPayment,
-            actions: [AccessAction.Read],
-            identifier: ctx.paymentPointer.url
-          }
-        ]
-      },
-      mockKeyInfo
-    )
-    const scope = mockAuthServer(grant.toJSON())
-    await expect(middleware(ctx, next)).resolves.toBeUndefined()
-    expect(ctx.status).toBe(401)
-    expect(next).not.toHaveBeenCalled()
-    scope.done()
-  })
+  // test('returns 401 for invalid key type with body', async (): Promise<void> => {
+  //   // mockKeyInfo.jwk.kty = 'EC'
+  //   const grant = mockGrant({
+  //     access: [
+  //       {
+  //         type: AccessType.IncomingPayment,
+  //         actions: [AccessAction.Read],
+  //         identifier: ctx.paymentPointer.url
+  //       }
+  //     ]
+  //   })
+  //   const scope = mockAuthServer(grant.toTokenInfo())
+  //   await expect(middleware(ctx, next)).resolves.toBeUndefined()
+  //   expect(ctx.status).toBe(401)
+  //   expect(next).not.toHaveBeenCalled()
+  //   scope.done()
+  // })
 
   test('returns 401 if any signature keyid does not match the jwk key id without body', async (): Promise<void> => {
     await prepareTest(false)
-    const grant = new TokenInfo(
+    const tokenInfo = createTokenInfo([
       {
-        active: true,
-        clientId: uuid(),
-        grant: uuid(),
-        access: [
-          {
-            type: AccessType.IncomingPayment,
-            actions: [AccessAction.Read],
-            identifier: ctx.paymentPointer.url
-          }
-        ]
-      },
-      mockKeyInfo
-    )
-    const scope = mockAuthServer(grant.toJSON())
+        type: AccessType.IncomingPayment,
+        actions: [AccessAction.Read],
+        identifier: ctx.paymentPointer.url
+      }
+    ])
+    const introspectSpy = jest
+      .spyOn(authService, 'introspect')
+      .mockResolvedValueOnce(tokenInfo)
     ctx.request.headers['signature-input'] = ctx.request.headers[
       'signature-input'
     ].replace('gnap-key', 'mismatched-key')
     await expect(middleware(ctx, next)).resolves.toBeUndefined()
+    expect(introspectSpy).toHaveBeenCalledWith(token)
     expect(ctx.status).toBe(401)
     expect(next).not.toHaveBeenCalled()
-    scope.done()
   })
 
   test('returns 401 if any signature keyid does not match the jwk key id with body', async (): Promise<void> => {
-    const grant = new TokenInfo(
+    const tokenInfo = createTokenInfo([
       {
-        active: true,
-        clientId: uuid(),
-        grant: uuid(),
-        access: [
-          {
-            type: AccessType.IncomingPayment,
-            actions: [AccessAction.Read],
-            identifier: ctx.paymentPointer.url
-          }
-        ]
-      },
-      mockKeyInfo
-    )
-    const scope = mockAuthServer(grant.toJSON())
+        type: AccessType.IncomingPayment,
+        actions: [AccessAction.Read],
+        identifier: ctx.paymentPointer.url
+      }
+    ])
+    const introspectSpy = jest
+      .spyOn(authService, 'introspect')
+      .mockResolvedValueOnce(tokenInfo)
     ctx.request.headers['signature-input'] = ctx.request.headers[
       'signature-input'
     ].replace('gnap-key', 'mismatched-key')
     await expect(middleware(ctx, next)).resolves.toBeUndefined()
+    expect(introspectSpy).toHaveBeenCalledWith(token)
     expect(ctx.status).toBe(401)
     expect(next).not.toHaveBeenCalled()
-    scope.done()
   })
 
+  // should this be in its own middleware?
   test('returns 401 if content-digest does not match the body', async (): Promise<void> => {
     ctx = setupHttpSigContext({
       reqOpts: {
@@ -535,25 +455,19 @@ describe('Auth Middleware', (): void => {
       paymentPointer: await createPaymentPointer(deps)
     })
     ctx.container = deps
-    const grant = new TokenInfo(
+    const tokenInfo = createTokenInfo([
       {
-        active: true,
-        clientId: uuid(),
-        grant: uuid(),
-        access: [
-          {
-            type: AccessType.IncomingPayment,
-            actions: [AccessAction.Read],
-            identifier: ctx.paymentPointer.url
-          }
-        ]
-      },
-      mockKeyInfo
-    )
-    const scope = mockAuthServer(grant.toJSON())
+        type: AccessType.IncomingPayment,
+        actions: [AccessAction.Read],
+        identifier: ctx.paymentPointer.url
+      }
+    ])
+    const introspectSpy = jest
+      .spyOn(authService, 'introspect')
+      .mockResolvedValueOnce(tokenInfo)
     await expect(middleware(ctx, next)).resolves.toBeUndefined()
+    expect(introspectSpy).toHaveBeenCalledWith(token)
     expect(ctx.status).toBe(401)
     expect(next).not.toHaveBeenCalled()
-    scope.done()
   })
 })

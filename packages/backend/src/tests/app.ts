@@ -17,8 +17,7 @@ import { URL } from 'url'
 
 import { start, gracefulShutdown } from '..'
 import { App, AppServices } from '../app'
-import { Grant, AccessAction, AccessType } from '../open_payments/auth/grant'
-import { v4 as uuid } from 'uuid'
+import { AccessAction, AccessType } from '../open_payments/auth/grant'
 export const testAccessToken = 'test-app-access'
 
 export interface TestContainer {
@@ -29,8 +28,6 @@ export interface TestContainer {
   apolloClient: ApolloClient<NormalizedCacheObject>
   connectionUrl: string
   shutdown: () => Promise<void>
-  grantId: string
-  clientId: string
 }
 
 export const createTestApp = async (
@@ -61,30 +58,26 @@ export const createTestApp = async (
   const app = new App(container)
   await start(container, app)
 
-  const grant = new Grant({
-    active: true,
-    clientId: uuid(),
-    grant: 'PRY5NM33OM4TB8N6BW7',
-    access: [
-      {
-        type: AccessType.IncomingPayment,
-        actions: [AccessAction.Create, AccessAction.Complete, AccessAction.Read]
-      },
-      {
-        type: AccessType.OutgoingPayment,
-        actions: [AccessAction.Read]
-      }
-    ]
-  })
+  // const grant = mockGrant({
+  //   access: [
+  //     {
+  //       type: AccessType.IncomingPayment,
+  //       actions: [AccessAction.Create, AccessAction.Complete, AccessAction.Read]
+  //     },
+  //     {
+  //       type: AccessType.OutgoingPayment,
+  //       actions: [AccessAction.Read]
+  //     }
+  //   ]
+  // })
 
-  const authServerIntrospectionUrl = new URL(config.authServerIntrospectionUrl)
-  nock(authServerIntrospectionUrl.origin)
-    .post(authServerIntrospectionUrl.pathname, {
-      access_token: testAccessToken,
-      resource_server: '7C7C4AZ9KHRS6X63AJAO'
-    })
-    .reply(200, grant.toJSON())
-    .persist()
+  // const authServerIntrospectionUrl = new URL(config.authServerIntrospectionUrl)
+  // nock(authServerIntrospectionUrl.origin)
+  //   .post(authServerIntrospectionUrl.pathname, {
+  //     access_token: testAccessToken
+  //   })
+  //   .reply(200, grant.toJSON())
+  //   .persist()
 
   // Since payment pointers MUST use HTTPS, manually mock an HTTPS proxy to the Open Payments / SPSP server
   nock(config.openPaymentsUrl)
@@ -153,8 +146,6 @@ export const createTestApp = async (
     shutdown: async () => {
       nock.cleanAll()
       await gracefulShutdown(container, app)
-    },
-    grantId: grant.grant,
-    clientId: grant.clientId
+    }
   }
 }

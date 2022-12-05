@@ -1,11 +1,10 @@
 import assert from 'assert'
+import { faker } from '@faker-js/faker'
 import jestOpenAPI from 'jest-openapi'
-import * as httpMocks from 'node-mocks-http'
 import { Knex } from 'knex'
 import { v4 as uuid } from 'uuid'
 import { IocContract } from '@adonisjs/fold'
 
-import { createContext } from '../../tests/context'
 import { createTestApp, TestContainer } from '../../tests/app'
 import { Config, IAppConfig } from '../../config/app'
 import { initIocContainer } from '../..'
@@ -15,9 +14,11 @@ import { QuoteService } from './service'
 import { Quote } from './model'
 import { QuoteRoutes, CreateBody } from './routes'
 import { Amount, serializeAmount } from '../amount'
-import { AccessAction, AccessType, Grant } from '../auth/grant'
 import { PaymentPointer } from '../payment_pointer/model'
-import { getRouteTests } from '../payment_pointer/model.test'
+import {
+  getRouteTests,
+  setup as setupContext
+} from '../payment_pointer/model.test'
 import { randomAsset } from '../../tests/asset'
 import { createPaymentPointer } from '../../tests/paymentPointer'
 import { createQuote } from '../../tests/quote'
@@ -41,10 +42,10 @@ describe('Quote Routes', (): void => {
 
   const createPaymentPointerQuote = async ({
     paymentPointerId,
-    clientId
+    client
   }: {
     paymentPointerId: string
-    clientId: string
+    client: string
   }): Promise<Quote> => {
     return await createQuote(deps, {
       paymentPointerId,
@@ -54,7 +55,7 @@ describe('Quote Routes', (): void => {
         assetCode: asset.code,
         assetScale: asset.scale
       },
-      clientId,
+      client,
       validDestination: false
     })
   }
@@ -67,7 +68,8 @@ describe('Quote Routes', (): void => {
     config = await deps.use('config')
     quoteRoutes = await deps.use('quoteRoutes')
     quoteService = await deps.use('quoteService')
-    jestOpenAPI(await deps.use('openApi'))
+    const { resourceServerSpec } = await deps.use('openApi')
+    jestOpenAPI(resourceServerSpec)
   })
 
   beforeEach(async (): Promise<void> => {
@@ -90,10 +92,10 @@ describe('Quote Routes', (): void => {
   describe('get', (): void => {
     getRouteTests({
       getPaymentPointer: async () => paymentPointer,
-      createModel: async ({ clientId }) =>
+      createModel: async ({ client }) =>
         createPaymentPointerQuote({
           paymentPointerId: paymentPointer.id,
-          clientId
+          client
         }),
       get: (ctx) => quoteRoutes.get(ctx),
       getBody: (quote) => ({
@@ -111,26 +113,21 @@ describe('Quote Routes', (): void => {
 
   describe('create', (): void => {
     let options: CreateBody
-    let grant: Grant | undefined
 
-    function setup(
-      reqOpts: Pick<httpMocks.RequestOptions, 'headers'>
-    ): CreateContext<CreateBody> {
-      const ctx = createContext<CreateContext<CreateBody>>({
-        headers: Object.assign(
-          { Accept: 'application/json', 'Content-Type': 'application/json' },
-          reqOpts.headers
-        ),
-        method: 'POST',
-        url: `/quotes`
+    const setup = ({
+      client
+    }: {
+      client?: string
+    }): CreateContext<CreateBody> =>
+      setupContext<CreateContext<CreateBody>>({
+        reqOpts: {
+          body: options,
+          method: 'POST',
+          url: `/quotes`
+        },
+        paymentPointer,
+        client
       })
-      ctx.paymentPointer = paymentPointer
-      ctx.request.body = {
-        ...options
-      }
-      ctx.grant = grant
-      return ctx
-    }
 
     test('returns error on invalid sendAmount asset', async (): Promise<void> => {
       options = {
@@ -160,26 +157,10 @@ describe('Quote Routes', (): void => {
     })
 
     describe.each`
-      clientId     | description
-      ${uuid()}    | ${'clientId'}
-      ${undefined} | ${'no clientId'}
-    `('returns the quote on success ($description)', ({ clientId }): void => {
-      beforeEach(async (): Promise<void> => {
-        grant = clientId
-          ? new Grant({
-              active: true,
-              clientId,
-              grant: uuid(),
-              access: [
-                {
-                  type: AccessType.Quote,
-                  actions: [AccessAction.Create, AccessAction.Read]
-                }
-              ]
-            })
-          : undefined
-      })
-
+      client                  | description
+      ${faker.internet.url()} | ${'client'}
+      ${undefined}            | ${'no client'}
+    `('returns the quote on success ($description)', ({ client }): void => {
       test.each`
         sendAmount   | receiveAmount | description
         ${'123'}     | ${undefined}  | ${'sendAmount'}
@@ -204,7 +185,7 @@ describe('Quote Routes', (): void => {
                 }
               : undefined
           }
-          const ctx = setup({})
+          const ctx = setup({ client })
           let quote: Quote | undefined
           const quoteSpy = jest
             .spyOn(quoteService, 'create')
@@ -212,7 +193,7 @@ describe('Quote Routes', (): void => {
               quote = await createQuote(deps, {
                 ...opts,
                 validDestination: false,
-                clientId
+                client
               })
               return quote
             })
@@ -228,7 +209,7 @@ describe('Quote Routes', (): void => {
               ...options.receiveAmount,
               value: BigInt(options.receiveAmount.value)
             },
-            clientId
+            client
           })
           expect(ctx.response).toSatisfyApiSpec()
           const quoteId = (
@@ -259,7 +240,7 @@ describe('Quote Routes', (): void => {
         options = {
           receiver
         }
-        const ctx = setup({})
+        const ctx = setup({ client })
         let quote: Quote | undefined
         const quoteSpy = jest
           .spyOn(quoteService, 'create')
@@ -267,7 +248,7 @@ describe('Quote Routes', (): void => {
             quote = await createQuote(deps, {
               ...opts,
               validDestination: false,
-              clientId
+              client
             })
             return quote
           })
@@ -275,7 +256,7 @@ describe('Quote Routes', (): void => {
         expect(quoteSpy).toHaveBeenCalledWith({
           paymentPointerId: paymentPointer.id,
           receiver,
-          clientId
+          client
         })
         expect(ctx.response).toSatisfyApiSpec()
         const quoteId = (

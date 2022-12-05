@@ -87,7 +87,7 @@ function getSigInputComponents(sigInput: string): string[] | null {
 
 const KEY_ID_PREFIX = 'keyid="'
 
-function getSigInputKeyId(sigInput: string): string | undefined {
+export function getSigInputKeyId(sigInput: string): string | undefined {
   const keyIdParam = sigInput
     .split(';')
     .find((param) => param.startsWith(KEY_ID_PREFIX))

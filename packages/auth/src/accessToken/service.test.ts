@@ -1,6 +1,5 @@
 import { faker } from '@faker-js/faker'
 import nock from 'nock'
-import assert from 'assert'
 import { Knex } from 'knex'
 import crypto from 'crypto'
 import { v4 } from 'uuid'
@@ -76,7 +75,6 @@ describe('Access Token Service', (): void => {
   }
 
   let grant: Grant
-  let access: Access
   let token: AccessToken
   beforeEach(async (): Promise<void> => {
     grant = await Grant.query(trx).insertAndFetch({
@@ -88,10 +86,12 @@ describe('Access Token Service', (): void => {
       interactRef: crypto.randomBytes(8).toString('hex').toUpperCase(),
       interactNonce: crypto.randomBytes(8).toString('hex').toUpperCase()
     })
-    access = await Access.query(trx).insertAndFetch({
-      grantId: grant.id,
-      ...BASE_ACCESS
-    })
+    grant.access = [
+      await Access.query(trx).insertAndFetch({
+        grantId: grant.id,
+        ...BASE_ACCESS
+      })
+    ]
     token = await AccessToken.query(trx).insertAndFetch({
       grantId: grant.id,
       ...BASE_TOKEN,
@@ -141,24 +141,9 @@ describe('Access Token Service', (): void => {
 
   describe('Introspect', (): void => {
     test('Can introspect active token', async (): Promise<void> => {
-      const clientId = crypto.createHash('sha256').update(CLIENT).digest('hex')
-
-      const scope = nock(CLIENT)
-        .get('/jwks.json')
-        .reply(200, {
-          keys: [testJwk]
-        })
-
-      const introspection = await accessTokenService.introspect(token.value)
-      assert.ok(introspection)
-      expect(introspection.active).toEqual(true)
-      expect(introspection).toMatchObject({
-        ...grant,
-        access: [access],
-        key: { proof: 'httpsig', jwk: testJwk },
-        clientId
-      })
-      scope.isDone()
+      await expect(accessTokenService.introspect(token.value)).resolves.toEqual(
+        grant
+      )
     })
 
     test('Can introspect expired token', async (): Promise<void> => {
@@ -167,24 +152,20 @@ describe('Access Token Service', (): void => {
         tokenCreatedDate.getTime() + (token.expiresIn + 1) * 1000
       )
       jest.useFakeTimers({ now })
-      const introspection = await accessTokenService.introspect(token.value)
-      expect(introspection).toEqual({ active: false })
+      await expect(
+        accessTokenService.introspect(token.value)
+      ).resolves.toBeUndefined()
     })
 
     test('Can introspect active token for revoked grant', async (): Promise<void> => {
       await grant.$query(trx).patch({ state: GrantState.Revoked })
-      const introspection = await accessTokenService.introspect(token.value)
-      expect(introspection).toEqual({ active: false })
+      await expect(
+        accessTokenService.introspect(token.value)
+      ).resolves.toBeUndefined()
     })
 
     test('Cannot introspect non-existing token', async (): Promise<void> => {
       expect(accessTokenService.introspect('uuid')).resolves.toBeUndefined()
-    })
-
-    test('Cannot introspect with non-existing key', async (): Promise<void> => {
-      await expect(accessTokenService.introspect(token.value)).resolves.toEqual(
-        { active: false }
-      )
     })
   })
 
