@@ -1,6 +1,5 @@
-import { Grant, AccessType, AccessAction, getInterval } from './grant'
+import { Grant, AccessType, AccessAction } from './grant'
 import { faker } from '@faker-js/faker'
-import { Interval } from 'luxon'
 
 describe('Grant', (): void => {
   describe('findAccess', (): void => {
