@@ -26,7 +26,7 @@ import { createPaymentPointerMiddleware } from './open_payments/payment_pointer/
 import { PaymentPointer } from './open_payments/payment_pointer/model'
 import { PaymentPointerService } from './open_payments/payment_pointer/service'
 import { AccessType, AccessAction } from './open_payments/auth/grant'
-import { createAuthMiddleware } from './open_payments/auth/middleware'
+import { createAuthMiddleware, httpsigMiddleware } from './open_payments/auth/middleware'
 import { AuthService } from './open_payments/auth/service'
 import { RatesService } from './rates/service'
 import { SPSPRoutes } from './spsp/routes'
@@ -345,6 +345,9 @@ export class App {
               type,
               action
             }),
+            this.config.bypassSignatureValidation
+              ? (ctx, next) => next()
+              : httpsigMiddleware,
             route
           )
         }

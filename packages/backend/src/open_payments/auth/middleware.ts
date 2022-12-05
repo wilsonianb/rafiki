@@ -55,31 +55,6 @@ export function createAuthMiddleware({
       if (!access) {
         ctx.throw(403, 'Insufficient Grant')
       }
-      if (!config.bypassSignatureValidation) {
-        const sigInput = ctx.headers['signature-input']
-        const keyId = getSigInputKeyId(sigInput)
-        if (!keyId) {
-          ctx.throw(401, 'Invalid signature input')
-        }
-        // TODO: get client key
-        const openPaymentsClient = await ctx.container.use('openPaymentsClient')
-        const keys = await openPaymentsClient.paymentPointer.getKeys()
-        if (!keys) {
-          ctx.throw(401, 'Invalid signature input')
-        }
-        const key = keys.find((key) => key.kid === keyId)
-        if (!key) {
-          ctx.throw(401, 'Invalid signature input')
-        }
-        try {
-          if (!(await verifySigAndChallenge(key, ctx))) {
-            ctx.throw(401, 'Invalid signature')
-          }
-        } catch (e) {
-          ctx.status = 401
-          ctx.throw(401, `Invalid signature`)
-        }
-      }
       if (
         type === AccessType.OutgoingPayment &&
         action === AccessAction.Create
@@ -106,5 +81,35 @@ export function createAuthMiddleware({
         throw err
       }
     }
+  }
+}
+
+export const httpsigMiddleware = async (
+  ctx: HttpSigContext,
+  next: () => Promise<unknown>
+): Promise<void> => {
+  const sigInput = ctx.headers['signature-input']
+  const keyId = getSigInputKeyId(sigInput)
+  if (!keyId) {
+    ctx.throw(401, 'Invalid signature input')
+  }
+  const openPaymentsClient = await ctx.container.use('openPaymentsClient')
+  const keys = await openPaymentsClient.paymentPointer.getKeys({
+    url: tokenInfo.client
+  })
+  if (!keys) {
+    ctx.throw(401, 'Invalid signature input')
+  }
+  const key = keys.find((key) => key.kid === keyId)
+  if (!key) {
+    ctx.throw(401, 'Invalid signature input')
+  }
+  try {
+    if (!(await verifySigAndChallenge(key, ctx))) {
+      ctx.throw(401, 'Invalid signature')
+    }
+  } catch (e) {
+    ctx.status = 401
+    ctx.throw(401, `Invalid signature`)
   }
 }
