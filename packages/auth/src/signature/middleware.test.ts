@@ -1,7 +1,6 @@
 import crypto from 'crypto'
 import nock from 'nock'
 import { faker } from '@faker-js/faker'
-import { importJWK } from 'jose'
 import { v4 } from 'uuid'
 import { Knex } from 'knex'
 import { createContentDigestHeader } from 'httpbis-digest-headers'
@@ -12,7 +11,6 @@ import { Config } from '../config/app'
 import { IocContract } from '@adonisjs/fold'
 import { initIocContainer } from '../'
 import { AppServices } from '../app'
-import { JWKWithRequired } from '../client/service'
 import { createContext, createContextWithSigHeaders } from '../tests/context'
 import { generateTestKeys } from '../tests/signature'
 import { Grant, GrantState, StartMethod, FinishMethod } from '../grant/model'
@@ -32,8 +30,8 @@ describe('Signature Service', (): void => {
   let appContainer: TestContainer
   const CLIENT = faker.internet.url()
 
-  let privateKey: JWKWithRequired
-  let testClientKey: JWKWithRequired
+  let privateKey: crypto.KeyLike
+  let testClientKey: JWK
 
   beforeAll(async (): Promise<void> => {
     deps = await initIocContainer(Config)
@@ -52,8 +50,7 @@ describe('Signature Service', (): void => {
   describe('signatures', (): void => {
     test('can verify a signature', async (): Promise<void> => {
       const challenge = 'test-challenge'
-      const privateJwk = (await importJWK(privateKey)) as crypto.KeyLike
-      const signature = crypto.sign(null, Buffer.from(challenge), privateJwk)
+      const signature = crypto.sign(null, Buffer.from(challenge), privateKey)
       await expect(
         verifySig(signature.toString('base64'), testClientKey, challenge)
       ).resolves.toBe(true)

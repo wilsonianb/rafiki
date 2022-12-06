@@ -1,3 +1,4 @@
+import { KeyLike } from 'crypto'
 import EventEmitter from 'events'
 import * as httpMocks from 'node-mocks-http'
 import Koa from 'koa'
@@ -6,7 +7,6 @@ import { IocContract } from '@adonisjs/fold'
 
 import { AppContext, AppContextData, AppServices } from '../app'
 import { generateSigHeaders } from './signature'
-import { JWKWithRequired } from '../client/service'
 
 export function createContext(
   reqOpts: httpMocks.RequestOptions,
@@ -41,7 +41,7 @@ export async function createContextWithSigHeaders(
   reqOpts: httpMocks.RequestOptions,
   params: Record<string, unknown>,
   requestBody: Record<string, unknown>,
-  privateKey: JWKWithRequired,
+  privateKey: KeyLike,
   keyId: string,
   container?: IocContract<AppServices>
 ): Promise<AppContext> {

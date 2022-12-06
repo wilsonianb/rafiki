@@ -1,8 +1,7 @@
-import crypto from 'crypto'
+import { generateKeyPairSync, KeyLike, sign } from 'crypto'
 import { v4 } from 'uuid'
 import { createContentDigestHeader } from 'httpbis-digest-headers'
-import { importJWK, exportJWK } from 'jose'
-import { JWKWithRequired } from '../client/service'
+import { generateJwk, JWK } from 'open-payments'
 
 export const SIGNATURE_METHOD = 'GET'
 export const SIGNATURE_TARGET_URI = '/test'
@@ -21,36 +20,20 @@ export const TEST_CLIENT_DISPLAY = {
   uri: TEST_CLIENT.uri
 }
 
-// TODO: refactor any oustanding key-using tests to generate them from here
-const BASE_TEST_KEY_JWK = {
-  kty: 'OKP',
-  alg: 'EdDSA',
-  crv: 'Ed25519',
-  use: 'sig'
-}
-
 export async function generateTestKeys(): Promise<{
   keyId: string
-  publicKey: JWKWithRequired
-  privateKey: JWKWithRequired
+  publicKey: JWK
+  privateKey: KeyLike
 }> {
-  const { privateKey } = crypto.generateKeyPairSync('ed25519')
-
-  const { x, d } = await exportJWK(privateKey)
+  const { privateKey } = generateKeyPairSync('ed25519')
   const keyId = v4()
   return {
     keyId,
-    publicKey: {
-      ...BASE_TEST_KEY_JWK,
-      kid: keyId,
-      x
-    },
-    privateKey: {
-      ...BASE_TEST_KEY_JWK,
-      kid: keyId,
-      x,
-      d
-    }
+    publicKey: generateJwk({
+      keyId,
+      privateKey
+    }),
+    privateKey
   }
 }
 
@@ -61,7 +44,7 @@ export async function generateSigHeaders({
   keyId,
   optionalComponents
 }: {
-  privateKey: JWKWithRequired
+  privateKey: KeyLike
   url: string
   method: string
   keyId: string
@@ -104,8 +87,7 @@ export async function generateSigHeaders({
 
   challenge += `"@signature-params": ${sigInput.replace('sig1=', '')}`
 
-  const privateJwk = (await importJWK(privateKey)) as crypto.KeyLike
-  const signature = crypto.sign(null, Buffer.from(challenge), privateJwk)
+  const signature = sign(null, Buffer.from(challenge), privateKey)
 
   return {
     signature: signature.toString('base64'),
