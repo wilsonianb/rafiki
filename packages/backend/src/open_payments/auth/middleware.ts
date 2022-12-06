@@ -1,5 +1,6 @@
 import { AccessType, AccessAction } from './grant'
-import { HttpSigContext, verifySigAndChallenge } from 'auth'
+import { HttpSigContext, PaymentPointerContext } from '../../app'
+import { verifySigAndChallenge } from 'auth'
 
 export function createAuthMiddleware({
   type,
@@ -9,7 +10,7 @@ export function createAuthMiddleware({
   action: AccessAction
 }) {
   return async (
-    ctx: HttpSigContext,
+    ctx: PaymentPointerContext,
     next: () => Promise<unknown>
   ): Promise<void> => {
     const config = await ctx.container.use('config')
@@ -39,16 +40,6 @@ export function createAuthMiddleware({
       if (!access) {
         ctx.throw(403, 'Insufficient Grant')
       }
-      if (!config.bypassSignatureValidation) {
-        try {
-          if (!(await verifySigAndChallenge(grant.key.jwk, ctx))) {
-            ctx.throw(401, 'Invalid signature')
-          }
-        } catch (e) {
-          ctx.status = 401
-          ctx.throw(401, `Invalid signature`)
-        }
-      }
       ctx.grant = grant
 
       // Unless the relevant grant action is ReadAll/ListAll add the
@@ -68,4 +59,24 @@ export function createAuthMiddleware({
       }
     }
   }
+}
+
+export const httpsigMiddleware = async (
+  ctx: HttpSigContext,
+  next: () => Promise<unknown>
+): Promise<void> => {
+  // TODO: look up client jwks.json
+  // https://github.com/interledger/rafiki/issues/737
+  if (!ctx.grant?.key.jwk) {
+    ctx.throw(500)
+  }
+  try {
+    if (!(await verifySigAndChallenge(ctx.grant.key.jwk, ctx))) {
+      ctx.throw(401, 'Invalid signature')
+    }
+  } catch (e) {
+    ctx.status = 401
+    ctx.throw(401, `Invalid signature`)
+  }
+  await next()
 }
