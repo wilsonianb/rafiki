@@ -26,21 +26,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  active:
-                    type: boolean
-                  grant:
-                    type: string
-                  access:
-                    $ref: ./schemas.yaml#/components/schemas/access
-                  key:
-                    $ref: '#/components/schemas/key'
-                  client_id:
-                    type: string
-                    description: Opaque client identifier.
-                required:
-                  - active
+                $ref: '#/components/schemas/token-info'
               examples:
                 Token Introspection:
                   value:
@@ -171,6 +157,23 @@ components:
       required:
         - proof
         - jwk
+    token-info:
+      title: token-info
+      type: object
+      properties:
+        active:
+          type: boolean
+        grant:
+          type: string
+        access:
+          $ref: ./schemas.yaml#/components/schemas/access
+        key:
+          $ref: '#/components/schemas/key'
+        client_id:
+          type: string
+          description: Opaque client identifier.
+      required:
+        - active
   securitySchemes:
     GNAP:
       name: Authorization
