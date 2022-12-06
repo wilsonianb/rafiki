@@ -149,7 +149,7 @@ importers:
       auth: workspace:../auth
       axios: 0.26.1
       base64url: ^3.0.1
-      bcrypt: ^5.0.1
+      bcrypt: ^5.1.0
       cross-fetch: ^3.1.4
       extensible-error: ^1.0.2
       fishery: ^2.2.2
@@ -207,7 +207,7 @@ importers:
       apollo-server-koa: 3.10.1_graphql@16.6.0+koa@2.13.4
       axios: 0.26.1
       base64url: 3.0.1
-      bcrypt: 5.0.1
+      bcrypt: 5.1.0
       extensible-error: 1.0.2
       fishery: 2.2.2
       graphql: 16.6.0
@@ -3216,8 +3216,8 @@ packages:
       path-to-regexp: 6.2.1
     dev: false
 
-  /@mapbox/node-pre-gyp/1.0.9:
-    resolution: {integrity: sha512-aDF3S3rK9Q2gey/WAttUlISduDItz5BU3306M9Eyv6/oS40aMprnopshtlKTykxRNIBEZuRMaZAnbrQ4QtKGyw==}
+  /@mapbox/node-pre-gyp/1.0.10:
+    resolution: {integrity: sha512-4ySo4CjzStuprMwk35H5pPbkymjv1SF3jGLj6rAHp/xT/RF7TL7bd9CTm1xDY49K2qF7jmR/g7k+SkLETP6opA==}
     hasBin: true
     dependencies:
       detect-libc: 2.0.1
@@ -5272,13 +5272,13 @@ packages:
     dependencies:
       tweetnacl: 0.14.5
 
-  /bcrypt/5.0.1:
-    resolution: {integrity: sha512-9BTgmrhZM2t1bNuDtrtIMVSmmxZBrJ71n8Wg+YgdjHuIWYF7SjjmCPZFB+/5i/o/PIeRpwVJR3P+NrpIItUjqw==}
+  /bcrypt/5.1.0:
+    resolution: {integrity: sha512-RHBS7HI5N5tEnGTmtR/pppX0mmDSBpQ4aCBsj7CEQfYXDcO74A8sIBYcJMuCsis2E81zDxeENYhv66oZwLiA+Q==}
     engines: {node: '>= 10.0.0'}
     requiresBuild: true
     dependencies:
-      '@mapbox/node-pre-gyp': 1.0.9
-      node-addon-api: 3.2.1
+      '@mapbox/node-pre-gyp': 1.0.10
+      node-addon-api: 5.0.0
     transitivePeerDependencies:
       - encoding
       - supports-color
@@ -10543,8 +10543,8 @@ packages:
     dev: true
     optional: true
 
-  /node-addon-api/3.2.1:
-    resolution: {integrity: sha512-mmcei9JghVNDYydghQmeDX8KoAm0FAiYyIcUt/N4nhyAipB17pllZQDOJD2fotxABnt4Mdz+dKTO7eftLg4d0A==}
+  /node-addon-api/5.0.0:
+    resolution: {integrity: sha512-CvkDw2OEnme7ybCykJpVcKH+uAOLV2qLqiyla128dN9TkEWfrYmxG6C2boDe5KcNQqZF3orkqzGgOMvZ/JNekA==}
     dev: false
 
   /node-dir/0.1.17:
