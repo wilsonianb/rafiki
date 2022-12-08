@@ -37,12 +37,12 @@ export interface components {
     };
     /** token-info */
     "token-info": {
-      active: boolean;
-      grant?: string;
-      access?: external["schemas.yaml"]["components"]["schemas"]["access"];
-      key?: components["schemas"]["key"];
+      active: true;
+      grant: string;
+      access: external["schemas.yaml"]["components"]["schemas"]["access"];
+      key: components["schemas"]["key"];
       /** @description Opaque client identifier. */
-      client_id?: string;
+      client_id: string;
     };
   };
 }
@@ -55,7 +55,11 @@ export interface operations {
       /** OK */
       200: {
         content: {
-          "application/json": components["schemas"]["token-info"];
+          "application/json":
+            | {
+                active: false;
+              }
+            | components["schemas"]["token-info"];
         };
       };
       /** Not Found */
@@ -66,10 +70,6 @@ export interface operations {
         "application/json": {
           /** @description The access token value presented to the RS by the client instance. */
           access_token: string;
-          /** @description The proofing method used by the client instance to bind the token to the RS request. */
-          proof?: string;
-          /** @description The identification used to authenticate the resource server making this call, either by value or by reference. */
-          resource_server: components["schemas"]["key"] | string;
           access?: external["schemas.yaml"]["components"]["schemas"]["access"];
         };
       };
