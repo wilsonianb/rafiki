@@ -20,28 +20,19 @@ export interface components {
     key: {
       /** @description The form of proof that the client instance will use when presenting the key. */
       proof: "httpsig";
-      /** @description The public key and its properties represented as a JSON Web Key [[RFC7517](https://datatracker.ietf.org/doc/html/rfc7517)]. */
+      /**
+       * Ed25519 Public Key
+       * @description A JWK representation of an Ed25519 Public Key
+       */
       jwk: {
+        kid: string;
         /** @description The cryptographic algorithm family used with the key. The only allowed value is `EdDSA`. */
         alg: "EdDSA";
-        /** @description A Key ID can be used to match a specific key. */
-        kid: string;
-        /** @description The Key Type. The only allowed value is `OKP`. */
-        kty: "OKP";
-        /** @description The intended use of the key. */
         use?: "sig";
-        /** @description The cryptographic curve used with the key. The only allowed value is `Ed25519`. */
+        kty: "OKP";
         crv: "Ed25519";
-        /** @description Public key encoded using the `base64url` encoding. */
+        /** @description The base64 url-encoded public key. */
         x: string;
-        /** @description Array of allowed operations this key may be used for. */
-        key_ops?: ("sign" | "verify")[];
-        /** @description UNIX timestamp indicating the earliest this key may be used. */
-        nbf?: number;
-        /** @description UNIX timestamp indicating the latest this key may be used. */
-        exp?: number;
-        /** @description The revocation status of the key. */
-        revoked?: boolean;
       };
     };
     /** token-info */
