@@ -18,7 +18,12 @@ import { createUnauthenticatedClient as createOpenPaymentsClient } from 'open-pa
 
 export { KeyInfo } from './accessToken/service'
 export { JWKWithRequired } from './client/service'
-export { TokenInfo } from './openapi/types'
+export {
+  AccessLimits,
+  ActiveTokenInfo,
+  Introspection,
+  TokenInfo
+} from './openapi/types'
 export { HttpSigContext, verifySigAndChallenge } from './signature/middleware'
 const container = initIocContainer(Config)
 const app = new App(container)

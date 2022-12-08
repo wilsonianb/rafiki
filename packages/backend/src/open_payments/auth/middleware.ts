@@ -1,6 +1,7 @@
 import { AccessType, AccessAction } from './grant'
 import { HttpSigContext, PaymentPointerContext } from '../../app'
 import { verifySigAndChallenge } from 'auth'
+import { parseLimits } from '../payment/outgoing/limits'
 
 export function createAuthMiddleware({
   type,
@@ -28,24 +29,42 @@ export function createAuthMiddleware({
         return
       }
       const authService = await ctx.container.use('authService')
-      const grant = await authService.introspect(token)
-      if (!grant) {
+      const tokenInfo = await authService.introspect(token)
+      if (!tokenInfo) {
         ctx.throw(401, 'Invalid Token')
       }
-      const access = grant.findAccess({
-        type,
-        action,
-        identifier: ctx.paymentPointer.url
-      })
+      const access = tokenInfo.access.find(
+        (access) =>
+          access.type == type &&
+          (!access['identifier'] ||
+            access['identifier'] === ctx.paymentPointer.url) &&
+          access.actions.find((tokenAction) => {
+            if (tokenAction == action) {
+              // Unless the relevant grant action is ReadAll/ListAll add the
+              // clientId to ctx for Read/List filtering
+              ctx.clientId = tokenInfo.client_id
+              return true
+            }
+            return (
+              (action === AccessAction.Read &&
+                tokenAction == AccessAction.ReadAll) ||
+              (action === AccessAction.List &&
+                tokenAction == AccessAction.ListAll)
+            )
+          })
+      )
       if (!access) {
         ctx.throw(403, 'Insufficient Grant')
       }
-      ctx.grant = grant
-
-      // Unless the relevant grant action is ReadAll/ListAll add the
-      // clientId to ctx for Read/List filtering
-      if (access.actions.includes(action)) {
-        ctx.clientId = grant.clientId
+      ctx.clientKey = tokenInfo.key.jwk
+      if (
+        type === AccessType.OutgoingPayment &&
+        action === AccessAction.Create
+      ) {
+        ctx.grant = {
+          id: tokenInfo.grant,
+          limits: access['limits'] ? parseLimits(access['limits']) : undefined
+        }
       }
 
       await next()
@@ -67,11 +86,11 @@ export const httpsigMiddleware = async (
 ): Promise<void> => {
   // TODO: look up client jwks.json
   // https://github.com/interledger/rafiki/issues/737
-  if (!ctx.grant?.key.jwk) {
+  if (!ctx.clientKey) {
     ctx.throw(500)
   }
   try {
-    if (!(await verifySigAndChallenge(ctx.grant.key.jwk, ctx))) {
+    if (!(await verifySigAndChallenge(ctx.clientKey, ctx))) {
       ctx.throw(401, 'Invalid signature')
     }
   } catch (e) {
