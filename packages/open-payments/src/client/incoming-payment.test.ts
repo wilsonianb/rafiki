@@ -1,3 +1,4 @@
+import { getTests } from './index.test'
 import {
   completeIncomingPayment,
   createIncomingPayment,
@@ -77,23 +78,9 @@ describe('incoming-payment', (): void => {
   })
 
   describe('getIncomingPayment', (): void => {
-    test('returns incoming payment if passes validation', async (): Promise<void> => {
-      const incomingPayment = mockIncomingPayment()
-
-      nock(baseUrl).get('/incoming-payments').reply(200, incomingPayment)
-
-      const result = await getIncomingPayment(
-        {
-          axiosInstance,
-          logger
-        },
-        {
-          url: `${baseUrl}/incoming-payments`,
-          accessToken: 'accessToken'
-        },
-        openApiValidators.successfulValidator
-      )
-      expect(result).toStrictEqual(incomingPayment)
+    getTests({
+      resource: mockIncomingPayment(),
+      get: getIncomingPayment
     })
 
     test('throws if incoming payment does not pass validation', async (): Promise<void> => {
@@ -123,26 +110,6 @@ describe('incoming-payment', (): void => {
             accessToken: 'accessToken'
           },
           openApiValidators.successfulValidator
-        )
-      ).rejects.toThrowError()
-    })
-
-    test('throws if incoming payment does not pass open api validation', async (): Promise<void> => {
-      const incomingPayment = mockIncomingPayment()
-
-      nock(baseUrl).get('/incoming-payments').reply(200, incomingPayment)
-
-      await expect(() =>
-        getIncomingPayment(
-          {
-            axiosInstance,
-            logger
-          },
-          {
-            url: `${baseUrl}/incoming-payments`,
-            accessToken: 'accessToken'
-          },
-          openApiValidators.failedValidator
         )
       ).rejects.toThrowError()
     })
