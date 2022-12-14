@@ -42,7 +42,6 @@ describe('Auth Middleware', (): void => {
   let mockKeyInfo: KeyInfo
   const token = 'OS9M2PMHKUR64TB8N6BW7OZB8CDFONP219RP1LT0'
   let testKeys: TestKeys
-  let requestPath: string
   let requestAuthorization: string
   let requestBody: Body
   let requestUrl: string
@@ -110,9 +109,8 @@ describe('Auth Middleware', (): void => {
       action: AccessAction.Read
     })
     const { tokenIntrospectionSpec } = await deps.use('openApi')
-    requestPath = '/introspect'
     validateRequest = tokenIntrospectionSpec.createRequestValidator({
-      path: requestPath,
+      path: '/',
       method: HttpMethod.POST
     })
     testKeys = generateTestKeys()
@@ -123,7 +121,7 @@ describe('Auth Middleware', (): void => {
       resource_server: 'test'
     }
     requestAuthorization = `GNAP ${token}`
-    requestUrl = Config.authServerGrantUrl + requestPath //'http://127.0.0.1:3006/introspect'
+    requestUrl = Config.authServerGrantUrl + `/introspect` //'http://127.0.0.1:3006/introspect'
   })
 
   beforeEach(async (): Promise<void> => {
