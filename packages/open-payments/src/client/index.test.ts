@@ -69,4 +69,70 @@ export const getTests = <T>({ resource, get }: GetTestsOptions<T>): void => {
   })
 }
 
+interface PostArgs<T = undefined> {
+  url: string
+  body?: T
+  accessToken: string
+}
+
+interface CreateTestsOptions<T> {
+  resource: T
+  create: (
+    deps: BaseDeps,
+    args: PostArgs,
+    validateOpenApiResponse: ResponseValidator<T>
+  ) => Promise<T>
+}
+
+export const createTests = <T>({
+  resource,
+  create
+}: CreateTestsOptions<T>): void => {
+  describe('common create tests', (): void => {
+    test('returns resource if passes validation', async (): Promise<void> => {
+      const scope = nock(url).post('/').reply(200, resource)
+
+      await expect(
+        create(
+          {
+            axiosInstance,
+            logger
+          },
+          {
+            url,
+            accessToken: 'accessToken',
+            body: {
+              key: 'value'
+            }
+          },
+          openApiValidators.successfulValidator
+        )
+      ).resolves.toEqual(resource)
+      scope.done()
+    })
+
+    test('throws if resource does not pass open api validation', async (): Promise<void> => {
+      const scope = nock(url).post('/').reply(200, resource)
+
+      await expect(() =>
+        create(
+          {
+            axiosInstance,
+            logger
+          },
+          {
+            url,
+            accessToken,
+            body: {
+              key: 'value'
+            }
+          },
+          openApiValidators.failedValidator
+        )
+      ).rejects.toThrowError()
+      scope.done()
+    })
+  })
+}
+
 test.todo('test suite must contain at least one test')

@@ -1,4 +1,4 @@
-import { getTests } from './index.test'
+import { createTests, getTests } from './index.test'
 import {
   completeIncomingPayment,
   createIncomingPayment,
@@ -115,108 +115,55 @@ describe('incoming-payment', (): void => {
     })
   })
 
-  describe('createIncomingPayment', (): void => {
-    test.each`
-      incomingAmount                                      | expiresAt                                      | description  | externalRef
-      ${undefined}                                        | ${undefined}                                   | ${undefined} | ${undefined}
-      ${{ assetCode: 'USD', assetScale: 2, value: '10' }} | ${new Date(Date.now() + 60_000).toISOString()} | ${'Invoice'} | ${'#INV-1'}
-    `(
-      'returns the incoming payment on success',
-      async ({
-        incomingAmount,
-        expiresAt,
-        description,
-        externalRef
-      }): Promise<void> => {
-        const incomingPayment = mockIncomingPayment({
+  describe.each`
+    incomingAmount                                      | expiresAt                                      | description  | externalRef
+    ${undefined}                                        | ${undefined}                                   | ${undefined} | ${undefined}
+    ${{ assetCode: 'USD', assetScale: 2, value: '10' }} | ${new Date(Date.now() + 60_000).toISOString()} | ${'Invoice'} | ${'#INV-1'}
+  `(
+    'createIncomingPayment',
+    ({ incomingAmount, expiresAt, description, externalRef }): void => {
+      createTests({
+        resource: mockIncomingPayment({
           incomingAmount,
           expiresAt,
           description,
           externalRef
+        }),
+        create: createIncomingPayment
+      })
+
+      test('throws if the created incoming payment does not pass validation', async (): Promise<void> => {
+        const amount = {
+          assetCode: 'USD',
+          assetScale: 2,
+          value: '10'
+        }
+
+        const incomingPayment = mockIncomingPayment({
+          incomingAmount: amount,
+          receivedAmount: amount,
+          completed: false
         })
 
         const scope = nock(baseUrl)
           .post('/incoming-payments')
           .reply(200, incomingPayment)
 
-        const result = await createIncomingPayment(
-          {
-            axiosInstance,
-            logger
-          },
-          {
-            url: `${baseUrl}/incoming-payments`,
-            body: {
-              incomingAmount,
-              expiresAt,
-              description,
-              externalRef
+        await expect(() =>
+          createIncomingPayment(
+            { axiosInstance, logger },
+            {
+              url: `${baseUrl}/incoming-payments`,
+              body: {},
+              accessToken: 'accessToken'
             },
-            accessToken: 'accessToken'
-          },
-          openApiValidators.successfulValidator
-        )
-
+            openApiValidators.successfulValidator
+          )
+        ).rejects.toThrowError()
         scope.done()
-        expect(result).toEqual(incomingPayment)
-      }
-    )
-
-    test('throws if the created incoming payment does not pass validation', async (): Promise<void> => {
-      const amount = {
-        assetCode: 'USD',
-        assetScale: 2,
-        value: '10'
-      }
-
-      const incomingPayment = mockIncomingPayment({
-        incomingAmount: amount,
-        receivedAmount: amount,
-        completed: false
       })
-
-      const scope = nock(baseUrl)
-        .post('/incoming-payments')
-        .reply(200, incomingPayment)
-
-      await expect(() =>
-        createIncomingPayment(
-          { axiosInstance, logger },
-          {
-            url: `${baseUrl}/incoming-payments`,
-            body: {},
-            accessToken: 'accessToken'
-          },
-          openApiValidators.successfulValidator
-        )
-      ).rejects.toThrowError()
-      scope.done()
-    })
-
-    test('throws if the created incoming payment does not pass open api validation', async (): Promise<void> => {
-      const incomingPayment = mockIncomingPayment()
-
-      const scope = nock(baseUrl)
-        .post('/incoming-payments')
-        .reply(200, incomingPayment)
-
-      await expect(() =>
-        createIncomingPayment(
-          {
-            axiosInstance,
-            logger
-          },
-          {
-            url: `${baseUrl}/incoming-payments`,
-            body: {},
-            accessToken: 'accessToken'
-          },
-          openApiValidators.failedValidator
-        )
-      ).rejects.toThrowError()
-      scope.done()
-    })
-  })
+    }
+  )
 
   describe('completeIncomingPayment', (): void => {
     test('returns incoming payment if it is successfully completed', async (): Promise<void> => {
