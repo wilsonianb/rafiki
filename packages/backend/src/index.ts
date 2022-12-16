@@ -7,6 +7,7 @@ import { Model } from 'objection'
 import { Ioc, IocContract } from '@adonisjs/fold'
 import Redis from 'ioredis'
 import { createClient } from 'tigerbeetle-node'
+import { createClient as createIntrospectClient } from 'token-introspection'
 
 import { App, AppServices } from './app'
 import { Config } from './config/app'
@@ -132,6 +133,13 @@ export function initIocContainer(
       paymentPointerUrl: config.paymentPointerUrl
     })
   })
+  container.singleton('introspectClient', async (deps) => {
+    const config = await deps.use('config')
+    return await createIntrospectClient({
+      logger: await deps.use('logger'),
+      url: config.authServerIntrospectionUrl
+    })
+  })
 
   /**
    * Add services to the container.
@@ -173,13 +181,11 @@ export function initIocContainer(
       httpTokenService: await deps.use('httpTokenService')
     })
   })
+
   container.singleton('authService', async (deps) => {
-    const config = await deps.use('config')
-    const { tokenIntrospectionSpec } = await deps.use('openApi')
     return await createAuthService({
-      logger: await deps.use('logger'),
-      authServerIntrospectionUrl: config.authServerIntrospectionUrl,
-      tokenIntrospectionSpec
+      client: await deps.use('introspectClient'),
+      logger: await deps.use('logger')
     })
   })
   container.singleton('authServerService', async (deps) => {
