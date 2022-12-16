@@ -1,3 +1,4 @@
+import { createTests, getTests } from './index.test'
 import {
   createOutgoingPayment,
   createOutgoingPaymentRoutes,
@@ -76,23 +77,9 @@ describe('outgoing-payment', (): void => {
   })
 
   describe('getOutgoingPayment', (): void => {
-    test('returns outgoing payment if passes validation', async (): Promise<void> => {
-      const outgoingPayment = mockOutgoingPayment()
-
-      nock(baseUrl).get('/outgoing-payments').reply(200, outgoingPayment)
-
-      const result = await getOutgoingPayment(
-        {
-          axiosInstance,
-          logger
-        },
-        {
-          url: `${baseUrl}/outgoing-payments`,
-          accessToken: 'accessToken'
-        },
-        openApiValidators.successfulValidator
-      )
-      expect(result).toStrictEqual(outgoingPayment)
+    getTests({
+      resource: mockOutgoingPayment(),
+      get: getOutgoingPayment
     })
 
     test('throws if outgoing payment does not pass validation', async (): Promise<void> => {
@@ -122,26 +109,6 @@ describe('outgoing-payment', (): void => {
             accessToken: 'accessToken'
           },
           openApiValidators.successfulValidator
-        )
-      ).rejects.toThrowError()
-    })
-
-    test('throws if outgoing payment does not pass open api validation', async (): Promise<void> => {
-      const outgoingPayment = mockOutgoingPayment()
-
-      nock(baseUrl).get('/outgoing-payments').reply(200, outgoingPayment)
-
-      await expect(() =>
-        getOutgoingPayment(
-          {
-            axiosInstance,
-            logger
-          },
-          {
-            url: `${baseUrl}/outgoing-payments`,
-            accessToken: 'accessToken'
-          },
-          openApiValidators.failedValidator
         )
       ).rejects.toThrowError()
     })
@@ -296,46 +263,21 @@ describe('outgoing-payment', (): void => {
     })
   })
 
-  describe('createOutgoingPayment', (): void => {
+  describe.each`
+    description           | externalRef
+    ${'Some description'} | ${'#INV-1'}
+    ${undefined}          | ${undefined}
+  `('createOutgoingPayment', ({ description, externalRef }): void => {
     const quoteId = `${baseUrl}/quotes/${uuid()}`
 
-    test.each`
-      description           | externalRef
-      ${'Some description'} | ${'#INV-1'}
-      ${undefined}          | ${undefined}
-    `(
-      'creates outgoing payment',
-      async ({ description, externalRef }): Promise<void> => {
-        const outgoingPayment = mockOutgoingPayment({
-          quoteId,
-          description,
-          externalRef
-        })
-
-        const scope = nock(baseUrl)
-          .post('/outgoing-payments')
-          .reply(200, outgoingPayment)
-
-        const result = await createOutgoingPayment(
-          {
-            axiosInstance,
-            logger
-          },
-          {
-            url: `${baseUrl}/outgoing-payments`,
-            accessToken: 'accessToken',
-            body: {
-              quoteId,
-              description,
-              externalRef
-            }
-          },
-          openApiValidators.successfulValidator
-        )
-        expect(result).toEqual(outgoingPayment)
-        scope.done()
-      }
-    )
+    createTests({
+      resource: mockOutgoingPayment({
+        quoteId,
+        description,
+        externalRef
+      }),
+      create: createOutgoingPayment
+    })
 
     test('throws if outgoing payment does not pass validation', async (): Promise<void> => {
       const outgoingPayment = mockOutgoingPayment({

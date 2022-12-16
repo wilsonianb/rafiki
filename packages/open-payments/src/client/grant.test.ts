@@ -121,4 +121,14 @@ describe('grant', (): void => {
       })
     })
   })
+
+  describe('requestGrant', (): void => {
+    // createTests({
+    //   resource: mockOutgoingPayment({
+    //     quoteId,
+    //     description,
+    //     externalRef
+    //   }),
+    //   create: createOutgoingPayment
+  })
 })
