@@ -1,6 +1,13 @@
 import { RequestLike, validateSignature } from 'http-signature-utils'
 import Koa from 'koa'
-import { AccessType, AccessAction } from './grant'
+import {
+  AccessType,
+  AccessAction,
+  GrantAccess,
+  GrantAccessJSON,
+  GrantOptions
+} from './grant'
+import { TokenInfo } from './service'
 import { HttpSigContext, PaymentPointerContext } from '../../app'
 
 function contextToRequestLike(ctx: HttpSigContext): RequestLike {
@@ -36,11 +43,52 @@ export function createTokenIntrospectionMiddleware({
         await next()
         return
       }
-      const authService = await ctx.container.use('authService')
-      const grant = await authService.introspect(token)
-      if (!grant) {
+      const tokenIntrospectionClient = await ctx.container.use(
+        'tokenIntrospectionClient'
+      )
+      const tokenInfo = await tokenIntrospectionClient.introspect(token)
+      if (!tokenInfo) {
         ctx.throw(401, 'Invalid Token')
       }
+      const options: GrantOptions = {
+        active: tokenInfo.active,
+        clientId: tokenInfo.client_id,
+        grant: tokenInfo.grant
+      }
+      if (tokenInfo.access) {
+        options.access = tokenInfo.access.map(
+          (access: GrantAccessJSON): GrantAccess => {
+            const options: GrantAccess = {
+              type: access.type,
+              actions: access.actions,
+              identifier: access.identifier,
+              interval: access.interval
+            }
+            if (access.limits) {
+              options.limits = {
+                receiver: access.limits.receiver
+              }
+              if (access.limits.sendAmount) {
+                options.limits.sendAmount = {
+                  value: BigInt(access.limits.sendAmount.value),
+                  assetCode: access.limits.sendAmount.assetCode,
+                  assetScale: access.limits.sendAmount.assetScale
+                }
+              }
+              if (access.limits.receiveAmount) {
+                options.limits.receiveAmount = {
+                  value: BigInt(access.limits.receiveAmount.value),
+                  assetCode: access.limits.receiveAmount.assetCode,
+                  assetScale: access.limits.receiveAmount.assetScale
+                }
+              }
+            }
+            return options
+          }
+        )
+      }
+      const grant = new TokenInfo(options, tokenInfo.key)
+
       const access = grant.findAccess({
         type,
         action,

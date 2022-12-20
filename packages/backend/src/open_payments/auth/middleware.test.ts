@@ -1,5 +1,6 @@
 import { generateKeyPairSync } from 'crypto'
 import { faker } from '@faker-js/faker'
+import { Client, ActiveTokenInfo } from 'token-introspection'
 import { v4 as uuid } from 'uuid'
 import {
   generateJwk,
@@ -12,7 +13,6 @@ import {
   httpsigMiddleware
 } from './middleware'
 import { AccessType, AccessAction } from './grant'
-import { AuthService } from './service'
 import { Config } from '../../config/app'
 import { IocContract } from '@adonisjs/fold'
 import { initIocContainer } from '../../'
@@ -35,9 +35,9 @@ describe('Auth Middleware', (): void => {
   let deps: IocContract<AppServices>
   let appContainer: TestContainer
   let middleware: AppMiddleware
-  let authService: AuthService
   let ctx: PaymentPointerContext
-  const key = {
+  let tokenIntrospectionClient: Client
+  const key: ActiveTokenInfo['key'] = {
     jwk: generateTestKeys().publicKey,
     proof: 'httpsig'
   }
@@ -49,7 +49,7 @@ describe('Auth Middleware', (): void => {
       type: AccessType.IncomingPayment,
       action: AccessAction.Read
     })
-    authService = await deps.use('authService')
+    tokenIntrospectionClient = await deps.use('tokenIntrospectionClient')
   })
 
   beforeEach(async (): Promise<void> => {
@@ -78,7 +78,7 @@ describe('Auth Middleware', (): void => {
   `(
     'returns 401 for $description access token',
     async ({ authorization }): Promise<void> => {
-      const introspectSpy = jest.spyOn(authService, 'introspect')
+      const introspectSpy = jest.spyOn(tokenIntrospectionClient, 'introspect')
       ctx.request.headers.authorization = authorization
       await expect(middleware(ctx, next)).resolves.toBeUndefined()
       expect(introspectSpy).not.toHaveBeenCalled()
@@ -93,7 +93,7 @@ describe('Auth Middleware', (): void => {
 
   test('returns 401 for unsuccessful token introspection', async (): Promise<void> => {
     const introspectSpy = jest
-      .spyOn(authService, 'introspect')
+      .spyOn(tokenIntrospectionClient, 'introspect')
       .mockResolvedValueOnce(undefined)
     await expect(middleware(ctx, next)).resolves.toBeUndefined()
     expect(introspectSpy).toHaveBeenCalledWith(token)
@@ -106,23 +106,21 @@ describe('Auth Middleware', (): void => {
   })
 
   test('returns 403 for unauthorized request', async (): Promise<void> => {
-    const tokenInfo = new TokenInfo(
-      {
-        active: true,
-        clientId: uuid(),
-        grant: uuid(),
-        access: [
-          {
-            type: AccessType.OutgoingPayment,
-            actions: [AccessAction.Create],
-            identifier: ctx.paymentPointer.url
-          }
-        ]
-      },
+    const tokenInfo: ActiveTokenInfo = {
+      active: true,
+      client_id: uuid(),
+      grant: uuid(),
+      access: [
+        {
+          type: AccessType.OutgoingPayment,
+          actions: [AccessAction.Create],
+          identifier: ctx.paymentPointer.url
+        }
+      ],
       key
-    )
+    }
     const introspectSpy = jest
-      .spyOn(authService, 'introspect')
+      .spyOn(tokenIntrospectionClient, 'introspect')
       .mockResolvedValueOnce(tokenInfo)
     await expect(middleware(ctx, next)).rejects.toMatchObject({
       status: 403,
@@ -139,43 +137,41 @@ describe('Auth Middleware', (): void => {
   `(
     'sets the context grant and calls next (limitAccount: $limitAccount)',
     async ({ limitAccount }): Promise<void> => {
-      const tokenInfo = new TokenInfo(
-        {
-          active: true,
-          clientId: uuid(),
-          grant: uuid(),
-          access: [
-            {
-              type: AccessType.IncomingPayment,
-              actions: [AccessAction.Read],
-              identifier: limitAccount ? ctx.paymentPointer.url : undefined
-            },
-            {
-              type: AccessType.OutgoingPayment,
-              actions: [AccessAction.Create, AccessAction.Read],
-              identifier: ctx.paymentPointer.url,
-              interval: 'R/2022-03-01T13:00:00Z/P1M',
-              limits: {
-                receiveAmount: {
-                  value: BigInt(500),
-                  assetCode: 'EUR',
-                  assetScale: 2
-                },
-                sendAmount: {
-                  value: BigInt(811),
-                  assetCode: 'USD',
-                  assetScale: 2
-                },
-                receiver:
-                  'https://wallet2.example/bob/incoming-payments/aa9da466-12ba-4760-9aa0-8c06061f333b'
-              }
+      const tokenInfo: ActiveTokenInfo = {
+        active: true,
+        client_id: uuid(),
+        grant: uuid(),
+        access: [
+          {
+            type: AccessType.IncomingPayment,
+            actions: [AccessAction.Read],
+            identifier: limitAccount ? ctx.paymentPointer.url : undefined
+          },
+          {
+            type: AccessType.OutgoingPayment,
+            actions: [AccessAction.Create, AccessAction.Read],
+            identifier: ctx.paymentPointer.url,
+            interval: 'R/2022-03-01T13:00:00Z/P1M',
+            limits: {
+              receiveAmount: {
+                value: BigInt(500),
+                assetCode: 'EUR',
+                assetScale: 2
+              },
+              sendAmount: {
+                value: BigInt(811),
+                assetCode: 'USD',
+                assetScale: 2
+              },
+              receiver:
+                'https://wallet2.example/bob/incoming-payments/aa9da466-12ba-4760-9aa0-8c06061f333b'
             }
-          ]
-        },
+          }
+        ],
         key
-      )
+      }
       const introspectSpy = jest
-        .spyOn(authService, 'introspect')
+        .spyOn(tokenIntrospectionClient, 'introspect')
         .mockResolvedValueOnce(tokenInfo)
 
       await expect(middleware(ctx, next)).resolves.toBeUndefined()
@@ -187,8 +183,7 @@ describe('Auth Middleware', (): void => {
 
   test('bypasses token introspection for configured DEV_ACCESS_TOKEN', async (): Promise<void> => {
     ctx.headers.authorization = `GNAP ${Config.devAccessToken}`
-    const authService = await deps.use('authService')
-    const introspectSpy = jest.spyOn(authService, 'introspect')
+    const introspectSpy = jest.spyOn(tokenIntrospectionClient, 'introspect')
     await expect(middleware(ctx, next)).resolves.toBeUndefined()
     expect(introspectSpy).not.toHaveBeenCalled()
     expect(next).toHaveBeenCalled()

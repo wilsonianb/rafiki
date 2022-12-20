@@ -188,6 +188,7 @@ importers:
       testcontainers: ^8.16.0
       tigerbeetle-node: ^0.10.0
       tmp: ^0.2.1
+      token-introspection: workspace:*
       typescript: ^4.2.4
       uuid: ^8.3.2
     dependencies:
@@ -236,6 +237,7 @@ importers:
       pino-pretty: 9.0.1
       raw-body: 2.5.1
       tigerbeetle-node: 0.10.0
+      token-introspection: link:../token-introspection
       uuid: 8.3.2
     devDependencies:
       '@graphql-codegen/cli': 2.16.1_tve7nxsgmnxotl4rj4bzrd7yjy

@@ -29,7 +29,7 @@ import {
   createTokenIntrospectionMiddleware,
   httpsigMiddleware
 } from './open_payments/auth/middleware'
-import { AuthService, TokenInfo } from './open_payments/auth/service'
+import { TokenInfo } from './open_payments/auth/service'
 import { RatesService } from './rates/service'
 import { SPSPRoutes } from './spsp/routes'
 import { IncomingPaymentRoutes } from './open_payments/payment/incoming/routes'
@@ -143,7 +143,6 @@ export interface AppServices {
   assetService: Promise<AssetService>
   accountingService: Promise<AccountingService>
   peerService: Promise<PeerService>
-  authService: Promise<AuthService>
   paymentPointerService: Promise<PaymentPointerService>
   spspRoutes: Promise<SPSPRoutes>
   incomingPaymentRoutes: Promise<IncomingPaymentRoutes>
