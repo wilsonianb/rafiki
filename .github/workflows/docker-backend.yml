@@ -10,7 +10,6 @@ name: Build / Release Backend Docker Image
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
     steps:
       - name: Docker meta
         id: meta
