@@ -75,7 +75,7 @@ importers:
       pg: ^8.6.0
       pino: ^8.8.0
       pino-pretty: ^9.1.1
-      testcontainers: ^8.16.0
+      testcontainers: ^9.1.1
       typescript: ^4.9.4
       uuid: ^9.0.0
     dependencies:
@@ -111,7 +111,7 @@ importers:
       jest-openapi: 0.14.2
       nock: 13.2.9
       openapi-types: 12.0.0
-      testcontainers: 8.16.0
+      testcontainers: 9.1.1
       typescript: 4.9.4
 
   packages/backend:
@@ -179,7 +179,7 @@ importers:
       raw-body: ^2.4.1
       react: ~18.2.0
       rosie: ^2.1.0
-      testcontainers: ^8.16.0
+      testcontainers: ^9.1.1
       tigerbeetle-node: ^0.10.0
       tmp: ^0.2.1
       typescript: ^4.9.4
@@ -251,7 +251,7 @@ importers:
       openapi-types: 12.0.0
       react: 18.2.0
       rosie: 2.1.0
-      testcontainers: 8.16.0
+      testcontainers: 9.1.1
       tmp: 0.2.1
       typescript: 4.9.4
 
@@ -4299,11 +4299,11 @@ packages:
     resolution: {integrity: sha512-qC7prjoEYR2QEe6SmCVfB1x3rfcQtUr1n4x89+3e0wSTMQ/KYCyf+/RAA9n2tllkkNc6//JMUZePdFRiGIWfaQ==}
     dependencies:
       '@types/node': 18.11.9
-      '@types/ssh2': 1.11.5
+      '@types/ssh2': 1.11.6
     dev: true
 
-  /@types/dockerode/3.3.9:
-    resolution: {integrity: sha512-SYRN5FF/qmwpxUT6snJP5D8k0wgoUKOGVs625XvpRJOOUi6s//UYI4F0tbyE3OmzpI70Fo1+aqpzX27zCrInww==}
+  /@types/dockerode/3.3.14:
+    resolution: {integrity: sha512-PUTwtySPzCbjZ/uqRMBWKHtLGqBAlhnLitzHuom19NEX0KBYsQXqbVlig+zbUgYQU1paDeQURXj7QNglh1RI6A==}
     dependencies:
       '@types/docker-modem': 3.0.2
       '@types/node': 18.11.9
@@ -4636,8 +4636,8 @@ packages:
       '@types/ssh2-streams': 0.1.9
     dev: true
 
-  /@types/ssh2/1.11.5:
-    resolution: {integrity: sha512-RaBsPKr+YP/slH8iR7XfC7chyomU+V57F/gJ5cMSP2n6/YWKVmeRLx7lrkgw4YYLpEW5lXLAdfZJqGo0PXboSA==}
+  /@types/ssh2/1.11.6:
+    resolution: {integrity: sha512-8Mf6bhzYYBLEB/G6COux7DS/F5bCWwojv/qFo2yH/e4cLzAavJnxvFXrYW59iKfXdhG6OmzJcXDasgOb/s0rxw==}
     dependencies:
       '@types/node': 18.11.9
     dev: true
@@ -13195,22 +13195,25 @@ packages:
       minimatch: 3.1.2
     dev: true
 
-  /testcontainers/8.16.0:
-    resolution: {integrity: sha512-4wVmnzj4mAVXSQ8kU4uyNiXPs5W8UHdwCRbUuyeOSSODcgmDGQ8Te/YOYuF12HnxyzABEm1nR2I0ZCsQw/GZ/Q==}
+  /testcontainers/9.1.1:
+    resolution: {integrity: sha512-4vTjKQWZxpMA+pNFlpupZ3XCdcbisYwbZIVUYFaNxl9bk8Vi/ELDzZJ3Kr14WdG7Q7333BGaZjKgKtx/ouEuMg==}
+    engines: {node: '>= 10.16'}
     dependencies:
       '@balena/dockerignore': 1.0.2
       '@types/archiver': 5.3.1
-      '@types/dockerode': 3.3.9
+      '@types/dockerode': 3.3.14
       archiver: 5.3.1
       byline: 5.0.0
       debug: 4.3.4
       docker-compose: 0.23.17
       dockerode: 3.3.4
       get-port: 5.1.1
+      node-fetch: 2.6.7
       properties-reader: 2.2.0
       ssh-remote-port-forward: 1.0.4
       tar-fs: 2.1.1
     transitivePeerDependencies:
+      - encoding
       - supports-color
     dev: true
 
