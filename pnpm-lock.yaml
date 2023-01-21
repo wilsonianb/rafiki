@@ -182,7 +182,7 @@ importers:
       react: ~18.2.0
       rosie: ^2.1.0
       testcontainers: ^9.1.1
-      tigerbeetle-node: ^0.10.0
+      tigerbeetle-node: ^0.11.8
       tmp: ^0.2.1
       token-introspection: workspace:*
       typescript: ^4.9.4
@@ -229,7 +229,7 @@ importers:
       pino: 8.8.0
       pino-pretty: 9.1.1
       raw-body: 2.5.1
-      tigerbeetle-node: 0.10.0
+      tigerbeetle-node: 0.11.8
       token-introspection: link:../token-introspection
       uuid: 9.0.0
     devDependencies:
@@ -13247,8 +13247,8 @@ packages:
       readable-stream: 3.6.0
     dev: true
 
-  /tigerbeetle-node/0.10.0:
-    resolution: {integrity: sha512-2R6VrgnAWo1n9jNccmeqo9mojUY6XJQtdUJqVhb+cG30pNVtmCsqdkdteTt1s/LCg7j90F6kaNzZGp0sCUtgsQ==}
+  /tigerbeetle-node/0.11.8:
+    resolution: {integrity: sha512-AxLdLDRrHTsT33joV/VbxqhjtvHZtMqqli7D8FnNzE5zgny9y+Bq3SrDuqZva5vrQLKmDI1ICrrVUvNM3jyfHw==}
     engines: {node: '>=14.0.0'}
     requiresBuild: true
     dev: false

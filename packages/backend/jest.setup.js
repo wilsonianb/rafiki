@@ -79,7 +79,7 @@ module.exports = async (globalConfig) => {
       const { name: tigerbeetleDir } = tmp.dirSync({ unsafeCleanup: true })
 
       const tbContFormat = await new GenericContainer(
-        'ghcr.io/coilhq/tigerbeetle@sha256:c312832a460e7374bcbd4bd4a5ae79b8762f73df6363c9c8106c76d864e21303'
+        'ghcr.io/tigerbeetledb/tigerbeetle@sha256:ea026bec8d80e56109b7dca636d70153ebdf4875d56e4f8783aa1500872527a2'
       )
         .withExposedPorts(TIGERBEETLE_PORT)
         .withBindMounts([
@@ -110,7 +110,7 @@ module.exports = async (globalConfig) => {
       await new Promise((f) => setTimeout(f, 1000))
 
       const tbContStart = await new GenericContainer(
-        'ghcr.io/coilhq/tigerbeetle:dj-request-dirty-prepare@sha256:c312832a460e7374bcbd4bd4a5ae79b8762f73df6363c9c8106c76d864e21303'
+        'ghcr.io/tigerbeetledb/tigerbeetle@sha256:ea026bec8d80e56109b7dca636d70153ebdf4875d56e4f8783aa1500872527a2'
       )
         .withExposedPorts(TIGERBEETLE_PORT)
         .withAddedCapabilities('IPC_LOCK')
