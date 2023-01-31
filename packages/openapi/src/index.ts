@@ -141,7 +141,6 @@ class OpenAPIImpl implements OpenAPI {
       customFormats
     })
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (response: Response): response is ValidatedResponse<T> => {
       const errors = responseValidator.validateResponse(
         response.status.toString(),

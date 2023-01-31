@@ -391,8 +391,6 @@ export class App {
       }
     }
 
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
     router.get(
       PAYMENT_POINTER_PATH + '/jwks.json',
       createPaymentPointerMiddleware(),
@@ -406,8 +404,6 @@ export class App {
 
     // Add the payment pointer query route last.
     // Otherwise it will be matched instead of other Open Payments endpoints.
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
     router.get(
       PAYMENT_POINTER_PATH,
       createPaymentPointerMiddleware(),
