@@ -27,12 +27,16 @@ export async function startTigerbeetleContainer(
     ])
     .withAddedCapabilities('IPC_LOCK')
     .withCommand([
-      'init',
+      'format',
       '--cluster=' + tigerbeetleClusterId,
       '--replica=0',
-      '--directory=' + TIGERBEETLE_DIR
+      TIGERBEETLE_DIR
     ])
-    .withWaitStrategy(Wait.forLogMessage(/initialized data file/))
+    .withWaitStrategy(
+      Wait.forLogMessage(
+        `info(main): 0: formatted: cluster=${tigerbeetleClusterId}`
+      )
+    )
     .start()
 
   const streamTbFormat = await tbContFormat.logs()
@@ -42,9 +46,6 @@ export async function startTigerbeetleContainer(
       .on('err', (line) => console.error(line))
       .on('end', () => console.log('Stream closed for [tb-format]'))
   }
-
-  // Give TB a chance to startup (no message currently to notify allocation is complete):
-  await new Promise((f) => setTimeout(f, 1000))
 
   const tbContStart = await new GenericContainer(
     'ghcr.io/tigerbeetledb/tigerbeetle@sha256:c376d8d6c6b206de630cd703eda1ea4c580e6f7fed52aa5bc84dc935d52f5a41'
@@ -59,12 +60,14 @@ export async function startTigerbeetleContainer(
     .withAddedCapabilities('IPC_LOCK')
     .withCommand([
       'start',
-      '--cluster=' + tigerbeetleClusterId,
-      '--replica=0',
       '--addresses=0.0.0.0:' + TIGERBEETLE_PORT,
-      '--directory=' + TIGERBEETLE_DIR
+      TIGERBEETLE_DIR
     ])
-    .withWaitStrategy(Wait.forLogMessage(/listening on/))
+    .withWaitStrategy(
+      Wait.forLogMessage(
+        `info(main): 0: cluster=${tigerbeetleClusterId}: listening on 0.0.0.0:${TIGERBEETLE_PORT}`
+      )
+    )
     .start()
 
   const streamTbStart = await tbContStart.logs()
