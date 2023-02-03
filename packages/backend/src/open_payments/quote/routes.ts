@@ -95,5 +95,5 @@ function quoteToBody(
   paymentPointer: PaymentPointer,
   quote: Quote
 ): OpenPaymentsQuote {
-  return quote.toOpenPaymentsType(paymentPointer)
+  return quote.toOpenPaymentsType({ paymentPointer })
 }

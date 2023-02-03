@@ -9,7 +9,7 @@ import {
 import { Asset } from '../../asset/model'
 import { Quote as OpenPaymentsQuote } from 'open-payments'
 
-export class Quote extends PaymentPointerSubresource {
+export class Quote extends PaymentPointerSubresource<OpenPaymentsQuote> {
   public static readonly tableName = 'quotes'
   public static readonly urlPath = '/quotes'
 
@@ -157,7 +157,11 @@ export class Quote extends PaymentPointerSubresource {
     }
   }
 
-  public toOpenPaymentsType(paymentPointer: PaymentPointer): OpenPaymentsQuote {
+  public toOpenPaymentsType({
+    paymentPointer
+  }: {
+    paymentPointer: PaymentPointer
+  }): OpenPaymentsQuote {
     return {
       id: this.getUrl(paymentPointer),
       paymentPointer: paymentPointer.url,

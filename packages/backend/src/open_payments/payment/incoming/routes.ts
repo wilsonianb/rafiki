@@ -177,5 +177,8 @@ function incomingPaymentToBody(
   | OpenPaymentsIncomingPayment
   | OpenPaymentsIncomingPaymentWithConnection
   | OpenPaymentsIncomingPaymentWithConnectionUrl {
-  return incomingPayment.toOpenPaymentsType(paymentPointer, ilpStreamConnection)
+  return incomingPayment.toOpenPaymentsType({
+    paymentPointer,
+    ilpStreamConnection
+  })
 }

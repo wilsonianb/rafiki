@@ -131,7 +131,10 @@ async function createLocalIncomingPayment(
     throw new Error(errorMessage)
   }
 
-  return incomingPaymentOrError.toOpenPaymentsType(paymentPointer, connection)
+  return incomingPaymentOrError.toOpenPaymentsType({
+    paymentPointer,
+    connection
+  })
 }
 
 async function getReceiver(
@@ -274,7 +277,7 @@ async function getLocalIncomingPayment({
     return undefined
   }
 
-  return incomingPayment.toOpenPaymentsType(paymentPointer, connection)
+  return incomingPayment.toOpenPaymentsType({ paymentPointer, connection })
 }
 
 async function getIncomingPaymentGrant(

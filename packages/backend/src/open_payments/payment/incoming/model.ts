@@ -57,8 +57,13 @@ export class IncomingPaymentEvent extends WebhookEvent {
   public data!: IncomingPaymentData
 }
 
+type AnyOpenPaymentsIncomingPayment =
+  | OpenPaymentsIncomingPayment
+  | OpenPaymentsIncomingPaymentWithConnection
+  | OpenPaymentsIncomingPaymentWithConnectionUrl
+
 export class IncomingPayment
-  extends PaymentPointerSubresource
+  extends PaymentPointerSubresource<AnyOpenPaymentsIncomingPayment>
   implements ConnectorAccount, LiquidityAccount
 {
   public static get tableName(): string {
@@ -214,28 +219,32 @@ export class IncomingPayment
     }
   }
 
-  public toOpenPaymentsType(
+  public toOpenPaymentsType(args: {
     paymentPointer: PaymentPointer
+  }
   ): OpenPaymentsIncomingPayment
-  public toOpenPaymentsType(
+  public toOpenPaymentsType(args: {
     paymentPointer: PaymentPointer,
     ilpStreamConnection: Connection
-  ): OpenPaymentsIncomingPaymentWithConnection
-  public toOpenPaymentsType(
+  }): OpenPaymentsIncomingPaymentWithConnection
+  public toOpenPaymentsType(args: {
     paymentPointer: PaymentPointer,
     ilpStreamConnection: string
-  ): OpenPaymentsIncomingPaymentWithConnectionUrl
-  public toOpenPaymentsType(
+  }): OpenPaymentsIncomingPaymentWithConnectionUrl
+  public toOpenPaymentsType(args: {
     paymentPointer: PaymentPointer,
     ilpStreamConnection?: Connection | string
-  ):
+  }):
     | OpenPaymentsIncomingPaymentWithConnection
     | OpenPaymentsIncomingPaymentWithConnectionUrl
 
-  public toOpenPaymentsType(
-    paymentPointer: PaymentPointer,
+  public toOpenPaymentsType({
+    paymentPointer,
+    ilpStreamConnection
+  }: {
+    paymentPointer: PaymentPointer
     ilpStreamConnection?: Connection | string
-  ):
+  }):
     | OpenPaymentsIncomingPayment
     | OpenPaymentsIncomingPaymentWithConnection
     | OpenPaymentsIncomingPaymentWithConnectionUrl {

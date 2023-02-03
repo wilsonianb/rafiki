@@ -39,7 +39,7 @@ describe('Incoming Payment Model', (): void => {
         description: 'my payment'
       })
 
-      expect(incomingPayment.toOpenPaymentsType(paymentPointer)).toEqual({
+      expect(incomingPayment.toOpenPaymentsType({ paymentPointer })).toEqual({
         id: `${paymentPointer.url}${IncomingPayment.urlPath}/${incomingPayment.id}`,
         paymentPointer: paymentPointer.url,
         completed: incomingPayment.completed,
@@ -65,7 +65,10 @@ describe('Incoming Payment Model', (): void => {
       const connection = `${config.openPaymentsUrl}/connections/${incomingPayment.connectionId}`
 
       expect(
-        incomingPayment.toOpenPaymentsType(paymentPointer, connection)
+        incomingPayment.toOpenPaymentsType({
+          paymentPointer,
+          connection
+        })
       ).toEqual({
         id: `${paymentPointer.url}${IncomingPayment.urlPath}/${incomingPayment.id}`,
         paymentPointer: paymentPointer.url,
@@ -100,7 +103,10 @@ describe('Incoming Payment Model', (): void => {
       })
 
       expect(
-        incomingPayment.toOpenPaymentsType(paymentPointer, connection)
+        incomingPayment.toOpenPaymentsType({
+          paymentPointer,
+          connection
+        })
       ).toEqual({
         id: `${paymentPointer.url}${IncomingPayment.urlPath}/${incomingPayment.id}`,
         paymentPointer: paymentPointer.url,

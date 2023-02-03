@@ -221,7 +221,7 @@ export interface CreateSubresourceOptions {
 }
 
 export interface PaymentPointerSubresourceService<
-  M extends PaymentPointerSubresource
+  M extends PaymentPointerSubresource<T>
 > {
   get(options: GetOptions): Promise<M | undefined>
   create(options: { paymentPointerId: string }): Promise<M | string>

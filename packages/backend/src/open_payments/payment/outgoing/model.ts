@@ -22,7 +22,7 @@ export class OutgoingPaymentGrant extends DbErrors(Model) {
 }
 
 export class OutgoingPayment
-  extends PaymentPointerSubresource
+  extends PaymentPointerSubresource<OpenPaymentsOutgoingPayment>
   implements ConnectorAccount, LiquidityAccount
 {
   public static readonly tableName = 'outgoingPayments'
@@ -156,9 +156,11 @@ export class OutgoingPayment
     return data
   }
 
-  public toOpenPaymentsType(
+  public toOpenPaymentsType({
+    paymentPointer
+  }: {
     paymentPointer: PaymentPointer
-  ): OpenPaymentsOutgoingPayment {
+  }): OpenPaymentsOutgoingPayment {
     return {
       id: this.getUrl(paymentPointer),
       paymentPointer: paymentPointer.url,

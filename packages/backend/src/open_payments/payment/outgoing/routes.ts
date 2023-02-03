@@ -109,5 +109,5 @@ function outgoingPaymentToBody(
   paymentPointer: PaymentPointer,
   outgoingPayment: OutgoingPayment
 ): OpenPaymentsOutgoingPayment {
-  return outgoingPayment.toOpenPaymentsType(paymentPointer)
+  return outgoingPayment.toOpenPaymentsType({ paymentPointer })
 }

@@ -44,7 +44,10 @@ describe('Receiver Model', (): void => {
       assert(connection instanceof Connection)
 
       const receiver = Receiver.fromIncomingPayment(
-        await incomingPayment.toOpenPaymentsType(paymentPointer, connection)
+        await incomingPayment.toOpenPaymentsType({
+          paymentPointer,
+          connection
+        })
       )
 
       expect(receiver).toEqual({
@@ -76,7 +79,7 @@ describe('Receiver Model', (): void => {
 
       assert(connection instanceof Connection)
       const openPaymentsIncomingPayment =
-        await incomingPayment.toOpenPaymentsType(paymentPointer, connection)
+        await incomingPayment.toOpenPaymentsType({ paymentPointer, connection })
 
       expect(() =>
         Receiver.fromIncomingPayment(openPaymentsIncomingPayment)
@@ -94,7 +97,7 @@ describe('Receiver Model', (): void => {
 
       assert(connection instanceof Connection)
       const openPaymentsIncomingPayment =
-        await incomingPayment.toOpenPaymentsType(paymentPointer, connection)
+        await incomingPayment.toOpenPaymentsType({ paymentPointer, connection })
 
       expect(() =>
         Receiver.fromIncomingPayment(openPaymentsIncomingPayment)
@@ -112,7 +115,7 @@ describe('Receiver Model', (): void => {
       ;(connection.ilpAddress as string) = 'not base 64 encoded'
 
       const openPaymentsIncomingPayment =
-        await incomingPayment.toOpenPaymentsType(paymentPointer, connection)
+        await incomingPayment.toOpenPaymentsType({ paymentPointer, connection })
 
       expect(() =>
         Receiver.fromIncomingPayment(openPaymentsIncomingPayment)

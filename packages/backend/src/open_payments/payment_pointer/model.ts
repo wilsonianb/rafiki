@@ -1,5 +1,6 @@
 import { Model, Page } from 'objection'
 import { PaymentPointer as OpenPaymentsPaymentPointer } from 'open-payments'
+import { OpenPaymentsResource } from '../shared'
 import { LiquidityAccount, OnCreditOptions } from '../../accounting/service'
 import { ConnectorAccount } from '../../connector/core/rafiki'
 import { Asset } from '../../asset/model'
@@ -9,7 +10,10 @@ import { PaymentPointerKey } from '../../open_payments/payment_pointer/key/model
 
 export class PaymentPointer
   extends BaseModel
-  implements ConnectorAccount, LiquidityAccount
+  implements
+    ConnectorAccount,
+    LiquidityAccount,
+    OpenPaymentsResource<OpenPaymentsPaymentPointer>
 {
   public static get tableName(): string {
     return 'paymentPointers'
@@ -162,7 +166,10 @@ class SubresourceQueryBuilder<
   }
 }
 
-export abstract class PaymentPointerSubresource extends BaseModel {
+export abstract class PaymentPointerSubresource<T>
+  extends BaseModel
+  implements OpenPaymentsResource<T>
+{
   public static readonly urlPath: string
 
   public readonly paymentPointerId!: string
@@ -185,6 +192,12 @@ export abstract class PaymentPointerSubresource extends BaseModel {
       }
     }
   }
+
+  public toOpenPaymentsType<T>({
+    paymentPointer
+  }: {
+    paymentPointer: PaymentPointer
+  }): T
 
   QueryBuilderType!: SubresourceQueryBuilder<this>
   static QueryBuilder = SubresourceQueryBuilder
