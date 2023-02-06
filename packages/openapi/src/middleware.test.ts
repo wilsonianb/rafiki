@@ -1,5 +1,6 @@
 import Koa from 'koa'
 import * as httpMocks from 'node-mocks-http'
+import path from 'path'
 import { v4 as uuid } from 'uuid'
 
 import { createOpenAPI, OpenAPI, HttpMethod } from './'
@@ -26,7 +27,13 @@ export function createContext<T extends Koa.Context>(
   reqOpts: httpMocks.RequestOptions,
   params: Record<string, string>
 ): T {
-  const req = httpMocks.createRequest(reqOpts)
+  const req = httpMocks.createRequest({
+    ...reqOpts,
+    headers: {
+      Signature: 'sig1=:EWJgAONk3D6542Scj8g51rYeMHw96cH2XiCMxcyL511wyemGcw==:',
+      ...reqOpts.headers
+    }
+  })
   const res = httpMocks.createResponse({ req })
   const koa = new Koa<unknown, ContextData>()
   const ctx = koa.createContext(req, res)
@@ -35,8 +42,7 @@ export function createContext<T extends Koa.Context>(
 }
 
 const PATH = '/{accountId}/incoming-payments'
-const SPEC =
-  'https://github.com/interledger/open-payments/raw/3930448672cfc678ec2bc02938566a316d83871c/open-api-spec.yaml'
+const SPEC = path.resolve(__dirname, '../test/mocks/openapi.yaml')
 
 describe('OpenAPI Validator', (): void => {
   let openApi: OpenAPI
@@ -187,7 +193,7 @@ describe('OpenAPI Validator', (): void => {
 
     const body = {
       id: `https://${accountId}/incoming-payments/${uuid()}`,
-      accountId: `https://${accountId}`,
+      paymentPointer: `https://${accountId}`,
       receivedAmount: {
         value: '0',
         assetCode: 'USD',
@@ -199,8 +205,8 @@ describe('OpenAPI Validator', (): void => {
     test.each`
       status | body                                                                    | message                                                           | description
       ${202} | ${{}}                                                                   | ${'An unknown status code was used and no default was provided.'} | ${'status code'}
-      ${201} | ${{ ...body, invalid: 'field' }}                                        | ${'response must NOT have additional properties: invalid'}        | ${'body'}
-      ${201} | ${{ ...body, receivedAmount: { ...body.receivedAmount, value: '-1' } }} | ${'response.receivedAmount.value must match format "uint64"'}     | ${'body'}
+      ${201} | ${{ ...body, invalid: 'field' }}                                        | ${'response must NOT have additional properties: invalid'}        | ${'body fields'}
+      ${201} | ${{ ...body, receivedAmount: { ...body.receivedAmount, value: '-1' } }} | ${'response.receivedAmount.value must match format "uint64"'}     | ${'body types'}
     `(
       'returns 500 on invalid response $description',
       async ({ status, body, message }): Promise<void> => {
