@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { InteractiveGrant, NonInteractiveGrant } from 'open-payments'
 import type { Access } from './types'
 
 export const StepNames = {
@@ -9,7 +10,7 @@ export const StepNames = {
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-export type ApiResponse<T = any> = (
+export type ApiResponse<T> = (
   | {
       readonly payload?: T
       readonly isFailure: false
@@ -33,7 +34,7 @@ export class ApiClient {
 
   public static async getGrant(
     params: Record<string, string>
-  ): Promise<ApiResponse> {
+  ): Promise<ApiResponse<InteractiveGrant | NonInteractiveGrant>> {
     // get grant --> GET /grant/:id/:nonce
     const { interactId, nonce } = params
     const response = await axios.get(
