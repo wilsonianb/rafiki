@@ -225,7 +225,9 @@ paths:
       description: List all incoming payments on the payment pointer
       parameters:
         - $ref: '#/components/parameters/account-id'
-        - $ref: '#/components/parameters/pagination'
+        - $ref: '#/components/parameters/count'
+        - $ref: '#/components/parameters/cursor'
+        - $ref: '#/components/parameters/direction'
         - $ref: '#/components/parameters/signature'
       tags:
         - incoming-payment
@@ -409,45 +411,6 @@ components:
               description: Endpoint that returns unique STREAM connection credentials to establish a STREAM connection to the underlying account.
               readOnly: true
       unevaluatedProperties: false
-    pagination:
-      description: Pagination parameters
-      oneOf:
-        - $ref: '#/components/schemas/forward-pagination'
-        - $ref: '#/components/schemas/backward-pagination'
-    forward-pagination:
-      description: Forward pagination parameters
-      type: object
-      examples:
-        - first: 10
-          cursor: 315581f8-9967-45a0-9cd3-87b60b6d6414
-      additionalProperties: false
-      properties:
-        first:
-          type: integer
-          minimum: 1
-          description: The number of items to return.
-        cursor:
-          type: string
-          minLength: 1
-          description: The cursor key to list from.
-    backward-pagination:
-      description: Backward pagination parameters
-      type: object
-      examples:
-        - last: 10
-          cursor: 315581f8-9967-45a0-9cd3-87b60b6d6414
-      properties:
-        last:
-          type: integer
-          minimum: 1
-          description: The number of items to return.
-        cursor:
-          type: string
-          minLength: 1
-          description: The cursor key to list from.
-      required:
-        - cursor
-      additionalProperties: false
     page-info:
       description: ''
       type: object
@@ -504,13 +467,30 @@ components:
       in: path
       required: true
       description: Account identifier
-    pagination:
+    count:
       schema:
-        $ref: '#/components/schemas/pagination'
+        type: integer
+        minimum: 1
+        default: 10
+      name: count
       in: query
-      name: pagination
-      description: Pagination parameters
-      style: form
+      description: The number of items to return.
+    cursor:
+      schema:
+        type: string
+        minLength: 1
+      name: cursor
+      in: query
+      description: The cursor key to list from.
+    direction:
+      schema:
+        enum:
+          - forwards
+          - backwards
+        default: forwards
+      name: direction
+      in: query
+      description: The direction from the cursor to list.
     id:
       name: id
       in: path

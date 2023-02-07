@@ -99,7 +99,7 @@ describe('OpenAPI Validator', (): void => {
       const ctx = createContext(
         {
           headers: { Accept: 'application/json' },
-          url: `${PATH}?first=NaN`
+          url: `${PATH}?count=NaN`
         },
         {
           accountId
@@ -107,7 +107,7 @@ describe('OpenAPI Validator', (): void => {
       )
       await expect(validateListMiddleware(ctx, next)).rejects.toMatchObject({
         status: 400,
-        message: 'first must be integer'
+        message: 'count must be integer'
       })
       expect(next).not.toHaveBeenCalled()
     })
@@ -182,8 +182,8 @@ describe('OpenAPI Validator', (): void => {
       )
       const next = jest.fn().mockImplementation(() => {
         expect(ctx.request.query).toEqual({
-          first: 10,
-          last: 10
+          count: 10,
+          direction: 'forwards'
         })
         ctx.response.body = {}
       })
