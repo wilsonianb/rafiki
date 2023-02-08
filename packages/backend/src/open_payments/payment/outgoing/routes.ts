@@ -48,13 +48,13 @@ async function getOutgoingPayment(
     outgoingPayment = await deps.outgoingPaymentService.get({
       id: ctx.params.id,
       client: ctx.accessAction === AccessAction.Read ? ctx.client : undefined,
-      paymentPointerId: ctx.paymentPointer.id
+      paymentPointerId: ctx.state.paymentPointer.id
     })
   } catch (_) {
     ctx.throw(500, 'Error trying to get outgoing payment')
   }
   if (!outgoingPayment) return ctx.throw(404)
-  ctx.body = outgoingPaymentToBody(ctx.paymentPointer, outgoingPayment)
+  ctx.body = outgoingPaymentToBody(ctx.state.paymentPointer, outgoingPayment)
 }
 
 export type CreateBody = {
@@ -76,7 +76,7 @@ async function createOutgoingPayment(
   }
 
   const paymentOrErr = await deps.outgoingPaymentService.create({
-    paymentPointerId: ctx.paymentPointer.id,
+    paymentPointerId: ctx.state.paymentPointer.id,
     quoteId,
     description: body.description,
     externalRef: body.externalRef,
@@ -88,7 +88,7 @@ async function createOutgoingPayment(
     return ctx.throw(errorToCode[paymentOrErr], errorToMessage[paymentOrErr])
   }
   ctx.status = 201
-  ctx.body = outgoingPaymentToBody(ctx.paymentPointer, paymentOrErr)
+  ctx.body = outgoingPaymentToBody(ctx.state.paymentPointer, paymentOrErr)
 }
 
 async function listOutgoingPayments(
@@ -99,7 +99,8 @@ async function listOutgoingPayments(
     await listSubresource({
       ctx,
       getPaymentPointerPage: deps.outgoingPaymentService.getPaymentPointerPage,
-      toBody: (payment) => outgoingPaymentToBody(ctx.paymentPointer, payment)
+      toBody: (payment) =>
+        outgoingPaymentToBody(ctx.state.paymentPointer, payment)
     })
   } catch (err) {
     if (err instanceof Koa.HttpError) {

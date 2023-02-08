@@ -37,15 +37,15 @@ export async function getKeysByPaymentPointerId(
   deps: ServiceDependencies,
   ctx: PaymentPointerKeysContext
 ): Promise<void> {
-  if (ctx.paymentPointer) {
+  if (ctx.state.paymentPointer) {
     const keys = await deps.paymentPointerKeyService.getKeysByPaymentPointerId(
-      ctx.paymentPointer.id
+      ctx.state.paymentPointer.id
     )
 
     ctx.body = {
       keys: keys.map((key) => key.jwk)
     }
-  } else if (deps.config.paymentPointerUrl === ctx.paymentPointerUrl) {
+  } else if (deps.config.paymentPointerUrl === ctx.state.paymentPointerUrl) {
     ctx.body = {
       keys: [deps.jwk]
     }

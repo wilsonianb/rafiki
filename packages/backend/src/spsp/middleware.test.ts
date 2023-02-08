@@ -71,10 +71,10 @@ describe('SPSP Middleware', (): void => {
       await expect(spspMiddleware(ctx, next)).resolves.toBeUndefined()
       expect(spspSpy).toHaveBeenCalledTimes(1)
       expect(next).not.toHaveBeenCalled()
-      expect(ctx.paymentTag).toEqual(ctx.paymentPointer.id)
+      expect(ctx.paymentTag).toEqual(ctx.state.paymentPointer.id)
       expect(ctx.asset).toEqual({
-        code: ctx.paymentPointer.asset.code,
-        scale: ctx.paymentPointer.asset.scale
+        code: ctx.state.paymentPointer.asset.code,
+        scale: ctx.state.paymentPointer.asset.scale
       })
     })
   })

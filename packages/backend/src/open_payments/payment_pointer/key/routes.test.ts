@@ -59,8 +59,8 @@ describe('Payment Pointer Keys Routes', (): void => {
         headers: { Accept: 'application/json' },
         url: `/jwks.json`
       })
-      ctx.paymentPointer = paymentPointer
-      ctx.paymentPointerUrl = paymentPointer.url
+      ctx.state.paymentPointer = paymentPointer
+      ctx.state.paymentPointerUrl = paymentPointer.url
 
       await expect(
         paymentPointerKeyRoutes.getKeysByPaymentPointerId(ctx)
@@ -78,8 +78,8 @@ describe('Payment Pointer Keys Routes', (): void => {
         headers: { Accept: 'application/json' },
         url: `/jwks.json`
       })
-      ctx.paymentPointer = paymentPointer
-      ctx.paymentPointerUrl = paymentPointer.url
+      ctx.state.paymentPointer = paymentPointer
+      ctx.state.paymentPointerUrl = paymentPointer.url
 
       await expect(
         paymentPointerKeyRoutes.getKeysByPaymentPointerId(ctx)
@@ -100,7 +100,7 @@ describe('Payment Pointer Keys Routes', (): void => {
         headers: { Accept: 'application/json' },
         url: '/jwks.json'
       })
-      ctx.paymentPointerUrl = config.paymentPointerUrl
+      ctx.state.paymentPointerUrl = config.paymentPointerUrl
 
       await expect(
         paymentPointerKeyRoutes.getKeysByPaymentPointerId(ctx)
@@ -115,7 +115,7 @@ describe('Payment Pointer Keys Routes', (): void => {
         headers: { Accept: 'application/json' },
         url: `/jwks.json`
       })
-      ctx.paymentPointer = undefined
+      ctx.state.paymentPointer = undefined
 
       await expect(
         paymentPointerKeyRoutes.getKeysByPaymentPointerId(ctx)

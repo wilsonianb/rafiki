@@ -70,7 +70,7 @@ async function getIncomingPayment(
     incomingPayment = await deps.incomingPaymentService.get({
       id: ctx.params.id,
       client: ctx.accessAction === AccessAction.Read ? ctx.client : undefined,
-      paymentPointerId: ctx.paymentPointer.id
+      paymentPointerId: ctx.state.paymentPointer.id
     })
   } catch (err) {
     ctx.throw(500, 'Error trying to get incoming payment')
@@ -78,7 +78,7 @@ async function getIncomingPayment(
   if (!incomingPayment) return ctx.throw(404)
   const connection = deps.connectionService.get(incomingPayment)
   ctx.body = incomingPaymentToBody(
-    ctx.paymentPointer,
+    ctx.state.paymentPointer,
     incomingPayment,
     connection
   )
@@ -105,7 +105,7 @@ async function createIncomingPayment(
   }
 
   const incomingPaymentOrError = await deps.incomingPaymentService.create({
-    paymentPointerId: ctx.paymentPointer.id,
+    paymentPointerId: ctx.state.paymentPointer.id,
     client: ctx.client,
     description: body.description,
     externalRef: body.externalRef,
@@ -123,7 +123,7 @@ async function createIncomingPayment(
   ctx.status = 201
   const connection = deps.connectionService.get(incomingPaymentOrError)
   ctx.body = incomingPaymentToBody(
-    ctx.paymentPointer,
+    ctx.state.paymentPointer,
     incomingPaymentOrError,
     connection
   )
@@ -148,7 +148,10 @@ async function completeIncomingPayment(
       errorToMessage[incomingPaymentOrError]
     )
   }
-  ctx.body = incomingPaymentToBody(ctx.paymentPointer, incomingPaymentOrError)
+  ctx.body = incomingPaymentToBody(
+    ctx.state.paymentPointer,
+    incomingPaymentOrError
+  )
 }
 
 async function listIncomingPayments(
@@ -161,7 +164,7 @@ async function listIncomingPayments(
       getPaymentPointerPage: deps.incomingPaymentService.getPaymentPointerPage,
       toBody: (payment) =>
         incomingPaymentToBody(
-          ctx.paymentPointer,
+          ctx.state.paymentPointer,
           payment,
           deps.connectionService.getUrl(payment)
         )

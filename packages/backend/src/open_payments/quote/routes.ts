@@ -38,10 +38,10 @@ async function getQuote(
   const quote = await deps.quoteService.get({
     id: ctx.params.id,
     client: ctx.accessAction === AccessAction.Read ? ctx.client : undefined,
-    paymentPointerId: ctx.paymentPointer.id
+    paymentPointerId: ctx.state.paymentPointer.id
   })
   if (!quote) return ctx.throw(404)
-  ctx.body = quoteToBody(ctx.paymentPointer, quote)
+  ctx.body = quoteToBody(ctx.state.paymentPointer, quote)
 }
 
 interface CreateBodyBase {
@@ -66,7 +66,7 @@ async function createQuote(
 ): Promise<void> {
   const { body } = ctx.request
   const options: CreateQuoteOptions = {
-    paymentPointerId: ctx.paymentPointer.id,
+    paymentPointerId: ctx.state.paymentPointer.id,
     receiver: body.receiver,
     client: ctx.client
   }
@@ -81,7 +81,7 @@ async function createQuote(
     }
 
     ctx.status = 201
-    ctx.body = quoteToBody(ctx.paymentPointer, quoteOrErr)
+    ctx.body = quoteToBody(ctx.state.paymentPointer, quoteOrErr)
   } catch (err) {
     if (isQuoteError(err)) {
       return ctx.throw(errorToCode[err], errorToMessage[err])

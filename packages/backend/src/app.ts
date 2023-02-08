@@ -69,8 +69,11 @@ export interface AppContextData {
   container: AppContainer
   // Set by @koa/router.
   params: { [key: string]: string }
-  paymentPointer?: PaymentPointer
-  paymentPointerUrl?: string
+}
+
+export interface AppState {
+  paymentPointer: PaymentPointer
+  paymentPointerUrl: string
 }
 
 export interface ApolloContext {
@@ -293,7 +296,7 @@ export class App {
   public async startOpenPaymentsServer(port: number | string): Promise<void> {
     const koa = await this.createKoaServer()
 
-    const router = new Router<DefaultState, AppContext>()
+    const router = new Router<AppState, AppContext>()
     router.use(bodyParser())
     router.get('/healthz', (ctx: AppContext): void => {
       ctx.status = 200
