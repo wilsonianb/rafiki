@@ -193,7 +193,8 @@ export const createAxiosInstance = (args: {
   const axiosInstance = axios.create({
     headers: {
       common: {
-        Accept: 'application/json'
+        Accept: 'application/json',
+        'Content-Type': 'application/json'
       }
     },
     timeout: args.requestTimeoutMs
