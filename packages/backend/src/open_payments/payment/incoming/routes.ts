@@ -91,6 +91,8 @@ export type CreateBody = {
   externalRef?: string
 }
 
+export type CreateIncomingPaymentContext = CreateContext<CreateBody>
+
 async function createIncomingPayment(
   deps: ServiceDependencies,
   ctx: CreateContext<CreateBody>
