@@ -36,7 +36,7 @@ export const setup = <T extends PaymentPointerContext>(
     },
     options.params
   )
-  ctx.paymentPointer = options.paymentPointer
+  ctx.state.paymentPointer = options.paymentPointer
   ctx.grant = options.grant
   ctx.client = options.client
   ctx.accessAction = options.accessAction

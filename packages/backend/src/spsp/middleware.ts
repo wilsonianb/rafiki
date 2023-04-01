@@ -17,7 +17,7 @@ export const spspMiddleware = async (
 ): Promise<void> => {
   // Fall back to legacy protocols if client doesn't support Open Payments.
   if (ctx.accepts('application/spsp4+json')) {
-    const receiver = ctx.paymentPointer ?? ctx.incomingPayment
+    const receiver = ctx.state.paymentPointer ?? ctx.incomingPayment
     ctx.paymentTag = receiver.id
     ctx.asset = {
       code: receiver.asset.code,

@@ -58,7 +58,7 @@ describe('Payment Pointer Routes', (): void => {
         headers: { Accept: 'application/json' },
         url: '/'
       })
-      ctx.paymentPointer = paymentPointer
+      ctx.state.paymentPointer = paymentPointer
       await expect(paymentPointerRoutes.get(ctx)).resolves.toBeUndefined()
       expect(ctx.response).toSatisfyApiSpec()
       expect(ctx.body).toEqual({

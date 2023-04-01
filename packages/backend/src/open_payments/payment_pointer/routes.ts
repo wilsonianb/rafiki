@@ -28,11 +28,11 @@ export async function getPaymentPointer(
   deps: ServiceDependencies,
   ctx: PaymentPointerContext
 ): Promise<void> {
-  if (!ctx.paymentPointer) {
+  if (!ctx.state.paymentPointer) {
     return ctx.throw(404)
   }
 
-  ctx.body = ctx.paymentPointer.toOpenPaymentsType({
+  ctx.body = ctx.state.paymentPointer.toOpenPaymentsType({
     authServer: deps.authServer
   })
 }
@@ -58,14 +58,14 @@ export const listSubresource = async <M extends PaymentPointerSubresource>({
   const pagination = parsePaginationQueryParameters(ctx.request.query)
   const client = ctx.accessAction === AccessAction.List ? ctx.client : undefined
   const page = await getPaymentPointerPage({
-    paymentPointerId: ctx.paymentPointer.id,
+    paymentPointerId: ctx.state.paymentPointer.id,
     pagination,
     client
   })
   const pageInfo = await getPageInfo(
     (pagination) =>
       getPaymentPointerPage({
-        paymentPointerId: ctx.paymentPointer.id,
+        paymentPointerId: ctx.state.paymentPointer.id,
         pagination,
         client
       }),

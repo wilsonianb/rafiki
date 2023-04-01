@@ -75,7 +75,8 @@ export function createTokenIntrospectionMiddleware({
       const access = tokenInfo.access.find((access: Access) => {
         if (
           access.type !== requestType ||
-          (access.identifier && access.identifier !== ctx.paymentPointer.url)
+          (access.identifier &&
+            access.identifier !== ctx.state.paymentPointer.url)
         ) {
           return false
         }

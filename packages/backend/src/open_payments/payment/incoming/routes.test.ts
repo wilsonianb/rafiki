@@ -261,7 +261,7 @@ describe('Incoming Payment Routes', (): void => {
         },
         paymentPointer
       })
-      ctx.paymentPointer = paymentPointer
+      ctx.state.paymentPointer = paymentPointer
       await expect(incomingPaymentRoutes.complete(ctx)).resolves.toBeUndefined()
       expect(ctx.response).toSatisfyApiSpec()
       expect(ctx.body).toEqual({

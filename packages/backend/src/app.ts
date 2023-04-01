@@ -23,7 +23,10 @@ import { HttpTokenService } from './httpToken/service'
 import { AssetService, AssetOptions } from './asset/service'
 import { AccountingService } from './accounting/service'
 import { PeerService } from './peer/service'
-import { connectionMiddleware } from './open_payments/connection/middleware'
+import {
+  ConnectionContext,
+  connectionMiddleware
+} from './open_payments/connection/middleware'
 import { createPaymentPointerMiddleware } from './open_payments/payment_pointer/middleware'
 import { PaymentPointer } from './open_payments/payment_pointer/model'
 import { PaymentPointerService } from './open_payments/payment_pointer/service'
@@ -36,7 +39,10 @@ import {
 import { RatesService } from './rates/service'
 import { spspMiddleware } from './spsp/middleware'
 import { SPSPRoutes } from './spsp/routes'
-import { IncomingPaymentRoutes } from './open_payments/payment/incoming/routes'
+import {
+  CreateIncomingPaymentContext,
+  IncomingPaymentRoutes
+} from './open_payments/payment/incoming/routes'
 import { PaymentPointerKeyRoutes } from './open_payments/payment_pointer/key/routes'
 import { PaymentPointerRoutes } from './open_payments/payment_pointer/routes'
 import { IncomingPaymentService } from './open_payments/payment/incoming/service'
@@ -69,8 +75,11 @@ export interface AppContextData {
   container: AppContainer
   // Set by @koa/router.
   params: { [key: string]: string }
-  paymentPointer?: PaymentPointer
-  paymentPointerUrl?: string
+}
+
+export interface AppState {
+  paymentPointer: PaymentPointer
+  paymentPointerUrl: string
 }
 
 export interface ApolloContext {
@@ -293,7 +302,7 @@ export class App {
   public async startOpenPaymentsServer(port: number | string): Promise<void> {
     const koa = await this.createKoaServer()
 
-    const router = new Router<DefaultState, AppContext>()
+    const router = new Router<AppState, AppContext>()
     router.use(bodyParser())
     router.get('/healthz', (ctx: AppContext): void => {
       ctx.status = 200
@@ -314,6 +323,50 @@ export class App {
     const quoteRoutes = await this.container.use('quoteRoutes')
     const connectionRoutes = await this.container.use('connectionRoutes')
     const { resourceServerSpec } = await this.container.use('openApi')
+
+    // {
+    //   const connectionRoutes = await this.container.use('connectionRoutes')
+
+    //   router.get(
+    //     '/connections/:id',
+    //     connectionMiddleware,
+    //     spspMiddleware,
+    //     createValidatorMiddleware<ConnectionContext>(
+    //       resourceServerSpec,
+    //       {
+    //         path: '/connections/{id}',
+    //         method: HttpMethod.GET
+    //       }
+    //     ),
+    //     connectionRoutes.get
+    //   )
+    // }
+
+    // {
+    //   const incomingPaymentRoutes = await this.container.use(
+    //     'incomingPaymentRoutes'
+    //   )
+    //   const requestType = AccessType.IncomingPayment
+
+    //   router.post(
+    //     `${PAYMENT_POINTER_PATH}/incoming-payments`,
+    //     createPaymentPointerMiddleware(),
+    //     createValidatorMiddleware<CreateIncomingPaymentContext>(
+    //       resourceServerSpec,
+    //       {
+    //         path: '/incoming-payments',
+    //         method: HttpMethod.POST
+    //       }
+    //     ),
+    //     createTokenIntrospectionMiddleware({
+    //       requestType,
+    //       requestAction: RequestAction.Create
+    //     }),
+    //     httpsigMiddleware,
+    //     incomingPaymentRoutes.create
+    //   )
+    // }
+
     const toRouterPath = (path: string): string =>
       path.replace(/{/g, ':').replace(/}/g, '')
 

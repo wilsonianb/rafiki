@@ -142,7 +142,7 @@ describe('Auth Middleware', (): void => {
 
       beforeEach(async (): Promise<void> => {
         if (identifierOption === IdentifierOption.Matching) {
-          identifier = ctx.paymentPointer.url
+          identifier = ctx.state.paymentPointer.url
         } else if (identifierOption === IdentifierOption.Conflicting) {
           identifier = faker.internet.url()
         }
